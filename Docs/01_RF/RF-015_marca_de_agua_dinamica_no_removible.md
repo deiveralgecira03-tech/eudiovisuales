@@ -44,8 +44,8 @@
         Se repite múltiples veces en diagonal sobre la imagen
 
 
-- En aplicaciones móviles (iOS/Android): deshabilitar capturas de pantalla.
-- En aplicación web: deshabilitar click derecho y atajos de teclado (Ctrl+S, Ctrl+P, PrtScr)
+- En aplicaciones móviles (iOS/Android): deshabilitar capturas de pantalla a nivel de sistema operativo.
+- En la app de escritorio (Windows/macOS, Flutter): deshabilitar clic derecho e interceptar atajos de captura/impresión (Ctrl+S, Ctrl+P, PrtScr) dentro de la app; a diferencia de móvil, el sistema operativo de escritorio no ofrece una API para bloquear capturas de forma garantizada, por lo que esto es un disuasivo y la marca de agua sigue siendo la protección principal (ver RNF-015).
 - Si usuario intenta exportar (solo roles autorizados): aplicar marca de agua.
 
 **Salidas**:

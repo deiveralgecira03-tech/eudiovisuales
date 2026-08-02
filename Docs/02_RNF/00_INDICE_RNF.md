@@ -31,5 +31,5 @@
 - [RNF-029: Escalabilidad de Almacenamiento](RNF-029_escalabilidad_de_almacenamiento.md) — Escalabilidad — Alta
 - [RNF-030: Modularidad del Código](RNF-030_modularidad_del_codigo.md) — Mantenibilidad — Alta
 - [RNF-031: Documentación Técnica Completa](RNF-031_documentacion_tecnica_completa.md) — Mantenibilidad — Media
-- [RNF-032: Compatibilidad con Navegadores Modernos](RNF-032_compatibilidad_con_navegadores_modernos.md) — Compatibilidad — Alta
+- [RNF-032: Compatibilidad de la Página Web de Ingreso con Navegadores Modernos](RNF-032_compatibilidad_con_navegadores_modernos.md) — Compatibilidad — Media
 - [RNF-033: Sincronización entre Dispositivos del Usuario](RNF-033_sincronizacion_entre_dispositivos_del_usuario.md) — Compatibilidad / Funcionalidad — Media

@@ -46,11 +46,11 @@
         Detectar intentos de grabación de pantalla externa: cerrar visor automáticamente
 
 
-- En aplicación web:
+- En la app de escritorio (Windows/macOS, Flutter):
 
-        Deshabilitar click derecho (menú contextual)
-        Deshabilitar atajos de teclado: Ctrl+S, Ctrl+P, PrtScr, Ctrl+C
-        Usar JavaScript para detectar extensiones de captura y bloquearlas
+        Deshabilitar clic derecho (menú contextual) dentro de la app
+        Interceptar atajos de teclado cuando la app tiene foco: Ctrl+S, Ctrl+P, PrtScr, Ctrl+C
+        Nota: el sistema operativo de escritorio no ofrece una API equivalente a FLAG_SECURE (móvil) para bloquear capturas de forma garantizada; estos controles son un disuasivo, y la marca de agua en cada página es la protección principal en esta plataforma
 
 
 - Permitir navegación por páginas del guion (anterior/siguiente, ir a página específica)

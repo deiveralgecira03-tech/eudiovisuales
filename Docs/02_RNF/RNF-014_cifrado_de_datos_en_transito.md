@@ -25,7 +25,7 @@
 
 **Aplica a**:
 - Todas las comunicaciones API (REST)
-- Aplicación web
+- Aplicación Flutter (iOS, Android, Windows, macOS) y página web de ingreso
 - Comunicación con servicios de terceros (S3, Firebase, etc.)
 
 **Estándar/Norma**:

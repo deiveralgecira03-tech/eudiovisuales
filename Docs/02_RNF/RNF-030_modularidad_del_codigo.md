@@ -32,7 +32,7 @@
 **Aplica a**:
 
 - Código backend (Python)
-- Código frontend (React/React Native)
+- Código frontend (Flutter/Dart)
 
 **Estándar/Norma**:
 - ISO/IEC 25010 - Mantenibilidad

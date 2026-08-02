@@ -29,8 +29,8 @@
 
 **Aplica a**:
 
-- Aplicaciones móviles (React Native)
-- Aplicación web (React.js)
+- Aplicación Flutter multiplataforma (iOS, Android, Windows, macOS), con layouts adaptativos según tamaño de pantalla
+- Página web de ingreso (autenticación) — solo necesita adaptarse a desktop, ya que en tablet/celular el enlace abre la app nativa directamente (ver ADR de stack de frontend)
 
 **Estándar/Norma**:
 

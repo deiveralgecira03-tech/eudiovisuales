@@ -24,8 +24,8 @@
 
 
 **Aplica a**:
-Aplicaciones móviles (iOS/Android)
-Aplicación web
+Aplicación Flutter (iOS, Android, Windows, macOS)
+Página web de ingreso
 Todas las pantallas del sistema
 
 **Estándar/Norma**:
