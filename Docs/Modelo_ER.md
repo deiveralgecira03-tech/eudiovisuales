@@ -1,3 +1,3 @@
 # Modelo Entidad Relación. 
 
-![Modelo ER](Img/MER-1.svg)
+![Modelo ER](Img/Modelo_MER.png)
