@@ -12,11 +12,13 @@ from app.routes.client_routes import router as client_router
 from app.routes.project_routes import router as project_router
 from app.routes.role_routes import router as role_router
 from app.routes.department_routes import router as department_router
+from app.routes.script_routes import router as script_router
 from app.routes.contact_routes import router as contact_router
 
 from app.config.database import Base, engine
 from app.models.user_project_model import UserProject
 from app.models.department_model import Department
+from app.models.script_model import Script
 from app.utils.response import api_response
 
 logger = logging.getLogger("raccord")
@@ -55,6 +57,7 @@ app.include_router(client_router)
 app.include_router(project_router)
 app.include_router(role_router)
 app.include_router(department_router)
+app.include_router(script_router)
 
 # Landing / contacto - público
 app.include_router(contact_router)
