@@ -13,12 +13,20 @@ from app.routes.project_routes import router as project_router
 from app.routes.role_routes import router as role_router
 from app.routes.department_routes import router as department_router
 from app.routes.script_routes import router as script_router
+from app.routes.scene_routes import router as scene_router
+from app.routes.breakdown_routes import router as breakdown_router
+from app.routes.shooting_day_routes import router as shooting_day_router
+from app.routes.breakdown_sheet_routes import router as breakdown_sheet_router
 from app.routes.contact_routes import router as contact_router
 
 from app.config.database import Base, engine
 from app.models.user_project_model import UserProject
 from app.models.department_model import Department
 from app.models.script_model import Script
+from app.models.scene_model import Scene
+from app.models.breakdown_model import DesgloseItem, DesgloseItemDetalle
+from app.models.shooting_day_model import ShootingDay
+from app.models.breakdown_sheet_model import BreakdownSheet
 from app.utils.response import api_response
 
 logger = logging.getLogger("raccord")
@@ -58,6 +66,10 @@ app.include_router(project_router)
 app.include_router(role_router)
 app.include_router(department_router)
 app.include_router(script_router)
+app.include_router(scene_router)
+app.include_router(breakdown_router)
+app.include_router(shooting_day_router)
+app.include_router(breakdown_sheet_router)
 
 # Landing / contacto - público
 app.include_router(contact_router)

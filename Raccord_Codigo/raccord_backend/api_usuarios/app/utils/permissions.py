@@ -35,6 +35,24 @@ USUARIO = 1005
 # que, cuando se creen esas rutas, solo haga falta agregar
 # Depends(require_permission("<permiso>")) — sin tener que rediseñar
 # el esquema de permisos.
+#
+# Desglose de producción (módulo "breakdown"), dos niveles:
+#
+# "manage_general_breakdown" -> crear/editar/eliminar el desglose
+# GENERAL (categoría + item + cantidad por escena). Solo Administrador
+# y Director, porque son quienes cargan/aprueban el desglose completo.
+#
+# "view_department_breakdown" -> ver la segmentación ESPECIFICA que
+# hace cada área (ej. de "95 gente de mercado", cuántas mujeres,
+# hombres, niños). Ojo: Administrador y Director NO tienen este
+# permiso a propósito — ese nivel es exclusivo del equipo del
+# departamento dueño del item (Jefe + Onset + Usuario de esa misma
+# área). El filtro por id_departamento se hace además en el
+# controller, este permiso solo controla el rol.
+#
+# "edit_department_breakdown" -> crear/editar/eliminar esa
+# segmentación específica. Solo el Jefe de Departamento (1003); Onset
+# y Usuario del mismo departamento pueden verla pero no modificarla.
 ROLE_PERMISSIONS = {
     ADMINISTRADOR: {
         "full_management": True,     # CRUD total de usuarios, clientes y roles
@@ -49,6 +67,9 @@ ROLE_PERMISSIONS = {
         "upload_photos": True,
         "comment_scenes": True,
         "read_only": False,
+        "manage_general_breakdown": True,
+        "view_department_breakdown": False,
+        "edit_department_breakdown": False,
     },
     DIRECTOR: {
         "full_management": True,
@@ -63,6 +84,9 @@ ROLE_PERMISSIONS = {
         "upload_photos": True,
         "comment_scenes": True,
         "read_only": False,
+        "manage_general_breakdown": True,
+        "view_department_breakdown": False,
+        "edit_department_breakdown": False,
     },
     JEFE_DEPARTAMENTO: {
         "full_management": False,
@@ -77,6 +101,9 @@ ROLE_PERMISSIONS = {
         "upload_photos": True,
         "comment_scenes": False,
         "read_only": False,
+        "manage_general_breakdown": False,
+        "view_department_breakdown": True,
+        "edit_department_breakdown": True,
     },
     ONSET: {
         "full_management": False,
@@ -91,6 +118,9 @@ ROLE_PERMISSIONS = {
         "upload_photos": True,
         "comment_scenes": True,
         "read_only": False,
+        "manage_general_breakdown": False,
+        "view_department_breakdown": True,
+        "edit_department_breakdown": False,
     },
     USUARIO: {
         "full_management": False,
@@ -105,6 +135,9 @@ ROLE_PERMISSIONS = {
         "upload_photos": False,
         "comment_scenes": False,
         "read_only": True,
+        "manage_general_breakdown": False,
+        "view_department_breakdown": True,
+        "edit_department_breakdown": False,
     },
 }
 

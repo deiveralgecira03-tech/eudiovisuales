@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.script_model import Script
+from app.models.scene_model import Scene
 
 from app.schemas.script_schema import ScriptSchema
 
@@ -177,15 +178,23 @@ def update_script(id: int, script, db: Session):
 # DELETE SCRIPT
 # ==========================================
 # En la BD, escenas.id_guion tiene FK ON DELETE CASCADE hacia guiones.
-# El módulo de escenas todavía no existe en este backend, así que por
-# ahora no se puede validar aquí si hay escenas asociadas (cuando se
-# construya ese módulo, replicar el mismo bloqueo que se usa en
-# delete_department para no arrastrar datos en cascada por accidente).
+# Ahora que existe el modelo Scene, se bloquea el borrado si el guion
+# todavía tiene escenas asociadas, igual que se hace en
+# delete_department con los usuarios de un departamento.
 def delete_script(id: int, db: Session):
     script = db.query(Script).filter(Script.id_guion == id).first()
 
     if not script:
         return api_response(False, "Guion no encontrado")
+
+    scenes_in_script = db.query(Scene).filter(Scene.id_guion == id).count()
+
+    if scenes_in_script > 0:
+        return api_response(
+            False,
+            f"No se puede eliminar: hay {scenes_in_script} escena(s) asociadas a este guion",
+            error="SCRIPT_IN_USE"
+        )
 
     db.delete(script)
     db.commit()
