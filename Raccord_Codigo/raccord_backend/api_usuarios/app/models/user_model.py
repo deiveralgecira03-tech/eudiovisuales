@@ -76,12 +76,12 @@ class User(Base):
 
     id_departamento = Column( ## llave foranea
         String(20),
-        nullable=False
+        nullable=True
     )
 
     id_project = Column( ## llave foranea
         String(20),
-        nullable=False
+        nullable=True
     )
 
     id_rol = Column(

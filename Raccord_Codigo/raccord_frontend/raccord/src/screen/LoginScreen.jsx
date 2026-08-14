@@ -102,7 +102,7 @@ export default function LoginScreen() {
         setError(errorData.detail || errorData.message || "Correo o contraseña incorrectos");
       }
     } catch (err) {
-      setError("No se pudo conectar con el servidor");
+      console.error("ERROR REAL:", err); setError("No se pudo conectar con el servidor");
     } finally {
       setLoading(false);
     }
@@ -156,7 +156,7 @@ export default function LoginScreen() {
         setError(errorData.detail || errorData.message || "Error al registrar");
       }
     } catch (err) {
-      setError("No se pudo conectar con el servidor");
+      console.error("ERROR REAL:", err); setError("No se pudo conectar con el servidor");
     } finally {
       setLoading(false);
     }

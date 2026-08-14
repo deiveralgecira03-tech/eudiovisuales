@@ -13,8 +13,19 @@ from app.routes.project_routes import router as project_router
 from app.routes.role_routes import router as role_router
 from app.routes.contact_routes import router as contact_router
 
+#  imports de las rutas de Actores y Personajes 
+from app.routes.actor_routes import router as actor_router
+from app.routes.personaje_routes import router as personaje_router
+
 from app.config.database import Base, engine
 from app.models.user_project_model import UserProject
+
+#  se importan los modelos para que SQLAlchemy los "conozca"
+# y cree sus tablas automáticamente al iniciar (igual que se hace
+# arriba con UserProject).
+from app.models.actor_model import Actor
+from app.models.personaje_model import Personaje
+
 from app.utils.response import api_response
 
 logger = logging.getLogger("raccord")
@@ -52,6 +63,10 @@ app.include_router(user_router)
 app.include_router(client_router)
 app.include_router(project_router)
 app.include_router(role_router)
+
+#  Recursos de Actores y Personajes, también protegidos por JWT
+app.include_router(actor_router)
+app.include_router(personaje_router)
 
 # Landing / contacto - público
 app.include_router(contact_router)
