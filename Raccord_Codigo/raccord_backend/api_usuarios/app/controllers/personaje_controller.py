@@ -4,26 +4,21 @@ from app.schemas.personaje_schema import PersonajeSchema
 from app.utils.response import api_response
 
 
-# GET ALL PERSONAJES
-
 def get_personajes(db: Session):
     personajes = db.query(Personaje).all()
     personajes_list = [
         {
             "id_personaje": p.id_personaje,
-            "nombre_personaje": p.nombre_personaje,
-            "descripcion": p.descripcion,
-            "id_project": p.id_project,
-            "id_actor": p.id_actor
+            "nombre": p.nombre,
+            "edad": p.edad,
+            "codigo_personaje": p.codigo_personaje
         }
         for p in personajes
     ]
     return api_response(True, "Lista de personajes", personajes_list)
 
 
-# GET PERSONAJE BY ID
-
-def get_personaje(id: int, db: Session):
+def get_personaje(id: str, db: Session):
     personaje = db.query(Personaje).filter(Personaje.id_personaje == id).first()
 
     if not personaje:
@@ -31,38 +26,17 @@ def get_personaje(id: int, db: Session):
 
     return api_response(True, "Personaje encontrado", {
         "id_personaje": personaje.id_personaje,
-        "nombre_personaje": personaje.nombre_personaje,
-        "descripcion": personaje.descripcion,
-        "id_project": personaje.id_project,
-        "id_actor": personaje.id_actor
+        "nombre": personaje.nombre,
+        "edad": personaje.edad,
+        "codigo_personaje": personaje.codigo_personaje
     })
 
 
-# GET PERSONAJES BY PROJECT
-
-def get_personajes_by_project(id_project: str, db: Session):
-    personajes = db.query(Personaje).filter(Personaje.id_project == id_project).all()
-    personajes_list = [
-        {
-            "id_personaje": p.id_personaje,
-            "nombre_personaje": p.nombre_personaje,
-            "descripcion": p.descripcion,
-            "id_project": p.id_project,
-            "id_actor": p.id_actor
-        }
-        for p in personajes
-    ]
-    return api_response(True, "Personajes del proyecto", personajes_list)
-
-
-# CREATE PERSONAJE
-
 def create_personaje(personaje: PersonajeSchema, db: Session):
     new_personaje = Personaje(
-        nombre_personaje=personaje.nombre_personaje,
-        descripcion=personaje.descripcion,
-        id_project=personaje.id_project,
-        id_actor=personaje.id_actor
+        nombre=personaje.nombre,
+        edad=personaje.edad,
+        codigo_personaje=personaje.codigo_personaje
     )
 
     db.add(new_personaje)
@@ -71,35 +45,30 @@ def create_personaje(personaje: PersonajeSchema, db: Session):
 
     return api_response(True, "Personaje creado", {
         "id_personaje": new_personaje.id_personaje,
-        "nombre_personaje": new_personaje.nombre_personaje
+        "nombre": new_personaje.nombre
     })
 
 
-# UPDATE PERSONAJE (PUT)
-
-def update_personaje_full(id: int, personaje: PersonajeSchema, db: Session):
+def update_personaje_full(id: str, personaje: PersonajeSchema, db: Session):
     personaje_db = db.query(Personaje).filter(Personaje.id_personaje == id).first()
 
     if not personaje_db:
         return api_response(False, "Personaje no encontrado")
 
-    personaje_db.nombre_personaje = personaje.nombre_personaje
-    personaje_db.descripcion = personaje.descripcion
-    personaje_db.id_project = personaje.id_project
-    personaje_db.id_actor = personaje.id_actor
+    personaje_db.nombre = personaje.nombre
+    personaje_db.edad = personaje.edad
+    personaje_db.codigo_personaje = personaje.codigo_personaje
 
     db.commit()
     db.refresh(personaje_db)
 
     return api_response(True, "Personaje actualizado", {
         "id_personaje": personaje_db.id_personaje,
-        "nombre_personaje": personaje_db.nombre_personaje
+        "nombre": personaje_db.nombre
     })
 
 
-# UPDATE PERSONAJE (PATCH)
-
-def update_personaje(id: int, personaje, db: Session):
+def update_personaje(id: str, personaje, db: Session):
     personaje_db = db.query(Personaje).filter(Personaje.id_personaje == id).first()
 
     if not personaje_db:
@@ -115,13 +84,11 @@ def update_personaje(id: int, personaje, db: Session):
 
     return api_response(True, "Personaje actualizado", {
         "id_personaje": personaje_db.id_personaje,
-        "nombre_personaje": personaje_db.nombre_personaje
+        "nombre": personaje_db.nombre
     })
 
 
-# DELETE PERSONAJE
-
-def delete_personaje(id: int, db: Session):
+def delete_personaje(id: str, db: Session):
     personaje = db.query(Personaje).filter(Personaje.id_personaje == id).first()
 
     if not personaje:

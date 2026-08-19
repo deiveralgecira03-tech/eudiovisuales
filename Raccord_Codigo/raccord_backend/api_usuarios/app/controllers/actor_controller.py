@@ -4,52 +4,53 @@ from app.schemas.actor_schema import ActorSchema
 from app.utils.response import api_response
 
 
-# GET ALL ACTORS
+def _actor_to_dict(a: Actor):
+    return {
+        "id_actor": a.id_actor,
+        "nombre": a.nombre,
+        "apellido": a.apellido,
+        "genero": a.genero,
+        "fecha_de_nacimiento": a.fecha_de_nacimiento,
+        "talla_zapatos": a.talla_zapatos,
+        "ancho_espalda": a.ancho_espalda,
+        "pecho": a.pecho,
+        "cintura": a.cintura,
+        "cadera": a.cadera,
+        "largo_manga": a.largo_manga,
+        "largo_pierna": a.largo_pierna,
+        "talla_anillo": a.talla_anillo,
+        "contorno_cabeza": a.contorno_cabeza,
+        "contorno_cuello": a.contorno_cuello,
+        "color_cabello": a.color_cabello,
+        "textura_cabello": a.textura_cabello,
+        "tipo_piel": a.tipo_piel,
+        "color_ojos": a.color_ojos,
+        "alergias": a.alergias,
+        "habilidades_especiales": a.habilidades_especiales,
+        "restricciones": a.restricciones,
+        "comentarios_adicionales": a.comentarios_adicionales,
+        "nacionalidad": a.nacionalidad,
+        "doble_riesgo": a.doble_riesgo,
+        "id_personaje": a.id_personaje
+    }
+
 
 def get_actors(db: Session):
     actors = db.query(Actor).all()
-    actors_list = [
-        {
-            "id_actor": a.id_actor,
-            "nombre": a.nombre,
-            "apellido": a.apellido,
-            "email": a.email,
-            "telefono": a.telefono,
-            "activo": a.activo
-        }
-        for a in actors
-    ]
-    return api_response(True, "Lista de actores", actors_list)
+    return api_response(True, "Lista de actores", [_actor_to_dict(a) for a in actors])
 
 
-# GET ACTOR BY ID
-
-def get_actor(id: int, db: Session):
+def get_actor(id: str, db: Session):
     actor = db.query(Actor).filter(Actor.id_actor == id).first()
 
     if not actor:
         return api_response(False, "Actor no encontrado")
 
-    return api_response(True, "Actor encontrado", {
-        "id_actor": actor.id_actor,
-        "nombre": actor.nombre,
-        "apellido": actor.apellido,
-        "email": actor.email,
-        "telefono": actor.telefono,
-        "activo": actor.activo
-    })
+    return api_response(True, "Actor encontrado", _actor_to_dict(actor))
 
-
-# CREATE ACTOR
 
 def create_actor(actor: ActorSchema, db: Session):
-    new_actor = Actor(
-        nombre=actor.nombre,
-        apellido=actor.apellido,
-        email=actor.email,
-        telefono=actor.telefono,
-        activo=actor.activo
-    )
+    new_actor = Actor(**actor.model_dump())
 
     db.add(new_actor)
     db.commit()
@@ -62,19 +63,14 @@ def create_actor(actor: ActorSchema, db: Session):
     })
 
 
-# UPDATE ACTOR (PUT)
-
-def update_actor_full(id: int, actor: ActorSchema, db: Session):
+def update_actor_full(id: str, actor: ActorSchema, db: Session):
     actor_db = db.query(Actor).filter(Actor.id_actor == id).first()
 
     if not actor_db:
         return api_response(False, "Actor no encontrado")
 
-    actor_db.nombre = actor.nombre
-    actor_db.apellido = actor.apellido
-    actor_db.email = actor.email
-    actor_db.telefono = actor.telefono
-    actor_db.activo = actor.activo
+    for key, value in actor.model_dump().items():
+        setattr(actor_db, key, value)
 
     db.commit()
     db.refresh(actor_db)
@@ -85,9 +81,7 @@ def update_actor_full(id: int, actor: ActorSchema, db: Session):
     })
 
 
-# UPDATE ACTOR (PATCH)
-
-def update_actor(id: int, actor, db: Session):
+def update_actor(id: str, actor, db: Session):
     actor_db = db.query(Actor).filter(Actor.id_actor == id).first()
 
     if not actor_db:
@@ -107,9 +101,7 @@ def update_actor(id: int, actor, db: Session):
     })
 
 
-# DELETE ACTOR
-
-def delete_actor(id: int, db: Session):
+def delete_actor(id: str, db: Session):
     actor = db.query(Actor).filter(Actor.id_actor == id).first()
 
     if not actor:

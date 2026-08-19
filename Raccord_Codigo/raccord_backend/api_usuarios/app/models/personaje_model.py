@@ -1,33 +1,30 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, FetchedValue
 from app.config.database import Base
 
 class Personaje(Base):
     __tablename__ = "personajes"
 
+    # El id_personaje lo genera un trigger de PostgreSQL (formato "cast1",
+    # "cast2", ...). FetchedValue() le dice a SQLAlchemy que no calcule
+    # este valor en Python, sino que lo pida de vuelta a la base de datos
+    # justo después del INSERT (vía RETURNING).
     id_personaje = Column(
-        Integer,
+        Text,
         primary_key=True,
-        index=True,
-        autoincrement=True
+        server_default=FetchedValue()
     )
 
-    nombre_personaje = Column(
-        String(100),
+    nombre = Column(
+        String(45),
         nullable=False
     )
 
-    descripcion = Column(
-        Text
-    )
-
-    id_project = Column(
-        String(20),
-        ForeignKey("projects.id_project", ondelete="CASCADE"),
-        nullable=False
-    )
-
-    id_actor = Column(
+    edad = Column(
         Integer,
-        ForeignKey("actors.id_actor", ondelete="SET NULL"),
-        nullable=True
+        nullable=False
+    )
+
+    codigo_personaje = Column(
+        String(30),
+        nullable=False
     )

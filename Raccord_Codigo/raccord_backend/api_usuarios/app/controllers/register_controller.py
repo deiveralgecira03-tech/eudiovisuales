@@ -13,6 +13,7 @@ from app.utils.hash import hash_password
 from app.utils.formatters import format_text
 from app.utils.response import api_response
 from app.utils.mail import send_invitation_email
+from app.utils.security import create_access_token
 
 
 # ==========================================
@@ -67,13 +68,23 @@ def register(data, db: Session):
         db.refresh(new_user)
         db.refresh(new_client)
 
+        # ✅ NUEVO: generamos el token igual que hace login, para que el
+        # usuario quede autenticado automáticamente tras registrarse.
+        token = create_access_token({
+            "id_user": new_user.id_user,
+            "mail": new_user.mail,
+            "id_rol": new_user.id_rol
+        })
+
         return api_response(True, "Registro exitoso", {
             "id_user": new_user.id_user,
             "nombre": new_user.nombre,
             "apellido": new_user.apellido,
             "mail": new_user.mail,
             "id_cliente": new_client.id_cliente,
-            "razon_social": new_client.razon_social
+            "razon_social": new_client.razon_social,
+            "access_token": token,
+            "token_type": "Bearer"
         })
 
     except Exception as e:

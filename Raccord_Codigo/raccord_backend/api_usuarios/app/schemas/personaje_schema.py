@@ -2,13 +2,11 @@ from pydantic import BaseModel
 from typing import Optional
 
 class PersonajeSchema(BaseModel):
-    nombre_personaje: str
-    descripcion: Optional[str] = None
-    id_project: str
-    id_actor: Optional[int] = None
+    nombre: str
+    edad: int
+    codigo_personaje: str
 
 class PersonajeUpdateSchema(BaseModel):
-    nombre_personaje: Optional[str] = None
-    descripcion: Optional[str] = None
-    id_project: Optional[str] = None
-    id_actor: Optional[int] = None
+    nombre: Optional[str] = None
+    edad: Optional[int] = None
+    codigo_personaje: Optional[str] = None
