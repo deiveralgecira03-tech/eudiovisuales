@@ -1,0 +1,48 @@
+import '../core/api_client.dart';
+import '../core/json_utils.dart';
+import '../models/character.dart';
+
+class CharacterService {
+  final ApiClient api;
+  CharacterService(this.api);
+
+  Future<List<CharacterModel>> all() async {
+    final data = await api.get('/characters');
+    return asListOfMap(data).map(CharacterModel.fromJson).toList();
+  }
+
+  Future<CharacterModel> create(CharacterModel character) async {
+    final data = await api.post('/characters', body: character.toCreateJson());
+    if (data is Map) return CharacterModel.fromJson(Map<String, dynamic>.from(data));
+    return character;
+  }
+
+  Future<void> delete(String id) async {
+    await api.delete('/characters/$id');
+  }
+}
+
+class ActorService {
+  final ApiClient api;
+  ActorService(this.api);
+
+  Future<List<ActorModel>> all() async {
+    final data = await api.get('/actors');
+    return asListOfMap(data).map(ActorModel.fromJson).toList();
+  }
+
+  Future<List<ActorModel>> byCharacter(String idPersonaje) async {
+    final data = await api.get('/actors/character/$idPersonaje');
+    return asListOfMap(data).map(ActorModel.fromJson).toList();
+  }
+
+  Future<ActorModel> create(ActorModel actor) async {
+    final data = await api.post('/actors', body: actor.toCreateJson());
+    if (data is Map) return ActorModel.fromJson(Map<String, dynamic>.from(data));
+    return actor;
+  }
+
+  Future<void> delete(String id) async {
+    await api.delete('/actors/$id');
+  }
+}
