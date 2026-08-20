@@ -17,6 +17,9 @@ from app.routes.scene_routes import router as scene_router
 from app.routes.breakdown_routes import router as breakdown_router
 from app.routes.shooting_day_routes import router as shooting_day_router
 from app.routes.breakdown_sheet_routes import router as breakdown_sheet_router
+from app.routes.character_routes import router as character_router
+from app.routes.actor_routes import router as actor_router
+from app.routes.scene_character_routes import router as scene_character_router
 from app.routes.contact_routes import router as contact_router
 
 from app.config.database import Base, engine
@@ -27,6 +30,9 @@ from app.models.scene_model import Scene
 from app.models.breakdown_model import DesgloseItem, DesgloseItemDetalle
 from app.models.shooting_day_model import ShootingDay
 from app.models.breakdown_sheet_model import BreakdownSheet
+from app.models.character_model import Character
+from app.models.actor_model import Actor
+from app.models.scene_character_model import SceneCharacter
 from app.utils.response import api_response
 
 logger = logging.getLogger("raccord")
@@ -42,11 +48,23 @@ app = FastAPI(
 )
 
 
-# CORS -  esto habilita a que react pueda hacer peticiones a traves de las apis dispuesta en el backend
-
+# CORS - esto habilita a que react (o el nuevo frontend Flutter Web) puedan
+# hacer peticiones a traves de las apis dispuesta en el backend.
+#
+# `flutter run -d chrome` (y `-d edge`) levanta el servidor de desarrollo
+# en un puerto ALEATORIO cada vez (ej. http://localhost:49334), distinto de
+# los puertos fijos 3000/5173 que usa React. Sin este origen en la lista, el
+# navegador bloquea la petición por CORS *antes* de que llegue al backend, y
+# el frontend lo interpreta como "no se pudo conectar con el servidor"
+# aunque el backend esté funcionando bien (por eso funciona en Thunder
+# Client/Postman, que no aplican CORS, pero falla solo en el navegador).
+#
+# `allow_origin_regex` cubre cualquier puerto de localhost/127.0.0.1 para
+# desarrollo, sin tener que fijar `--web-port` cada vez que se corre Flutter.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,6 +88,9 @@ app.include_router(scene_router)
 app.include_router(breakdown_router)
 app.include_router(shooting_day_router)
 app.include_router(breakdown_sheet_router)
+app.include_router(character_router)
+app.include_router(actor_router)
+app.include_router(scene_character_router)
 
 # Landing / contacto - público
 app.include_router(contact_router)
