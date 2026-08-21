@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/session.dart';
+import 'core/theme_controller.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/login_register_screen.dart';
 import 'screens/auth/two_factor_screen.dart';
 import 'screens/breakdown/breakdown_screen.dart';
 import 'screens/characters/actor_form_screen.dart';
+import 'screens/characters/actors_screen.dart';
 import 'screens/characters/characters_screen.dart';
 import 'screens/characters/crew_list_screen.dart';
 import 'screens/dashboard/project_dashboard_screen.dart';
 import 'screens/gallery/gallery_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/projects/project_form_screen.dart';
 import 'screens/projects/project_selection_screen.dart';
 import 'screens/roles/roles_screen.dart';
 import 'screens/scenes/scenes_screen.dart';
@@ -21,9 +24,37 @@ import 'theme/app_theme.dart';
 import 'widgets/app_logo.dart';
 
 void main() {
+  // Por defecto, cuando un widget lanza una excepción durante su
+  // construcción, Flutter muestra una caja gris SIN texto (el
+  // ErrorWidget por defecto no imprime el mensaje salvo en modo
+  // debug con overlay rojo, y en release queda completamente en
+  // blanco/gris — indistinguible del fondo). Esto es exactamente lo
+  // que pasaba con el visor de PDF: si Syncfusion fallaba al
+  // construirse, no se veía nada. Con este override, cualquier error
+  // de construcción se ve como texto legible en pantalla, en
+  // cualquier modo (debug o release), para poder diagnosticarlo.
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Container(
+      color: const Color(0xFF2A2A38),
+      padding: const EdgeInsets.all(16),
+      alignment: Alignment.center,
+      child: Text(
+        'Ocurrió un error al mostrar este contenido:\n${details.exceptionAsString()}',
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+        textAlign: TextAlign.center,
+      ),
+    );
+  };
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AuthSession()..bootstrap(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthSession()..bootstrap()),
+        // Controla modo oscuro/claro desde el menú hamburguesa. Vive solo
+        // en memoria a propósito: cada vez que se abre la app arranca en
+        // oscuro, sin importar lo que se haya elegido en la sesión anterior.
+        ChangeNotifierProvider(create: (_) => ThemeController()),
+      ],
       child: const RaccordApp(),
     ),
   );
@@ -34,12 +65,13 @@ class RaccordApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeController = context.watch<ThemeController>();
     return MaterialApp(
       title: 'Raccord',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
+      theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.dark,
+      themeMode: themeController.mode,
       home: const _SplashGate(),
       onGenerateRoute: _onGenerateRoute,
     );
@@ -55,13 +87,19 @@ Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
       break;
     case '/2fa':
       final args = settings.arguments as Map<String, dynamic>? ?? {};
-      page = TwoFactorScreen(mail: args['mail'] as String? ?? '');
+      page = TwoFactorScreen(
+        mail: args['mail'] as String? ?? '',
+        contrasena: args['contrasena'] as String? ?? '',
+      );
       break;
     case '/olvide-password':
       page = const ForgotPasswordScreen();
       break;
     case '/proyectos':
       page = const ProjectSelectionScreen();
+      break;
+    case '/registrar-proyecto':
+      page = const RegisterProjectScreen();
       break;
     case '/dashboard':
       page = const ProjectDashboardScreen();
@@ -77,6 +115,9 @@ Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
       break;
     case '/personajes':
       page = const CharactersScreen();
+      break;
+    case '/actores':
+      page = const ActorsScreen();
       break;
     case '/actor-form':
       page = ActorFormScreen(idPersonaje: settings.arguments as String?);

@@ -17,11 +17,34 @@ class ScriptService {
     return script;
   }
 
-  Future<void> updateEstado(int idGuion, String estado) async {
-    await api.patch('/scripts/$idGuion', body: {'estado': estado});
+  /// Actualización parcial (PATCH /scripts/{id}): recibe solo los campos
+  /// que cambiaron (nombre, estado, numero_de_version, archivo,
+  /// descripcion — ver ScriptUpdateSchema en el backend, todos
+  /// opcionales).
+  Future<void> update(int idGuion, Map<String, dynamic> fields) async {
+    await api.patch('/scripts/$idGuion', body: fields);
   }
 
   Future<void> delete(int idGuion) async {
     await api.delete('/scripts/$idGuion');
+  }
+
+  /// Sube (o reemplaza) el PDF real del guion. Solo Admin/Director
+  /// (permiso `upload_scripts`, el backend lo vuelve a validar del lado
+  /// del servidor).
+  Future<void> uploadArchivo(int idGuion, {required List<int> bytes, required String filename}) async {
+    await api.postFile(
+      '/scripts/$idGuion/archivo',
+      fieldName: 'file',
+      bytes: bytes,
+      filename: filename,
+      contentType: 'application/pdf',
+    );
+  }
+
+  /// Descarga los bytes del PDF ya cargado, para mostrarlos en el
+  /// visor embebido (SfPdfViewer.memory).
+  Future<List<int>> archivoBytes(int idGuion) {
+    return api.getBytes('/scripts/$idGuion/archivo');
   }
 }

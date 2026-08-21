@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Date
+from sqlalchemy import Column, Integer, String, Text, Date, LargeBinary
 from app.config.database import Base
 
 # ==========================================
@@ -36,9 +36,12 @@ class Script(Base):
         nullable=False
     )
 
+    # Legacy: campo de texto libre (nombre/URL) de cuando no había carga
+    # real de archivo. Se deja nullable por compatibilidad con lo que ya
+    # exista; el PDF real ahora vive en archivo_contenido.
     archivo = Column(
         Text,
-        nullable=False
+        nullable=True
     )
 
     nombre = Column(
@@ -49,6 +52,17 @@ class Script(Base):
     descripcion = Column(
         Text
     )
+
+    # ==========================================
+    # PDF real del guión, guardado en la base de datos (BYTEA en
+    # Postgres). Se sube con POST /scripts/{id}/archivo y se sirve con
+    # GET /scripts/{id}/archivo — nunca viaja dentro del JSON normal de
+    # /scripts para no inflar esas respuestas.
+    # ==========================================
+    archivo_nombre = Column(String(255), nullable=True)
+    archivo_contenido = Column(LargeBinary, nullable=True)
+    archivo_tipo = Column(String(100), nullable=True)
+    archivo_tamano = Column(Integer, nullable=True)
 
     id_project = Column(  # llave foránea -> projects.id_project
         String(20),

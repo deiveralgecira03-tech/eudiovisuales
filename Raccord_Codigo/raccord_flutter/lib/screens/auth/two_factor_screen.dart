@@ -10,7 +10,11 @@ import '../../widgets/app_logo.dart';
 /// Mockup 2: Verificación de Doble Factor.
 class TwoFactorScreen extends StatefulWidget {
   final String mail;
-  const TwoFactorScreen({super.key, required this.mail});
+  // Necesaria para que el backend revalide la contraseña en
+  // /2fa/verify (y /2fa/send al reenviar) — el código de correo ya no
+  // es la única verificación real de la identidad.
+  final String contrasena;
+  const TwoFactorScreen({super.key, required this.mail, required this.contrasena});
 
   @override
   State<TwoFactorScreen> createState() => _TwoFactorScreenState();
@@ -96,7 +100,12 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
     final auth = AuthService(session.api);
 
     try {
-      final result = await auth.verify2faCode(widget.mail, _codeCtrl.text.trim(), session.deviceId ?? '');
+      final result = await auth.verify2faCode(
+        widget.mail,
+        _codeCtrl.text.trim(),
+        session.deviceId ?? '',
+        widget.contrasena,
+      );
       await session.setSession(result.token, result.user);
       if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil('/proyectos', (r) => false);
@@ -113,7 +122,7 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
     final auth = AuthService(session.api);
 
     try {
-      await auth.send2faCode(widget.mail, session.deviceId ?? '');
+      await auth.send2faCode(widget.mail, session.deviceId ?? '', widget.contrasena);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Código reenviado')));
     } on ApiException catch (e) {

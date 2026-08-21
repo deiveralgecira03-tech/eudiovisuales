@@ -24,7 +24,8 @@ def _serialize(s: Scene):
         "fecha_de_grabacion": str(s.fecha_de_grabacion) if s.fecha_de_grabacion else None,
         "dia_dramatico": s.dia_dramatico,
         "id_rodaje": s.id_rodaje,
-        "id_desglose": s.id_desglose
+        "id_desglose": s.id_desglose,
+        "estado": s.estado
     }
 
 
@@ -88,7 +89,8 @@ def create_scene(scene: SceneSchema, db: Session):
         fecha_de_grabacion=scene.fecha_de_grabacion,
         dia_dramatico=scene.dia_dramatico,
         id_rodaje=scene.id_rodaje,
-        id_desglose=scene.id_desglose
+        id_desglose=scene.id_desglose,
+        estado=scene.estado or "Pendiente"
     )
 
     db.add(new_scene)
@@ -119,6 +121,7 @@ def update_scene_full(id: str, scene: SceneSchema, db: Session):
     scene_db.dia_dramatico = scene.dia_dramatico
     scene_db.id_rodaje = scene.id_rodaje
     scene_db.id_desglose = scene.id_desglose
+    scene_db.estado = scene.estado or scene_db.estado
 
     db.commit()
     db.refresh(scene_db)

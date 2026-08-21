@@ -182,15 +182,17 @@ class _LoginFormState extends State<_LoginForm> {
     final auth = AuthService(session.api);
     final mail = _mailCtrl.text.trim();
 
+    final contrasena = _passCtrl.text;
+
     try {
-      final requires2fa = await auth.check2faRequired(mail, session.deviceId ?? '');
+      final requires2fa = await auth.check2faRequired(mail, session.deviceId ?? '', contrasena);
 
       if (requires2fa) {
-        await auth.send2faCode(mail, session.deviceId ?? '');
+        await auth.send2faCode(mail, session.deviceId ?? '', contrasena);
         if (!mounted) return;
         Navigator.of(context).pushNamed('/2fa', arguments: {
           'mail': mail,
-          'contrasena': _passCtrl.text,
+          'contrasena': contrasena,
         });
         return;
       }
@@ -447,6 +449,9 @@ class _RegisterFormState extends State<_RegisterForm> {
     final session = context.read<AuthSession>();
     final auth = AuthService(session.api);
 
+    final mail = _mail.text.trim();
+    final contrasena = _pass.text;
+
     try {
       await auth.register(
         razonSocial: _razonSocial.text.trim(),
@@ -459,22 +464,33 @@ class _RegisterFormState extends State<_RegisterForm> {
         idDocument: _idDocumentNumero.text.trim(),
         nombre: _nombres.text.trim(),
         apellido: _apellidos.text.trim(),
-        mail: _mail.text.trim(),
+        mail: mail,
         msisdn: _msisdn.text.trim(),
-        contrasena: _pass.text,
+        contrasena: contrasena,
       );
 
+      // El backend no devuelve token en /register, así que iniciamos
+      // sesión automáticamente con las mismas credenciales para poder
+      // llevar a la persona directo a "Registra Proyecto" (paso
+      // obligatorio) sin pedirle que vuelva a escribir su usuario y
+      // contraseña.
+      final result = await auth.login(mail, contrasena);
+      if (!mounted) return;
+      await session.setSession(result.token, result.user);
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/registrar-proyecto', (r) => false);
+    } on ApiException catch (e) {
+      _showError(e.message);
+    } catch (_) {
+      // Si el registro fue exitoso pero el auto-login falla por algún
+      // motivo, no perdemos la cuenta creada: devolvemos a la persona al
+      // tab de Ingresar para que inicie sesión manualmente.
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cuenta creada. Ahora puedes iniciar sesión.')),
       );
-
       final tabs = context.findAncestorStateOfType<_LoginRegisterScreenState>();
       tabs?.setState(() => tabs._tab.index = 0);
-    } on ApiException catch (e) {
-      _showError(e.message);
-    } catch (_) {
-      _showError('No fue posible conectar con el servidor.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

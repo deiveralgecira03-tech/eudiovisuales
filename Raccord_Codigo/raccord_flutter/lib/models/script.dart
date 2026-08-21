@@ -11,6 +11,11 @@ class Script {
   final String nombre;
   final String? descripcion;
   final String? idProject;
+  // PDF real (guardado en la BD, ver POST/GET /scripts/{id}/archivo).
+  // archivoNombre != null quiere decir que este guion ya tiene un PDF
+  // cargado.
+  final String? archivoNombre;
+  final int? archivoTamano;
 
   Script({
     this.idGuion,
@@ -21,7 +26,11 @@ class Script {
     required this.nombre,
     this.descripcion,
     this.idProject,
+    this.archivoNombre,
+    this.archivoTamano,
   });
+
+  bool get tienePdf => archivoNombre != null && archivoNombre!.isNotEmpty;
 
   factory Script.fromJson(Map<String, dynamic> json) {
     final fecha = asString(pick(json, ['fecha_de_emision']));
@@ -34,6 +43,8 @@ class Script {
       nombre: asString(pick(json, ['nombre'])) ?? '',
       descripcion: asString(pick(json, ['descripcion'])),
       idProject: asString(pick(json, ['id_project'])),
+      archivoNombre: asString(pick(json, ['archivo_nombre'])),
+      archivoTamano: asInt(pick(json, ['archivo_tamano'])),
     );
   }
 

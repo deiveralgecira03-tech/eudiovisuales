@@ -101,15 +101,9 @@ class _CharactersScreenState extends State<CharactersScreen> {
   }
 
   Future<void> _openForm(BuildContext context) async {
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: const _CharacterFormSheet(),
-      ),
+    final created = await showCenteredFormSheet<bool>(
+      context,
+      const _CharacterFormSheet(),
     );
     if (created == true) _reload();
   }

@@ -1,3 +1,5 @@
+from fastapi import HTTPException, UploadFile
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.models.script_model import Script
@@ -6,6 +8,12 @@ from app.models.scene_model import Scene
 from app.schemas.script_schema import ScriptSchema
 
 from app.utils.response import api_response
+
+# Solo PDF, y con un tope de tamaño razonable para guardarlo como BYTEA
+# en la base de datos (evita que alguien suba un archivo gigante sin
+# querer).
+ALLOWED_CONTENT_TYPES = {"application/pdf"}
+MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024  # 25 MB
 
 
 # ==========================================
@@ -21,6 +29,8 @@ def get_scripts(db: Session):
             "fecha_de_emision": str(s.fecha_de_emision),
             "estado": s.estado,
             "archivo": s.archivo,
+            "archivo_nombre": s.archivo_nombre,
+            "archivo_tamano": s.archivo_tamano,
             "nombre": s.nombre,
             "descripcion": s.descripcion,
             "id_project": s.id_project
@@ -46,6 +56,8 @@ def get_script(id: int, db: Session):
         "fecha_de_emision": str(script.fecha_de_emision),
         "estado": script.estado,
         "archivo": script.archivo,
+        "archivo_nombre": script.archivo_nombre,
+        "archivo_tamano": script.archivo_tamano,
         "nombre": script.nombre,
         "descripcion": script.descripcion,
         "id_project": script.id_project
@@ -65,6 +77,8 @@ def get_scripts_by_project(id_project: str, db: Session):
             "fecha_de_emision": str(s.fecha_de_emision),
             "estado": s.estado,
             "archivo": s.archivo,
+            "archivo_nombre": s.archivo_nombre,
+            "archivo_tamano": s.archivo_tamano,
             "nombre": s.nombre,
             "descripcion": s.descripcion,
             "id_project": s.id_project
@@ -200,3 +214,70 @@ def delete_script(id: int, db: Session):
     db.commit()
 
     return api_response(True, "Guion eliminado")
+
+
+# ==========================================
+# UPLOAD SCRIPT PDF
+# ==========================================
+# El PDF se guarda directo en la base de datos (columna BYTEA
+# archivo_contenido) — no se escribe a disco ni a un bucket externo.
+# Reemplaza el archivo anterior si ya había uno (siempre queda solo la
+# última versión subida para este registro de guion).
+async def upload_script_archivo(id: int, file: UploadFile, db: Session):
+    script = db.query(Script).filter(Script.id_guion == id).first()
+
+    if not script:
+        return api_response(False, "Guion no encontrado", error="SCRIPT_NOT_FOUND")
+
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        return api_response(False, "Solo se permiten archivos PDF", error="INVALID_FILE_TYPE")
+
+    contenido = await file.read()
+
+    if not contenido:
+        return api_response(False, "El archivo está vacío", error="EMPTY_FILE")
+
+    if len(contenido) > MAX_FILE_SIZE_BYTES:
+        return api_response(
+            False,
+            f"El archivo supera el tamaño máximo permitido ({MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB)",
+            error="FILE_TOO_LARGE"
+        )
+
+    script.archivo_nombre = file.filename
+    script.archivo_contenido = contenido
+    script.archivo_tipo = file.content_type
+    script.archivo_tamano = len(contenido)
+
+    db.commit()
+    db.refresh(script)
+
+    return api_response(True, "Archivo cargado correctamente", {
+        "id_guion": script.id_guion,
+        "archivo_nombre": script.archivo_nombre,
+        "archivo_tamano": script.archivo_tamano
+    })
+
+
+# ==========================================
+# GET SCRIPT PDF (visualizar / descargar)
+# ==========================================
+# Devuelve el binario directo (no el envelope api_response habitual,
+# porque esto no es JSON) para que el navegador o el visor de PDF del
+# frontend lo puedan renderizar tal cual.
+def get_script_archivo(id: int, db: Session):
+    script = db.query(Script).filter(Script.id_guion == id).first()
+
+    if not script:
+        raise HTTPException(status_code=404, detail="Guion no encontrado")
+
+    if not script.archivo_contenido:
+        raise HTTPException(status_code=404, detail="Este guion todavía no tiene un archivo PDF cargado")
+
+    nombre = script.archivo_nombre or f"guion_{id}.pdf"
+
+    return Response(
+        content=script.archivo_contenido,
+        media_type=script.archivo_tipo or "application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{nombre}"'}
+    )

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/permissions.dart';
 import '../../core/session.dart';
 import '../../models/project.dart';
 import '../../services/project_service.dart';
@@ -28,6 +29,16 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
   void initState() {
     super.initState();
     _future = _load();
+    // Solo Administrador (1001) puede crear proyectos nuevos (ver
+    // core/permissions.dart, espejo de app/utils/permissions.py). Para
+    // el resto de roles la tarjeta "Crear Proyecto" ni siquiera se
+    // muestra, así que de una vez les mostramos su lista de proyectos
+    // asignados: es la única acción que tienen disponible en esta
+    // pantalla.
+    final session = context.read<AuthSession>();
+    if (!hasPermission(session.user?.idRol, 'create_project')) {
+      _showProjects = true;
+    }
   }
 
   Future<List<Project>> _load() {
@@ -78,15 +89,23 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
                   const SizedBox(height: 12),
                   const Text('Gestión de Proyectos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24)),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Accede a un proyecto existente o inicia uno nuevo en el sistema.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.grisMedio),
-                  ),
+                  Builder(builder: (context) {
+                    final session = context.watch<AuthSession>();
+                    final canCreate = hasPermission(session.user?.idRol, 'create_project');
+                    return Text(
+                      canCreate
+                          ? 'Accede a un proyecto existente o inicia uno nuevo en el sistema.'
+                          : 'Accede a uno de los proyectos que tienes asignados.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.grisMedio),
+                    );
+                  }),
                   const SizedBox(height: 24),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final narrow = constraints.maxWidth < 420;
+                  Builder(
+                    builder: (context) {
+                      final session = context.watch<AuthSession>();
+                      final canCreate = hasPermission(session.user?.idRol, 'create_project');
+
                       final cards = [
                         _OptionCard(
                           icon: Icons.folder_open_outlined,
@@ -94,25 +113,39 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
                           subtitle: 'Acceder a un proyecto existente',
                           onTap: () => setState(() => _showProjects = true),
                         ),
-                        _OptionCard(
-                          icon: Icons.add,
-                          title: 'Crear Proyecto',
-                          subtitle: 'Registrar un nuevo proyecto',
-                          onTap: () async {
-                            final created = await showCreateProjectDialog(context);
-                            if (created != null) _reload();
-                          },
-                        ),
+                        // Solo Administrador (1001) puede crear proyectos;
+                        // el resto de roles (Director incluido) solo puede
+                        // elegir entre los que ya tiene asignados, así que
+                        // esta tarjeta directamente no se muestra para
+                        // ellos en vez de aparecer deshabilitada.
+                        if (canCreate)
+                          _OptionCard(
+                            icon: Icons.add,
+                            title: 'Crear Proyecto',
+                            subtitle: 'Registrar un nuevo proyecto',
+                            onTap: () async {
+                              final created = await showCreateProjectDialog(context);
+                              if (created != null) _reload();
+                            },
+                          ),
                       ];
-                      return narrow
-                          ? Column(children: [cards[0], const SizedBox(height: 12), cards[1]])
-                          : Row(
-                              children: [
-                                Expanded(child: cards[0]),
-                                const SizedBox(width: 16),
-                                Expanded(child: cards[1]),
-                              ],
-                            );
+
+                      if (cards.length == 1) return cards.first;
+
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final narrow = constraints.maxWidth < 420;
+                          return narrow
+                              ? Column(children: [cards[0], const SizedBox(height: 12), cards[1]])
+                              : Row(
+                                  children: [
+                                    Expanded(child: cards[0]),
+                                    const SizedBox(width: 16),
+                                    Expanded(child: cards[1]),
+                                  ],
+                                );
+                        },
+                      );
                     },
                   ),
                   if (_showProjects) ...[

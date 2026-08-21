@@ -5,13 +5,19 @@ import '../../core/api_exception.dart';
 import '../../core/session.dart';
 import '../../models/project.dart';
 import '../../services/project_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/app_logo.dart';
 import '../../widgets/app_text_field.dart';
 
 /// Formulario "Registra/Crear Proyecto" (mockups 5 y 6.1). Se usa tanto
 /// en pantalla completa como dentro de un diálogo modal.
 class ProjectFormContent extends StatefulWidget {
   final ValueChanged<Project> onCreated;
-  const ProjectFormContent({super.key, required this.onCreated});
+  // Texto del botón de envío: "Crear Proyecto" en el diálogo rápido
+  // (mockup 6.1), "Finalizar" en el paso obligatorio tras el registro
+  // (mockup 5 / RegisterProjectScreen).
+  final String submitLabel;
+  const ProjectFormContent({super.key, required this.onCreated, this.submitLabel = 'Crear Proyecto'});
 
   @override
   State<ProjectFormContent> createState() => _ProjectFormContentState();
@@ -67,7 +73,7 @@ class _ProjectFormContentState extends State<ProjectFormContent> {
             onPressed: _loading ? null : _submit,
             child: _loading
                 ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Crear Proyecto'),
+                : Text(widget.submitLabel),
           ),
         ],
       ),
@@ -140,22 +146,61 @@ Future<Project?> showCreateProjectDialog(BuildContext context) {
   );
 }
 
-/// Pantalla completa equivalente (mockup 5, cuando se llega desde
-/// "Gestión de Proyectos" sin proyectos previos).
-class ProjectFormScreen extends StatelessWidget {
-  const ProjectFormScreen({super.key});
+/// Paso OBLIGATORIO justo después de registrar la cuenta (mockup 5): la
+/// persona no puede saltarse esta pantalla (no hay botón "volver" ni
+/// "cerrar") porque toda cuenta nueva necesita al menos un proyecto para
+/// llegar al dashboard. Usa Logo_Negativo centrado arriba de la tarjeta
+/// (no Logo_CC_Negativo, que es el que va en la barra superior del resto
+/// de pantallas) y el botón dice "Finalizar" en vez de "Crear Proyecto".
+class RegisterProjectScreen extends StatelessWidget {
+  const RegisterProjectScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Registra Proyecto')),
-      body: Center(
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: ProjectFormContent(
-              onCreated: (p) => Navigator.of(context).pop(p),
+          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 620),
+              child: Column(
+                children: [
+                  const AppWordmark(fontSize: 34, asset: AppLogos.logoNegativo),
+                  const SizedBox(height: 32),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Registra Proyecto',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22),
+                        ),
+                        const SizedBox(height: 20),
+                        ProjectFormContent(
+                          submitLabel: 'Finalizar',
+                          onCreated: (project) async {
+                            final session = context.read<AuthSession>();
+                            await session.setProject(project);
+                            if (context.mounted) {
+                              Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (r) => false);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

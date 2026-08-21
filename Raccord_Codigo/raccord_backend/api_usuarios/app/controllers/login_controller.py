@@ -76,13 +76,24 @@ def _build_session_response(user: User, db: Session, message: str, extra: dict =
 
 
 # ==========================================
-# LOGIN
+# VALIDAR CREDENCIALES (mail + contraseña)
 # ==========================================
-def login_user(mail: str, contrasena: str, db: Session):
+# Punto único de verificación de contraseña. Se usa tanto en el login
+# directo como en CADA paso del flujo de 2FA (check/send/verify).
+#
+# IMPORTANTE: antes, check_2fa_required/send_2fa_code/verify_2fa_code
+# no recibían ni validaban la contraseña en absoluto — solo dependían
+# de mail + device_id + código. Eso significa que con cualquier
+# contraseña (correcta o no) se podía llegar hasta la pantalla de 2FA,
+# y si se tenía el código (enviado al correo real), se obtenía sesión
+# igual, sin que la contraseña importara. Ahora la contraseña se
+# revalida en cada paso, incluido verify_2fa_code, que es el punto
+# donde realmente se emite el token.
+def _validar_credenciales(mail: str, contrasena: str, db: Session):
     user = db.query(User).filter(User.mail == mail).first()
 
     if not user:
-        return api_response(False, "Correo no registrado", error="USER_NOT_FOUND")
+        return None, api_response(False, "Correo no registrado", error="USER_NOT_FOUND")
 
     try:
         password_ok = verify_password(contrasena, user.contrasena)
@@ -90,10 +101,22 @@ def login_user(mail: str, contrasena: str, db: Session):
         # Ej: hash corrupto/formato incompatible en la BD. No debe
         # tumbar la petición con un 500 crudo.
         logger.exception("Error verificando contraseña para %s", mail)
-        return api_response(False, "No fue posible validar las credenciales", error="AUTH_ERROR")
+        return None, api_response(False, "No fue posible validar las credenciales", error="AUTH_ERROR")
 
     if not password_ok:
-        return api_response(False, "Contraseña incorrecta", error="INVALID_PASSWORD")
+        return None, api_response(False, "Contraseña incorrecta", error="INVALID_PASSWORD")
+
+    return user, None
+
+
+# ==========================================
+# LOGIN
+# ==========================================
+def login_user(mail: str, contrasena: str, db: Session):
+    user, error = _validar_credenciales(mail, contrasena, db)
+
+    if error:
+        return error
 
     user.ultimo_acceso = func.now()
     db.commit()
@@ -125,7 +148,15 @@ def _device_is_verified(mail: str, device_id: str) -> bool:
 # Un dispositivo ya verificado dentro de la ventana de confianza
 # (DEVICE_TRUST_HOURS) no vuelve a pedir código. Si es un dispositivo
 # nuevo, o pasó la ventana, sí se requiere.
-def check_2fa_required(mail: str, device_id: str):
+#
+# La contraseña se valida PRIMERO, siempre: si está mal, no importa si
+# el dispositivo es confiable o no, se corta acá con INVALID_PASSWORD.
+def check_2fa_required(mail: str, device_id: str, contrasena: str, db: Session):
+    _, error = _validar_credenciales(mail, contrasena, db)
+
+    if error:
+        return error
+
     if _device_is_verified(mail, device_id):
         return api_response(True, "Dispositivo confiable, no se requiere verificación", {
             "requires_2fa": False
@@ -139,16 +170,16 @@ def check_2fa_required(mail: str, device_id: str):
 # ==========================================
 # 2FA - ENVIAR CODIGO
 # ==========================================
-def send_2fa_code(mail: str, device_id: str, db: Session):
+def send_2fa_code(mail: str, device_id: str, contrasena: str, db: Session):
+    user, error = _validar_credenciales(mail, contrasena, db)
+
+    if error:
+        return error
+
     if _device_is_verified(mail, device_id):
         return api_response(True, "Dispositivo confiable, no se requiere verificación", {
             "requires_2fa": False
         })
-
-    user = db.query(User).filter(User.mail == mail).first()
-
-    if not user:
-        return api_response(False, "Usuario no encontrado", error="USER_NOT_FOUND")
 
     codigo = ''.join(random.choices(string.digits, k=6))
 
@@ -171,7 +202,16 @@ def send_2fa_code(mail: str, device_id: str, db: Session):
 # ==========================================
 # 2FA - VERIFICAR CODIGO
 # ==========================================
-def verify_2fa_code(mail: str, codigo: str, device_id: str, db: Session):
+# Este es el paso que realmente emite el token de sesión, así que es
+# el más importante para revalidar la contraseña: aunque alguien se
+# salte la pantalla de login y llame este endpoint directo, no puede
+# obtener sesión sin la contraseña correcta, solo con el código.
+def verify_2fa_code(mail: str, codigo: str, device_id: str, contrasena: str, db: Session):
+    user, error = _validar_credenciales(mail, contrasena, db)
+
+    if error:
+        return error
+
     if mail not in two_factor_codes:
         return api_response(False, "No hay código de verificación pendiente", error="NO_CODE")
 
@@ -188,11 +228,6 @@ def verify_2fa_code(mail: str, codigo: str, device_id: str, db: Session):
     verified_devices[key] = datetime.now() + timedelta(hours=DEVICE_TRUST_HOURS)
 
     del two_factor_codes[mail]
-
-    user = db.query(User).filter(User.mail == mail).first()
-
-    if not user:
-        return api_response(False, "Usuario no encontrado", error="USER_NOT_FOUND")
 
     user.ultimo_acceso = func.now()
     db.commit()

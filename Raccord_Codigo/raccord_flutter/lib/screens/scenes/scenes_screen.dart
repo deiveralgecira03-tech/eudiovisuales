@@ -9,8 +9,13 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/state_views.dart';
+import 'scene_edit_screen.dart';
+import 'scene_gallery_screen.dart';
 
-/// Mockups 6.2/6.3 (Escenas): lista + crear escena.
+/// Mockups 6/6.1: Escenas — lista con filtro por estado, orden y
+/// paginación; el ojo abre las fotos de continuidad de la escena
+/// (SceneGalleryScreen) y el lápiz abre la edición completa
+/// (SceneEditScreen, que también incluye la carga de fotos).
 class ScenesScreen extends StatefulWidget {
   const ScenesScreen({super.key});
 
@@ -18,8 +23,23 @@ class ScenesScreen extends StatefulWidget {
   State<ScenesScreen> createState() => _ScenesScreenState();
 }
 
+enum _SortField { numero, diaDramatico, fecha, ciudad }
+
+const _sortLabels = {
+  _SortField.numero: 'Número de Escena',
+  _SortField.diaDramatico: 'Día Dramático',
+  _SortField.fecha: 'Fecha de Grabación',
+  _SortField.ciudad: 'Ciudad',
+};
+
+const _pageSize = 10;
+
 class _ScenesScreenState extends State<ScenesScreen> {
   late Future<List<Scene>> _future;
+  String? _filtroEstado;
+  _SortField _sortField = _SortField.numero;
+  bool _sortAsc = true;
+  int _page = 0;
 
   @override
   void initState() {
@@ -32,16 +52,64 @@ class _ScenesScreenState extends State<ScenesScreen> {
     return SceneService(session.api).all();
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+        _future = _load();
+        _page = 0;
+      });
+
+  /// El número de escena puede venir como "1", "2A", etc. — se ordena
+  /// numéricamente por la parte inicial de dígitos y, si empata (o no
+  /// hay dígitos), por el texto completo.
+  int _compareNumero(Scene a, Scene b) {
+    final na = int.tryParse(RegExp(r'^\d+').stringMatch(a.numeroDeEscena) ?? '');
+    final nb = int.tryParse(RegExp(r'^\d+').stringMatch(b.numeroDeEscena) ?? '');
+    if (na != null && nb != null && na != nb) return na.compareTo(nb);
+    return a.numeroDeEscena.compareTo(b.numeroDeEscena);
+  }
+
+  List<Scene> _filterSort(List<Scene> scenes) {
+    var list = _filtroEstado == null ? scenes : scenes.where((s) => s.estado == _filtroEstado).toList();
+    list = [...list];
+    list.sort((a, b) {
+      int cmp;
+      switch (_sortField) {
+        case _SortField.numero:
+          cmp = _compareNumero(a, b);
+          break;
+        case _SortField.diaDramatico:
+          cmp = (a.diaDramatico ?? 0).compareTo(b.diaDramatico ?? 0);
+          break;
+        case _SortField.fecha:
+          final fa = a.fechaDeGrabacion;
+          final fb = b.fechaDeGrabacion;
+          if (fa == null && fb == null) {
+            cmp = 0;
+          } else if (fa == null) {
+            cmp = 1;
+          } else if (fb == null) {
+            cmp = -1;
+          } else {
+            cmp = fa.compareTo(fb);
+          }
+          break;
+        case _SortField.ciudad:
+          cmp = (a.ciudad ?? '').compareTo(b.ciudad ?? '');
+          break;
+      }
+      return _sortAsc ? cmp : -cmp;
+    });
+    return list;
+  }
 
   @override
   Widget build(BuildContext context) {
     final session = context.watch<AuthSession>();
+    final canEdit = session.can('create_scenes');
 
     return AppScaffold(
       title: 'Escenas',
       showBack: true,
-      floatingActionButton: session.can('create_scenes')
+      floatingActionButton: canEdit
           ? FloatingActionButton.extended(
               onPressed: () => _openForm(context),
               icon: const Icon(Icons.add),
@@ -53,43 +121,112 @@ class _ScenesScreenState extends State<ScenesScreen> {
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) return const LoadingView();
           if (snap.hasError) return ErrorView(message: 'No se pudieron cargar las escenas.', onRetry: _reload);
-          final scenes = snap.data ?? [];
-          if (scenes.isEmpty) {
+          final all = snap.data ?? [];
+          if (all.isEmpty) {
             return const EmptyView(message: 'Todavía no hay escenas registradas.', icon: Icons.movie_filter_outlined);
           }
-          return ListView.separated(
+
+          final filtered = _filterSort(all);
+          final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
+          final page = _page.clamp(0, totalPages - 1);
+          final start = page * _pageSize;
+          final pageItems = filtered.skip(start).take(_pageSize).toList();
+
+          return Padding(
             padding: const EdgeInsets.all(20),
-            itemCount: scenes.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) {
-              final s = scenes[i];
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 12,
                   children: [
-                    CircleAvatar(backgroundColor: AppColors.surfaceVariant, child: Text('#${s.numeroDeEscena}')),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(s.encabezado, style: const TextStyle(fontWeight: FontWeight.w700)),
-                          if (s.modoYMomento.isNotEmpty)
-                            Text(s.modoYMomento, style: const TextStyle(color: AppColors.grisMedio, fontSize: 12)),
-                          if (s.diaDramatico != null)
-                            Text('Día dramático ${s.diaDramatico}', style: const TextStyle(color: AppColors.grisMedio, fontSize: 12)),
-                        ],
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.filter_alt_outlined, size: 18, color: AppColors.grisMedio),
+                        const SizedBox(width: 8),
+                        DropdownButton<String?>(
+                          value: _filtroEstado,
+                          underline: const SizedBox.shrink(),
+                          dropdownColor: AppColors.surfaceVariant,
+                          hint: const Text('Todos los estados'),
+                          items: [
+                            const DropdownMenuItem<String?>(value: null, child: Text('Todos los estados')),
+                            ...kEstadosEscena.map((e) => DropdownMenuItem<String?>(value: e, child: Text(e))),
+                          ],
+                          onChanged: (v) => setState(() {
+                            _filtroEstado = v;
+                            _page = 0;
+                          }),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Ordenar por: ', style: TextStyle(color: AppColors.grisMedio)),
+                        DropdownButton<_SortField>(
+                          value: _sortField,
+                          underline: const SizedBox.shrink(),
+                          dropdownColor: AppColors.surfaceVariant,
+                          items: _SortField.values
+                              .map((f) => DropdownMenuItem(value: f, child: Text(_sortLabels[f]!)))
+                              .toList(),
+                          onChanged: (v) => setState(() => _sortField = v ?? _sortField),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: _sortAsc ? 'Ascendente' : 'Descendente',
+                          icon: Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 18),
+                          onPressed: () => setState(() => _sortAsc = !_sortAsc),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+                Expanded(
+                  child: pageItems.isEmpty
+                      ? const EmptyView(message: 'No hay escenas con ese estado.', icon: Icons.filter_alt_off_outlined)
+                      : ListView.separated(
+                          itemCount: pageItems.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 12),
+                          itemBuilder: (context, i) => _SceneRow(
+                            scene: pageItems[i],
+                            canEdit: canEdit,
+                            onView: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => SceneGalleryScreen(scene: pageItems[i])),
+                            ),
+                            onEdit: () async {
+                              final changed = await Navigator.of(context).push<bool>(
+                                MaterialPageRoute(builder: (_) => SceneEditScreen(scene: pageItems[i])),
+                              );
+                              if (changed == true) _reload();
+                            },
+                          ),
+                        ),
+                ),
+                if (totalPages > 1) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: page > 0 ? () => setState(() => _page = page - 1) : null,
+                      ),
+                      Text('Página ${page + 1} de $totalPages', style: const TextStyle(color: AppColors.grisMedio)),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: page < totalPages - 1 ? () => setState(() => _page = page + 1) : null,
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           );
         },
       ),
@@ -97,17 +234,104 @@ class _ScenesScreenState extends State<ScenesScreen> {
   }
 
   Future<void> _openForm(BuildContext context) async {
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: const _SceneFormSheet(),
-      ),
+    final created = await showCenteredFormSheet<bool>(
+      context,
+      const _SceneFormSheet(),
     );
     if (created == true) _reload();
+  }
+}
+
+Color colorForEstadoEscena(String estado) {
+  switch (estado) {
+    case 'Finalizada':
+      return AppColors.success;
+    case 'En proceso':
+      return AppColors.warning;
+    default:
+      return AppColors.error;
+  }
+}
+
+class _SceneRow extends StatelessWidget {
+  final Scene scene;
+  final bool canEdit;
+  final VoidCallback onView;
+  final VoidCallback onEdit;
+
+  const _SceneRow({required this.scene, required this.canEdit, required this.onView, required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: _Field('Escena', '#${scene.numeroDeEscena}', bold: true),
+          ),
+          Expanded(
+            flex: 4,
+            child: _Field('Encabezado', scene.encabezado),
+          ),
+          Expanded(
+            flex: 3,
+            child: _Field('Día Dramático', scene.diaDramatico != null ? 'Día ${scene.diaDramatico}' : '—'),
+          ),
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Estado', style: TextStyle(color: AppColors.grisMedio, fontSize: 12)),
+                const SizedBox(height: 6),
+                StatusPill(label: scene.estado, color: colorForEstadoEscena(scene.estado)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.visibility_outlined, size: 20),
+            tooltip: 'Ver fotos de continuidad',
+            onPressed: onView,
+          ),
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              tooltip: 'Editar escena',
+              onPressed: onEdit,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Field extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool bold;
+  const _Field(this.label, this.value, {this.bold = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: AppColors.grisMedio, fontSize: 12)),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.w500),
+        ),
+      ],
+    );
   }
 }
 
@@ -126,6 +350,7 @@ class _SceneFormSheetState extends State<_SceneFormSheet> {
   final _ciudad = TextEditingController();
   String? _modoVista;
   String? _momentoDia;
+  String _estado = kEstadosEscena.first;
   bool _loading = false;
 
   @override
@@ -179,7 +404,22 @@ class _SceneFormSheetState extends State<_SceneFormSheet> {
               ],
             ),
             const SizedBox(height: 16),
-            AppTextField(label: 'Ciudad', hint: 'Ciudad donde se grabará', controller: _ciudad),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: AppTextField(label: 'Ciudad', hint: 'Ciudad donde se grabará', controller: _ciudad)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppDropdown<String>(
+                    label: 'Estado',
+                    value: _estado,
+                    items: kEstadosEscena,
+                    labelBuilder: (e) => e,
+                    onChanged: (v) => setState(() => _estado = v ?? _estado),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _loading ? null : _submit,
@@ -208,6 +448,7 @@ class _SceneFormSheetState extends State<_SceneFormSheet> {
         modoVista: _modoVista,
         momentoDia: _momentoDia,
         ciudad: _ciudad.text.trim(),
+        estado: _estado,
       ));
       if (!mounted) return;
       Navigator.of(context).pop(true);

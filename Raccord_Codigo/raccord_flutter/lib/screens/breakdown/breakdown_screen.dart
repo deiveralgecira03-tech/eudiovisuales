@@ -126,15 +126,9 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
   }
 
   Future<void> _openForm(BuildContext context) async {
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: _BreakdownItemFormSheet(idEscena: _idEscenaCtrl.text.trim()),
-      ),
+    final created = await showCenteredFormSheet<bool>(
+      context,
+      _BreakdownItemFormSheet(idEscena: _idEscenaCtrl.text.trim()),
     );
     if (created == true) _buscar();
   }

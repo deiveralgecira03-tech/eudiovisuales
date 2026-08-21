@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 from app.config.database import get_db
 from app.controllers.script_controller import (
@@ -8,7 +8,9 @@ from app.controllers.script_controller import (
     create_script,
     update_script_full,
     update_script,
-    delete_script
+    delete_script,
+    upload_script_archivo,
+    get_script_archivo
 )
 from app.schemas.script_schema import ScriptSchema, ScriptUpdateSchema
 
@@ -47,3 +49,26 @@ def patch_script(id: int, script: ScriptUpdateSchema, db: Session = Depends(get_
 @router.delete("/scripts/{id}")
 def destroy_script(id: int, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("upload_scripts"))):
     return delete_script(id, db)
+
+
+# ==========================================
+# PDF real del guión, guardado en la base de datos
+# ==========================================
+# Subir/reemplazar el PDF: mismo permiso que crear/editar guiones
+# (Administrador/Director).
+@router.post("/scripts/{id}/archivo")
+async def upload_script_file(
+    id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_permission("upload_scripts"))
+):
+    return await upload_script_archivo(id, file, db)
+
+
+# Ver/descargar el PDF: cualquier usuario autenticado (mismo nivel que
+# GET /scripts/{id}), igual que el resto del guion es visible para todo
+# el equipo del proyecto.
+@router.get("/scripts/{id}/archivo")
+def download_script_file(id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    return get_script_archivo(id, db)

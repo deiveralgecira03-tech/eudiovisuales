@@ -2,12 +2,83 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/session.dart';
+import '../core/theme_controller.dart';
 import '../theme/app_theme.dart';
 import 'app_logo.dart';
 
+/// Los 8 módulos del proyecto (mockups 7, 7.1). Se usan tanto en las
+/// tarjetas del dashboard como en el menú lateral de todas las pantallas
+/// "dentro" de un proyecto.
+const appSideMenuItems = [
+  ('Guión', Icons.description_outlined, '/guiones'),
+  ('Crear Escenas', Icons.movie_filter_outlined, '/escenas'),
+  ('Personajes', Icons.people_outline, '/personajes'),
+  ('Crew List', Icons.badge_outlined, '/crew-list'),
+  ('Actores', Icons.theater_comedy_outlined, '/actores'),
+  ('Plan de Rodaje', Icons.event_note_outlined, '/plan-rodaje'),
+  ('Desglose', Icons.checklist_outlined, '/desglose'),
+  ('Galería', Icons.photo_library_outlined, '/galeria'),
+  ('Roles', Icons.admin_panel_settings_outlined, '/roles'),
+];
+
+/// Reemplaza los `showModalBottomSheet` (hoja pegada al borde inferior)
+/// por un diálogo centrado en pantalla — se ve mejor en Web/Desktop, que
+/// es donde corre esta app la mayor parte del tiempo. El formulario que
+/// se le pasa ya trae su propio scroll/padding interno (ver
+/// `_SceneFormSheet`, `_ScriptFormSheet`, etc.), así que acá solo se
+/// limita el ancho/alto máximo del diálogo.
+Future<T?> showCenteredFormSheet<T>(BuildContext context, Widget child) {
+  return showDialog<T>(
+    context: context,
+    builder: (_) => Dialog(
+      backgroundColor: AppColors.surface,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 680),
+        child: child,
+      ),
+    ),
+  );
+}
+
+/// Panel con los 8 módulos, usado como contenido del `endDrawer` tipo
+/// "hamburguesa" que ahora aparece en TODAS las pantallas dentro de un
+/// proyecto (no solo el dashboard), para que la navegación entre módulos
+/// esté siempre a un toque de distancia.
+class AppSideMenu extends StatelessWidget {
+  final ValueChanged<String> onSelect;
+  const AppSideMenu({super.key, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final themeController = context.watch<ThemeController>();
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        ...appSideMenuItems.map((item) => ListTile(
+              leading: Icon(item.$2, size: 20),
+              title: Text(item.$1),
+              onTap: () => onSelect(item.$3),
+            )),
+        const Divider(),
+        SwitchListTile(
+          secondary: Icon(themeController.isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined, size: 20),
+          title: const Text('Modo oscuro'),
+          subtitle: const Text('Por defecto siempre inicia oscuro', style: TextStyle(fontSize: 11)),
+          value: themeController.isDark,
+          onChanged: (_) => themeController.toggle(),
+        ),
+      ],
+    );
+  }
+}
+
 /// Scaffold estándar de las pantallas "dentro" de un proyecto: barra
 /// superior con wordmark + botón volver opcional + menú de usuario
-/// (Perfil / Salir), como en los mockups 7, 7.1 y 8.
+/// (Perfil / Salir) + menú lateral de módulos, como en los mockups 7,
+/// 7.1 y 8.
 class AppScaffold extends StatelessWidget {
   final String title;
   final Widget body;
@@ -19,9 +90,12 @@ class AppScaffold extends StatelessWidget {
   // navegación vacía porque se usó pushNamedAndRemoveUntil, así que
   // necesitan indicar explícitamente a dónde volver.
   final VoidCallback? onBack;
-  // Menú lateral que se abre desde la derecha (tipo hamburguesa), en vez
-  // de un menú que empuja el contenido hacia abajo.
+  // Si se pasa un drawer explícito, se usa ese. Si no, y `showModuleMenu`
+  // es true (el default), se arma automáticamente el menú de los 8
+  // módulos — así todas las pantallas dentro de un proyecto tienen la
+  // hamburguesa sin tener que repetir el drawer en cada una.
   final Widget? endDrawer;
+  final bool showModuleMenu;
 
   const AppScaffold({
     super.key,
@@ -32,14 +106,27 @@ class AppScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.onBack,
     this.endDrawer,
+    this.showModuleMenu = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final session = context.watch<AuthSession>();
 
+    final effectiveEndDrawer = endDrawer ??
+        (showModuleMenu
+            ? Drawer(
+                child: SafeArea(
+                  child: AppSideMenu(onSelect: (route) {
+                    Navigator.of(context).pop(); // cierra el drawer
+                    Navigator.of(context).pushNamed(route);
+                  }),
+                ),
+              )
+            : null);
+
     return Scaffold(
-      endDrawer: endDrawer,
+      endDrawer: effectiveEndDrawer,
       appBar: AppBar(
         leading: showBack
             ? IconButton(
@@ -64,7 +151,7 @@ class AppScaffold extends StatelessWidget {
         ),
         actions: [
           ...?actions,
-          if (endDrawer != null)
+          if (effectiveEndDrawer != null)
             Builder(
               builder: (context) => IconButton(
                 icon: const Icon(Icons.menu),

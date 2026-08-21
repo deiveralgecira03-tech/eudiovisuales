@@ -78,3 +78,14 @@ class Scene(Base):
         Text,
         nullable=True
     )
+
+    # Estado de seguimiento de la escena (Pendiente / En proceso /
+    # Finalizada) — ver sql/004_escenas_estado_y_fotos.sql. No es un
+    # ENUM de Postgres (para no depender de una migración de tipo),
+    # solo texto validado del lado de la API (ver EstadoEscena en
+    # scene_schema.py).
+    estado = Column(
+        String(20),
+        nullable=False,
+        server_default="Pendiente"
+    )

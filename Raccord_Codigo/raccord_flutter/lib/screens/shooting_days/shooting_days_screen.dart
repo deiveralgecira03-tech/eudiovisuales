@@ -104,15 +104,9 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
   }
 
   Future<void> _openForm(BuildContext context) async {
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: const _ShootingDayFormSheet(),
-      ),
+    final created = await showCenteredFormSheet<bool>(
+      context,
+      const _ShootingDayFormSheet(),
     );
     if (created == true) _reload();
   }

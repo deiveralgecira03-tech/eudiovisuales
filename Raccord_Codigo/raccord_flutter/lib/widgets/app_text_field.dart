@@ -10,6 +10,8 @@ class AppTextField extends StatelessWidget {
   final int maxLines;
   final Widget? suffixIcon;
   final bool enabled;
+  final bool readOnly;
+  final VoidCallback? onTap;
 
   const AppTextField({
     super.key,
@@ -22,6 +24,8 @@ class AppTextField extends StatelessWidget {
     this.maxLines = 1,
     this.suffixIcon,
     this.enabled = true,
+    this.readOnly = false,
+    this.onTap,
   });
 
   @override
@@ -38,6 +42,8 @@ class AppTextField extends StatelessWidget {
           validator: validator,
           maxLines: maxLines,
           enabled: enabled,
+          readOnly: readOnly,
+          onTap: onTap,
           decoration: InputDecoration(hintText: hint, suffixIcon: suffixIcon),
         ),
       ],
@@ -71,7 +77,7 @@ class AppDropdown<T> extends StatelessWidget {
         Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         const SizedBox(height: 8),
         DropdownButtonFormField<T>(
-          initialValue: value,
+          value: value,
           isExpanded: true,
           hint: hint != null ? Text(hint!) : null,
           items: items

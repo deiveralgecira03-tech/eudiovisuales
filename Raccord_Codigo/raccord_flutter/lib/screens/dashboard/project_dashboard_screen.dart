@@ -23,17 +23,6 @@ const _modules = [
   _ModuleDef('Desglose', Icons.checklist_outlined, AppColors.grisMedio, '/desglose'),
 ];
 
-const _sidebarItems = [
-  ('Guión', Icons.description_outlined, '/guiones'),
-  ('Escenas', Icons.movie_filter_outlined, '/escenas'),
-  ('Personajes', Icons.people_outline, '/personajes'),
-  ('Crew List', Icons.badge_outlined, '/crew-list'),
-  ('Plan de Rodaje', Icons.event_note_outlined, '/plan-rodaje'),
-  ('Desglose', Icons.checklist_outlined, '/desglose'),
-  ('Galería', Icons.photo_library_outlined, '/galeria'),
-  ('Roles', Icons.admin_panel_settings_outlined, '/roles'),
-];
-
 /// Shell del proyecto (mockups 7, 7.1, 7.2): header, menú lateral con
 /// los 8 módulos y tarjetas de acceso rápido.
 class ProjectDashboardScreen extends StatefulWidget {
@@ -60,18 +49,11 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
           Navigator.of(context).pushNamedAndRemoveUntil('/proyectos', (r) => false);
         }
       },
-      // El menú de módulos ahora es un panel lateral tipo "hamburguesa"
-      // que se abre desde el borde derecho (ver botón de menú en la
-      // barra superior), en vez de una lista que empujaba las tarjetas
-      // hacia abajo.
-      endDrawer: Drawer(
-        child: SafeArea(
-          child: _SideMenu(onSelect: (route) {
-            Navigator.of(context).pop(); // cierra el drawer
-            Navigator.of(context).pushNamed(route);
-          }),
-        ),
-      ),
+      // El menú de módulos es un panel lateral tipo "hamburguesa" que se
+      // abre desde el borde derecho (ver botón de menú en la barra
+      // superior), en vez de una lista que empujaba las tarjetas hacia
+      // abajo. `AppScaffold` ya lo arma por defecto (showModuleMenu:
+      // true), igual que en todas las demás pantallas del proyecto.
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
@@ -109,31 +91,6 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SideMenu extends StatelessWidget {
-  final ValueChanged<String> onSelect;
-  const _SideMenu({required this.onSelect});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: _sidebarItems
-            .map((item) => ListTile(
-                  leading: Icon(item.$2, size: 20),
-                  title: Text(item.$1),
-                  onTap: () => onSelect(item.$3),
-                ))
-            .toList(),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import 'api_config.dart';
 import 'api_exception.dart';
@@ -73,6 +74,51 @@ class ApiClient {
   Future<dynamic> delete(String path, {bool auth = true}) async {
     final res = await _http.delete(_uri(path), headers: _headers(auth: auth));
     return _parse(res);
+  }
+
+  /// Sube un archivo binario (multipart/form-data) — usado para el PDF
+  /// de guiones (POST /scripts/{id}/archivo) y las fotos de
+  /// continuidad (POST /scenes/{id}/fotos). El backend espera el
+  /// campo bajo el nombre `fieldName` (FastAPI: `file: UploadFile`).
+  /// `fields` son campos de texto adicionales del mismo formulario
+  /// (FastAPI: `Form(...)`) — ej. tipo_foto, descripcion.
+  Future<dynamic> postFile(
+    String path, {
+    required String fieldName,
+    required List<int> bytes,
+    required String filename,
+    String? contentType,
+    Map<String, String>? fields,
+    bool auth = true,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri(path));
+    final headers = _headers(auth: auth)..remove('Content-Type'); // multipart arma su propio boundary
+    request.headers.addAll(headers);
+    if (fields != null) request.fields.addAll(fields);
+    request.files.add(http.MultipartFile.fromBytes(
+      fieldName,
+      bytes,
+      filename: filename,
+      contentType: contentType != null ? MediaType.parse(contentType) : null,
+    ));
+    final streamed = await _http.send(request);
+    final res = await http.Response.fromStream(streamed);
+    return _parse(res);
+  }
+
+  /// Descarga bytes crudos (no JSON) — usado para leer el PDF de un
+  /// guion (GET /scripts/{id}/archivo) antes de mostrarlo en el visor.
+  Future<List<int>> getBytes(String path, {bool auth = true}) async {
+    final res = await _http.get(_uri(path), headers: _headers(auth: auth)..remove('Content-Type'));
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      String message = 'No se pudo descargar el archivo (${res.statusCode})';
+      try {
+        final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+        if (decoded is Map && decoded['detail'] is String) message = decoded['detail'];
+      } catch (_) {}
+      throw ApiException(message, statusCode: res.statusCode);
+    }
+    return res.bodyBytes;
   }
 
   dynamic _parse(http.Response res) {

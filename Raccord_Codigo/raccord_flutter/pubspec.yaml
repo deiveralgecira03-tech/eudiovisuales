@@ -11,10 +11,16 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
   http: ^1.2.1
+  http_parser: ^4.0.2
   shared_preferences: ^2.2.3
   provider: ^6.1.2
   intl: ^0.19.0
   uuid: ^4.4.0
+  # Selector de PDF (Android/iOS/Web/Desktop) para subir el guion.
+  file_picker: ^8.1.2
+  # Visor de PDF embebido en la app (licencia community, gratis) para
+  # abrir el guion sin salir de Raccord.
+  syncfusion_flutter_pdfviewer: ^27.1.58
 
 dev_dependencies:
   flutter_test:
@@ -26,6 +32,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/logos/
 
   fonts:
     - family: Montserrat

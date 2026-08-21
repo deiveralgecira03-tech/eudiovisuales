@@ -27,27 +27,34 @@ class AuthService {
     );
   }
 
-  Future<bool> check2faRequired(String mail, String deviceId) async {
+  // OJO: contrasena va en las 3 llamadas de 2FA porque el backend la
+  // revalida en cada paso (antes no se enviaba y cualquier contraseña
+  // dejaba pasar hasta la pantalla de código — el código de correo
+  // era el único chequeo real).
+  Future<bool> check2faRequired(String mail, String deviceId, String contrasena) async {
     final data = await api.post('/users/2fa/check', auth: false, body: {
       'mail': mail,
       'device_id': deviceId,
+      'contrasena': contrasena,
     });
     final map = Map<String, dynamic>.from(data as Map);
     return map['requires_2fa'] == true;
   }
 
-  Future<void> send2faCode(String mail, String deviceId) async {
+  Future<void> send2faCode(String mail, String deviceId, String contrasena) async {
     await api.post('/users/2fa/send', auth: false, body: {
       'mail': mail,
       'device_id': deviceId,
+      'contrasena': contrasena,
     });
   }
 
-  Future<LoginResult> verify2faCode(String mail, String codigo, String deviceId) async {
+  Future<LoginResult> verify2faCode(String mail, String codigo, String deviceId, String contrasena) async {
     final data = await api.post('/users/2fa/verify', auth: false, body: {
       'mail': mail,
       'codigo': codigo,
       'device_id': deviceId,
+      'contrasena': contrasena,
     });
     final map = Map<String, dynamic>.from(data as Map);
     return LoginResult(

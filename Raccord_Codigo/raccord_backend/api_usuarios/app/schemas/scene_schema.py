@@ -5,6 +5,7 @@ from datetime import date
 # Deben coincidir exactamente con los ENUM de la BD.
 ModoVista = Literal["int", "ext", "int/ext", "ext/int"]
 MomentoDia = Literal["dia", "noche", "amanecer", "atardecer", "amanecer/dia", "dia/noche"]
+EstadoEscena = Literal["Pendiente", "En proceso", "Finalizada"]
 
 
 # ==========================================
@@ -25,6 +26,7 @@ class SceneSchema(BaseModel):
     dia_dramatico: Optional[int] = None
     id_rodaje: Optional[str] = None
     id_desglose: Optional[str] = None
+    estado: Optional[EstadoEscena] = "Pendiente"
 
 
 class SceneUpdateSchema(BaseModel):
@@ -40,3 +42,4 @@ class SceneUpdateSchema(BaseModel):
     dia_dramatico: Optional[int] = None
     id_rodaje: Optional[str] = None
     id_desglose: Optional[str] = None
+    estado: Optional[EstadoEscena] = None

@@ -13,7 +13,10 @@ class ScriptSchema(BaseModel):
     numero_de_version: str
     fecha_de_emision: date
     estado: EstadoGuion
-    archivo: str
+    # Ya no es obligatorio: el PDF real se sube aparte con
+    # POST /scripts/{id}/archivo justo después de crear el guión. Este
+    # campo queda como texto libre opcional (legado).
+    archivo: Optional[str] = ""
     nombre: str
     descripcion: Optional[str] = None
     id_project: Optional[str] = None

@@ -2,6 +2,7 @@ import '../core/json_utils.dart';
 
 const kModosVista = ['int', 'ext', 'int/ext', 'ext/int'];
 const kMomentosDia = ['dia', 'noche', 'amanecer', 'atardecer', 'amanecer/dia', 'dia/noche'];
+const kEstadosEscena = ['Pendiente', 'En proceso', 'Finalizada'];
 
 class Scene {
   final String? idEscena;
@@ -17,6 +18,7 @@ class Scene {
   final int? diaDramatico;
   final String? idRodaje;
   final String? idDesglose;
+  final String estado;
 
   Scene({
     this.idEscena,
@@ -32,6 +34,7 @@ class Scene {
     this.diaDramatico,
     this.idRodaje,
     this.idDesglose,
+    this.estado = 'Pendiente',
   });
 
   String get modoYMomento {
@@ -57,6 +60,7 @@ class Scene {
       diaDramatico: asInt(pick(json, ['dia_dramatico'])),
       idRodaje: asString(pick(json, ['id_rodaje'])),
       idDesglose: asString(pick(json, ['id_desglose'])),
+      estado: asString(pick(json, ['estado'])) ?? 'Pendiente',
     );
   }
 
@@ -74,5 +78,6 @@ class Scene {
         if (diaDramatico != null) 'dia_dramatico': diaDramatico,
         if (idRodaje != null && idRodaje!.isNotEmpty) 'id_rodaje': idRodaje,
         if (idDesglose != null && idDesglose!.isNotEmpty) 'id_desglose': idDesglose,
+        'estado': estado,
       };
 }
