@@ -1,4 +1,6 @@
+import uuid
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.config.database import Base
 
@@ -22,20 +24,20 @@ class DesgloseItem(Base):
     __tablename__ = "desglose_items"
 
     id_desglose_item = Column(
-        Integer,
+        UUID(as_uuid=True),
         primary_key=True,
         index=True,
-        autoincrement=True
+        default=uuid.uuid4
     )
 
     id_escena = Column(  # llave foránea -> escenas.id_escena
-        Text,
+        UUID(as_uuid=True),
         ForeignKey("escenas.id_escena", ondelete="CASCADE"),
         nullable=False
     )
 
     id_departamento = Column(  # llave foránea -> departamentos.id_departamento
-        Text,
+        UUID(as_uuid=True),
         ForeignKey("departamentos.id_departamento"),
         nullable=True
     )
@@ -61,7 +63,7 @@ class DesgloseItem(Base):
     )
 
     id_user_creador = Column(  # llave foránea -> users.id_user
-        Integer,
+        UUID(as_uuid=True),
         ForeignKey("users.id_user"),
         nullable=True
     )
@@ -93,14 +95,14 @@ class DesgloseItemDetalle(Base):
     __tablename__ = "desglose_item_detalle"
 
     id_detalle = Column(
-        Integer,
+        UUID(as_uuid=True),
         primary_key=True,
         index=True,
-        autoincrement=True
+        default=uuid.uuid4
     )
 
     id_desglose_item = Column(  # llave foránea -> desglose_items.id_desglose_item
-        Integer,
+        UUID(as_uuid=True),
         ForeignKey("desglose_items.id_desglose_item", ondelete="CASCADE"),
         nullable=False
     )
@@ -132,7 +134,7 @@ class DesgloseItemDetalle(Base):
     )
 
     id_user_editor = Column(  # llave foránea -> users.id_user
-        Integer,
+        UUID(as_uuid=True),
         ForeignKey("users.id_user"),
         nullable=True
     )

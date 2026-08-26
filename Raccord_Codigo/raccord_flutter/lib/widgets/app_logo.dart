@@ -6,18 +6,24 @@ import '../theme/app_theme.dart';
 /// (carpeta src/assets/).
 ///
 /// - isotipoColor: círculo de marca — login, registro, recuperar
-///   contraseña, 2FA.
-/// - logoCcNegativo: logo completo (isotipo + wordmark, con las "c" en
-///   color) — barra superior de TODAS las pantallas desde "Selección de
-///   Proyecto" en adelante (AppScaffold y ProjectSelectionScreen).
-/// - logoNegativo: logo completo, variante sin las "c" en color — usado
-///   únicamente en la pantalla obligatoria "Registra Proyecto" que sigue
-///   al registro de cuenta.
+///   contraseña, 2FA. Es a color (degradé), así que se ve bien en
+///   modo oscuro y claro sin necesitar variante.
+/// - logoCcNegativo / logoNegativo: variantes "negativas" (texto claro),
+///   pensadas para fondo oscuro — logoCcNegativo en la barra superior de
+///   TODAS las pantallas desde "Selección de Proyecto" en adelante
+///   (AppScaffold y ProjectSelectionScreen), logoNegativo en la pantalla
+///   obligatoria "Registra Proyecto".
+/// - logoCcNegro / logoNegro: sus contrapartes en negro, para fondo
+///   claro (modo claro) — sin esto el texto claro de las variantes
+///   "negativo" queda invisible sobre fondo blanco. [AppWordmark] elige
+///   automáticamente cuál mostrar según el tema activo.
 class AppLogos {
   AppLogos._();
   static const isotipoColor = 'assets/images/logos/isotipo_color.png';
   static const logoCcNegativo = 'assets/images/logos/logo_cc_negativo.png';
   static const logoNegativo = 'assets/images/logos/logo_negativo.png';
+  static const logoCcNegro = 'assets/images/logos/logo_cc_negro.png';
+  static const logoNegro = 'assets/images/logos/logo_negro.png';
 }
 
 /// Isotipo circular de marca (mockups 1, 2, 5...). Si el archivo aún no
@@ -46,26 +52,32 @@ class AppIsotipo extends StatelessWidget {
 }
 
 /// Wordmark "Raccord" que aparece en la barra superior. Por defecto usa
-/// Logo_CC_Negativo (logo completo, "c" en color, para fondo oscuro) —
-/// la pantalla obligatoria "Registra Proyecto" pasa
-/// `asset: AppLogos.logoNegativo` explícitamente porque ahí va la otra
-/// variante. Si el archivo no está disponible todavía, cae al texto
-/// dibujado a mano para que la barra nunca quede vacía.
+/// el par Logo_CC_Negativo (modo oscuro) / Logo_CC_Negro (modo claro) —
+/// la pantalla obligatoria "Registra Proyecto" pasa el par
+/// `darkAsset: AppLogos.logoNegativo, lightAsset: AppLogos.logoNegro`
+/// porque ahí va la otra variante (sin las "c" en color). En ambos
+/// casos [AppWordmark] elige automáticamente cuál de los dos mostrar
+/// según `Theme.of(context).brightness`, para que el logo nunca quede
+/// invisible por poco contraste al cambiar de tema. Si el archivo no
+/// está disponible todavía, cae al texto dibujado a mano.
 class AppWordmark extends StatelessWidget {
   final double fontSize;
   final Color baseColor;
-  final String asset;
+  final String darkAsset;
+  final String lightAsset;
   const AppWordmark({
     super.key,
     this.fontSize = 28,
     this.baseColor = Colors.white,
-    this.asset = AppLogos.logoCcNegativo,
+    this.darkAsset = AppLogos.logoCcNegativo,
+    this.lightAsset = AppLogos.logoCcNegro,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Image.asset(
-      asset,
+      isDark ? darkAsset : lightAsset,
       height: fontSize * 1.6,
       fit: BoxFit.contain,
       errorBuilder: (_, __, ___) => _fallbackText(),

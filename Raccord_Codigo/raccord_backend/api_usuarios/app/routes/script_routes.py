@@ -10,9 +10,10 @@ from app.controllers.script_controller import (
     update_script,
     delete_script,
     upload_script_archivo,
-    get_script_archivo
+    get_script_archivo,
+    segmentar_script
 )
-from app.schemas.script_schema import ScriptSchema, ScriptUpdateSchema
+from app.schemas.script_schema import ScriptSchema, ScriptUpdateSchema, SegmentarScriptSchema
 
 # 🔐 autenticación / permisos
 from app.middleware.auth import get_current_user, require_permission
@@ -28,7 +29,7 @@ def scripts_by_project(id_project: str, db: Session = Depends(get_db), current_u
     return get_scripts_by_project(id_project, db)
 
 @router.get("/scripts/{id}")
-def script(id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def script(id: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return get_script(id, db)
 
 # Solo Administrador (1001) y Director (1002) suben/editan/eliminan
@@ -39,15 +40,15 @@ def store_script(script: ScriptSchema, db: Session = Depends(get_db), current_us
     return create_script(script, db)
 
 @router.put("/scripts/{id}")
-def edit_script(id: int, script: ScriptSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("upload_scripts"))):
+def edit_script(id: str, script: ScriptSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("upload_scripts"))):
     return update_script_full(id, script, db)
 
 @router.patch("/scripts/{id}")
-def patch_script(id: int, script: ScriptUpdateSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("upload_scripts"))):
+def patch_script(id: str, script: ScriptUpdateSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("upload_scripts"))):
     return update_script(id, script, db)
 
 @router.delete("/scripts/{id}")
-def destroy_script(id: int, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("upload_scripts"))):
+def destroy_script(id: str, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("upload_scripts"))):
     return delete_script(id, db)
 
 
@@ -58,7 +59,7 @@ def destroy_script(id: int, db: Session = Depends(get_db), current_user: dict = 
 # (Administrador/Director).
 @router.post("/scripts/{id}/archivo")
 async def upload_script_file(
-    id: int,
+    id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_permission("upload_scripts"))
@@ -70,5 +71,21 @@ async def upload_script_file(
 # GET /scripts/{id}), igual que el resto del guion es visible para todo
 # el equipo del proyecto.
 @router.get("/scripts/{id}/archivo")
-def download_script_file(id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def download_script_file(id: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return get_script_archivo(id, db)
+
+
+# ==========================================
+# SEGMENTACIÓN AUTOMÁTICA POR ESCENAS (heurística, sin IA)
+# ==========================================
+# Mismo permiso que crear escenas a mano (create_scenes): al final este
+# endpoint termina creando filas de Scene, así que debe exigir lo mismo
+# que crearlas manualmente en el módulo de Escenas.
+@router.post("/scripts/{id}/segmentar")
+def segmentar(
+    id: str,
+    data: SegmentarScriptSchema,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_permission("create_scenes"))
+):
+    return segmentar_script(id, data.confirmar, db)

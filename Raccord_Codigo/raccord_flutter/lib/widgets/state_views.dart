@@ -96,6 +96,37 @@ class ComingSoonView extends StatelessWidget {
   }
 }
 
+/// Diálogo de confirmación estándar para acciones de borrado (guiones,
+/// escenas, personajes, actores, fotos de continuidad). Devuelve `true`
+/// solo si la persona confirma con "Eliminar" — cualquier otra salida
+/// (Cancelar, tocar afuera, back) devuelve `false`, nunca null, para
+/// que el código que llama pueda usar el resultado directo en un `if`.
+Future<bool> confirmDelete(
+  BuildContext context, {
+  String title = '¿Eliminar este elemento?',
+  required String message,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Eliminar', style: TextStyle(color: AppColors.error)),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
 class StatusPill extends StatelessWidget {
   final String label;
   final Color color;

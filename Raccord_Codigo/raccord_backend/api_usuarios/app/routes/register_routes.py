@@ -33,4 +33,4 @@ def invite(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_permission("invite_users"))
 ):
-    return invite_users(data.correos, data.id_project, data.id_client, data.id_rol, db)
+    return invite_users(data.invitados, data.id_project, data.id_client, db)

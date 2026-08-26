@@ -38,7 +38,7 @@ def items_by_scene(id_escena: str, db: Session = Depends(get_db), current_user: 
     return get_items_by_scene(id_escena, db)
 
 @router.get("/breakdown/items/{id}")
-def item(id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def item(id: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return get_item(id, db)
 
 @router.post("/breakdown/items")
@@ -46,15 +46,15 @@ def store_item(item: DesgloseItemSchema, db: Session = Depends(get_db), current_
     return create_item(item, db, current_user)
 
 @router.put("/breakdown/items/{id}")
-def edit_item(id: int, item: DesgloseItemSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("manage_general_breakdown"))):
+def edit_item(id: str, item: DesgloseItemSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("manage_general_breakdown"))):
     return update_item_full(id, item, db)
 
 @router.patch("/breakdown/items/{id}")
-def patch_item(id: int, item: DesgloseItemUpdateSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("manage_general_breakdown"))):
+def patch_item(id: str, item: DesgloseItemUpdateSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("manage_general_breakdown"))):
     return update_item(id, item, db)
 
 @router.delete("/breakdown/items/{id}")
-def destroy_item(id: int, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("manage_general_breakdown"))):
+def destroy_item(id: str, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("manage_general_breakdown"))):
     return delete_item(id, db)
 
 
@@ -66,23 +66,23 @@ def destroy_item(id: int, db: Session = Depends(get_db), current_user: dict = De
 # para ellos). El match por id_departamento se valida además dentro
 # del controller.
 @router.get("/breakdown/items/{id_desglose_item}/detalle")
-def detalle_by_item(id_desglose_item: int, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("view_department_breakdown"))):
+def detalle_by_item(id_desglose_item: str, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("view_department_breakdown"))):
     return get_detalle_by_item(id_desglose_item, db, current_user)
 
 @router.post("/breakdown/items/{id_desglose_item}/detalle")
-def store_detalle(id_desglose_item: int, detalle: DesgloseDetalleSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("edit_department_breakdown"))):
+def store_detalle(id_desglose_item: str, detalle: DesgloseDetalleSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("edit_department_breakdown"))):
     return create_detalle(id_desglose_item, detalle, db, current_user)
 
 @router.put("/breakdown/detalle/{id}")
-def edit_detalle(id: int, detalle: DesgloseDetalleSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("edit_department_breakdown"))):
+def edit_detalle(id: str, detalle: DesgloseDetalleSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("edit_department_breakdown"))):
     return update_detalle_full(id, detalle, db, current_user)
 
 @router.patch("/breakdown/detalle/{id}")
-def patch_detalle(id: int, detalle: DesgloseDetalleUpdateSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("edit_department_breakdown"))):
+def patch_detalle(id: str, detalle: DesgloseDetalleUpdateSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("edit_department_breakdown"))):
     return update_detalle(id, detalle, db, current_user)
 
 @router.delete("/breakdown/detalle/{id}")
-def destroy_detalle(id: int, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("edit_department_breakdown"))):
+def destroy_detalle(id: str, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("edit_department_breakdown"))):
     return delete_detalle(id, db, current_user)
 
 

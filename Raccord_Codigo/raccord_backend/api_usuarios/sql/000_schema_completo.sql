@@ -476,7 +476,12 @@ CREATE TABLE public.escenas (
     dia_dramatico integer,
     id_rodaje text,
     id_desglose text,
-    estado character varying(20) DEFAULT 'Pendiente'::character varying NOT NULL
+    estado character varying(20) DEFAULT 'Pendiente'::character varying NOT NULL,
+    locacion_rodaje text,
+    tiempo_estimado text,
+    hora_inicio_rodaje time without time zone,
+    notas_rodaje text,
+    orden_rodaje integer
 );
 
 

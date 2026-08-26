@@ -7,7 +7,7 @@ class Project {
   final String genero;
   final String? sinopsis;
   final String? director;
-  final int idClient;
+  final String idClient;
 
   Project({
     required this.idProject,
@@ -32,7 +32,7 @@ class Project {
       genero: asString(pick(json, ['genero'])) ?? '',
       sinopsis: asString(pick(json, ['sinopsis'])),
       director: asString(pick(json, ['director'])),
-      idClient: asInt(pick(json, ['id_client'])) ?? 0,
+      idClient: asString(pick(json, ['id_client'])) ?? '',
     );
   }
 }

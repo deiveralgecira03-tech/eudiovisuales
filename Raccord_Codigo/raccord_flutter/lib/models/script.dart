@@ -3,7 +3,7 @@ import '../core/json_utils.dart';
 const kEstadosGuion = ['Borrador', 'Revisión', 'Aprobado', 'En Rodaje', 'Archivado'];
 
 class Script {
-  final int? idGuion;
+  final String? idGuion;
   final String numeroDeVersion;
   final DateTime fechaDeEmision;
   final String estado;
@@ -35,7 +35,7 @@ class Script {
   factory Script.fromJson(Map<String, dynamic> json) {
     final fecha = asString(pick(json, ['fecha_de_emision']));
     return Script(
-      idGuion: asInt(pick(json, ['id_guion'])),
+      idGuion: asString(pick(json, ['id_guion'])),
       numeroDeVersion: asString(pick(json, ['numero_de_version'])) ?? '',
       fechaDeEmision: fecha != null ? (DateTime.tryParse(fecha) ?? DateTime.now()) : DateTime.now(),
       estado: asString(pick(json, ['estado'])) ?? 'Borrador',

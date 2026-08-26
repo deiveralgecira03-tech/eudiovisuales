@@ -132,7 +132,7 @@ def delete_project(id: str, db: Session):
 
 # GET PROJECTS BY CLIENT
 
-def get_projects_by_client(id_client: int, db: Session):
+def get_projects_by_client(id_client: str, db: Session):
     projects = db.query(Project).filter(Project.id_client == id_client).all()
     projects_list = [
         {
@@ -151,31 +151,19 @@ def get_projects_by_client(id_client: int, db: Session):
 # CREATE PROJECT
 
 def create_project(project: ProjectSchema, db: Session):
-    # Autogenerar id_project si viene vacío o no viene
-    if not project.id_project or project.id_project.strip() == "":
-        # Buscar el último proyecto para generar el siguiente ID
-        last_project = db.query(Project).order_by(Project.id_project.desc()).first()
+    # id_project es UUID: si el cliente (ej. app offline) ya generó su
+    # propio UUID, se respeta (evita colisiones al sincronizar). Si no
+    # viene, se deja que la columna lo autogenere (default=uuid.uuid4 /
+    # gen_random_uuid() en la BD) — ya no hay generación manual tipo
+    # "proj0001", eso era el esquema viejo de IDs secuenciales.
+    project_id = project.id_project.strip() if project.id_project and project.id_project.strip() else None
 
-        if last_project and last_project.id_project.startswith("proj"):
-            try:
-                last_num = int(last_project.id_project.replace("proj", ""))
-                new_num = last_num + 1
-            except ValueError:
-                new_num = 1
-        else:
-            new_num = 1
-
-        project_id = f"proj{new_num:04d}"
-    else:
-        project_id = project.id_project
-
-    # Verificar que no exista
-    existing = db.query(Project).filter(Project.id_project == project_id).first()
-    if existing:
-        return api_response(False, "ID de proyecto ya existe", error="DUPLICATE_PROJECT")
+    if project_id:
+        existing = db.query(Project).filter(Project.id_project == project_id).first()
+        if existing:
+            return api_response(False, "ID de proyecto ya existe", error="DUPLICATE_PROJECT")
 
     new_project = Project(
-        id_project=project_id,
         project_name=project.project_name,
         formato_de_produccion=project.formato_de_produccion,
         genero=project.genero,
@@ -183,6 +171,8 @@ def create_project(project: ProjectSchema, db: Session):
         director=project.director,
         id_client=project.id_client
     )
+    if project_id:
+        new_project.id_project = project_id
 
     db.add(new_project)
     db.commit()
@@ -197,7 +187,7 @@ def create_project(project: ProjectSchema, db: Session):
 
 # CREATE PROJECT AND LINK USER
 
-def create_project_and_link(project: ProjectSchema, id_user: int, db: Session):
+def create_project_and_link(project: ProjectSchema, id_user: str, db: Session):
     # Crear el proyecto
     result = create_project(project, db)
 
@@ -220,7 +210,7 @@ def create_project_and_link(project: ProjectSchema, id_user: int, db: Session):
 
 # CREATE PROJECT AND LINK USER
 
-def create_project_and_link(project: ProjectSchema, id_user: int, db: Session):
+def create_project_and_link(project: ProjectSchema, id_user: str, db: Session):
     result = create_project(project, db)
 
     if not result["success"]:

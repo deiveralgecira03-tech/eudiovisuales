@@ -1,12 +1,15 @@
+import uuid
 from sqlalchemy import Column, String, Text, Date, Boolean, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
 # ==========================================
 # ACTOR MODEL (tabla "actors")
 # ==========================================
-# id_actor NO se genera acá: la BD tiene un trigger (gen_id_actor) que
-# arma 'act' + consecutivo en el INSERT. Se deja sin default para que
-# el trigger la complete y SQLAlchemy la recupere con RETURNING.
+# id_actor es UUID, generado en Python (uuid.uuid4) — ver
+# sql/009_uuid_primary_keys.sql. Antes lo armaba un trigger de Postgres
+# ('act1', 'act2'...) con una secuencia central, propensa a colisionar
+# si dos clientes crean actores sin conexión al mismo tiempo.
 #
 # "genero" es ENUM en Postgres (generosex: masculino/fenemino/otro —
 # el typo "fenemino" es el valor real que existe en la BD, no un error
@@ -21,9 +24,10 @@ class Actor(Base):
     __tablename__ = "actors"
 
     id_actor = Column(
-        Text,
+        UUID(as_uuid=True),
         primary_key=True,
-        index=True
+        index=True,
+        default=uuid.uuid4
     )
 
     nombre = Column(String(45), nullable=False)
@@ -56,7 +60,7 @@ class Actor(Base):
     doble_riesgo = Column(Boolean, nullable=False)
 
     id_personaje = Column(  # llave foránea -> personajes.id_personaje
-        Text,
+        UUID(as_uuid=True),
         ForeignKey("personajes.id_personaje", ondelete="CASCADE"),
         nullable=True
     )

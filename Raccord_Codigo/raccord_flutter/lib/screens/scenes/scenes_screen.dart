@@ -1,13 +1,20 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
+import '../../core/bulk_import.dart';
 import '../../core/session.dart';
 import '../../models/scene.dart';
 import '../../services/scene_service.dart';
+import '../../services/script_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
+import '../../widgets/bulk_upload_button.dart';
+import '../../widgets/pagination_bar.dart';
 import '../../widgets/state_views.dart';
 import 'scene_edit_screen.dart';
 import 'scene_gallery_screen.dart';
@@ -32,14 +39,20 @@ const _sortLabels = {
   _SortField.ciudad: 'Ciudad',
 };
 
-const _pageSize = 10;
-
 class _ScenesScreenState extends State<ScenesScreen> {
   late Future<List<Scene>> _future;
   String? _filtroEstado;
   _SortField _sortField = _SortField.numero;
   bool _sortAsc = true;
   int _page = 0;
+  int _pageSize = 10;
+
+  // Vista dividida: al seleccionar una escena (tap en la fila), se
+  // muestra el PDF de su guion al lado de la lista — mismo patrón que
+  // Desglose de Producción.
+  Scene? _selectedScene;
+  bool _vistaDividida = false;
+  Future<List<int>>? _pdfBytes;
 
   @override
   void initState() {
@@ -56,6 +69,15 @@ class _ScenesScreenState extends State<ScenesScreen> {
         _future = _load();
         _page = 0;
       });
+
+  void _selectScene(Scene scene) {
+    setState(() {
+      _selectedScene = scene;
+      _pdfBytes = scene.idGuion != null
+          ? ScriptService(context.read<AuthSession>().api).archivoBytes(scene.idGuion!)
+          : null;
+    });
+  }
 
   /// El número de escena puede venir como "1", "2A", etc. — se ordena
   /// numéricamente por la parte inicial de dígitos y, si empata (o no
@@ -109,6 +131,20 @@ class _ScenesScreenState extends State<ScenesScreen> {
     return AppScaffold(
       title: 'Escenas',
       showBack: true,
+      actions: [
+        if (_selectedScene != null)
+          IconButton(
+            icon: Icon(_vistaDividida ? Icons.vertical_split : Icons.vertical_split_outlined),
+            tooltip: _vistaDividida ? 'Cerrar vista dividida' : 'Vista dividida con el guion',
+            color: _vistaDividida ? AppColors.azulProfundo : null,
+            onPressed: () => setState(() => _vistaDividida = !_vistaDividida),
+          ),
+        if (canEdit)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: BulkUploadButton(onRows: _bulkCreate, onDone: _reload),
+          ),
+      ],
       floatingActionButton: canEdit
           ? FloatingActionButton.extended(
               onPressed: () => _openForm(context),
@@ -132,9 +168,75 @@ class _ScenesScreenState extends State<ScenesScreen> {
           final start = page * _pageSize;
           final pageItems = filtered.skip(start).take(_pageSize).toList();
 
+          final listaEscenas = _buildListaEscenas(context, canEdit, filtered, pageItems, totalPages, page);
+
           return Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
+            child: _vistaDividida && _selectedScene != null
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(flex: 5, child: _buildScriptPane(context)),
+                      const SizedBox(width: 16),
+                      const VerticalDivider(width: 1),
+                      const SizedBox(width: 16),
+                      Expanded(flex: 6, child: listaEscenas),
+                    ],
+                  )
+                : listaEscenas,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildScriptPane(BuildContext context) {
+    if (_pdfBytes == null) {
+      return const EmptyView(message: 'Esta escena no tiene un guion asociado.', icon: Icons.picture_as_pdf_outlined);
+    }
+    return FutureBuilder<List<int>>(
+      future: _pdfBytes,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) return const LoadingView();
+        if (snap.hasError) {
+          // El backend responde 404 cuando el guion todavía no tiene PDF
+          // cargado — eso es un estado normal (informativo), no una
+          // falla real, así que se muestra como EmptyView en vez de
+          // ErrorView (que se ve como un error/bug).
+          if (snap.error is ApiException && (snap.error as ApiException).statusCode == 404) {
+            return const EmptyView(
+              message: 'El guion de esta escena todavía no tiene un PDF cargado.\nSube el PDF desde el módulo Guión para poder verlo aquí.',
+              icon: Icons.picture_as_pdf_outlined,
+            );
+          }
+          final message = snap.error is ApiException ? (snap.error as ApiException).message : 'No se pudo cargar el guion.';
+          return ErrorView(message: message, onRetry: () => _selectScene(_selectedScene!));
+        }
+        final bytes = snap.data;
+        if (bytes == null || bytes.isEmpty) {
+          return const EmptyView(message: 'Este guion todavía no tiene un PDF cargado.', icon: Icons.picture_as_pdf_outlined);
+        }
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: PdfViewer.data(
+            Uint8List.fromList(bytes),
+            sourceName: 'guion-escenas-${_selectedScene?.idGuion}',
+            params: PdfViewerParams(backgroundColor: AppColors.bg),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildListaEscenas(
+    BuildContext context,
+    bool canEdit,
+    List<Scene> filtered,
+    List<Scene> pageItems,
+    int totalPages,
+    int page,
+  ) {
+    return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Wrap(
@@ -196,6 +298,8 @@ class _ScenesScreenState extends State<ScenesScreen> {
                           itemBuilder: (context, i) => _SceneRow(
                             scene: pageItems[i],
                             canEdit: canEdit,
+                            selected: _selectedScene?.idEscena != null && _selectedScene?.idEscena == pageItems[i].idEscena,
+                            onTap: () => _selectScene(pageItems[i]),
                             onView: () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => SceneGalleryScreen(scene: pageItems[i])),
                             ),
@@ -205,32 +309,27 @@ class _ScenesScreenState extends State<ScenesScreen> {
                               );
                               if (changed == true) _reload();
                             },
+                            onDelete: () => _delete(pageItems[i]),
                           ),
                         ),
                 ),
-                if (totalPages > 1) ...[
+                if (filtered.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.chevron_left),
-                        onPressed: page > 0 ? () => setState(() => _page = page - 1) : null,
-                      ),
-                      Text('Página ${page + 1} de $totalPages', style: const TextStyle(color: AppColors.grisMedio)),
-                      IconButton(
-                        icon: const Icon(Icons.chevron_right),
-                        onPressed: page < totalPages - 1 ? () => setState(() => _page = page + 1) : null,
-                      ),
-                    ],
+                  PaginationBar(
+                    page: page,
+                    totalPages: totalPages,
+                    totalItems: filtered.length,
+                    pageSize: _pageSize,
+                    itemLabel: 'escena(s)',
+                    onPageChanged: (p) => setState(() => _page = p),
+                    onPageSizeChanged: (size) => setState(() {
+                      _pageSize = size;
+                      _page = 0;
+                    }),
                   ),
                 ],
               ],
-            ),
-          );
-        },
-      ),
-    );
+            );
   }
 
   Future<void> _openForm(BuildContext context) async {
@@ -239,6 +338,88 @@ class _ScenesScreenState extends State<ScenesScreen> {
       const _SceneFormSheet(),
     );
     if (created == true) _reload();
+  }
+
+  Future<void> _delete(Scene s) async {
+    final idEscena = s.idEscena;
+    if (idEscena == null) return;
+
+    final confirmed = await confirmDelete(
+      context,
+      message:
+          '¿Eliminar la escena "#${s.numeroDeEscena} · ${s.encabezado}"? '
+          'También se eliminarán sus fotos de continuidad, el cast asignado y su desglose. '
+          'Esta acción no se puede deshacer.',
+    );
+    if (!confirmed) return;
+
+    final session = context.read<AuthSession>();
+    try {
+      await SceneService(session.api).delete(idEscena);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Escena eliminada')));
+      }
+      _reload();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  // ==========================================
+  // CARGA MASIVA
+  // ==========================================
+  // Columnas esperadas (encabezado, sin importar mayúsculas): numero
+  // (o numero_de_escena), encabezado, descripcion, vista (o
+  // modo_vista), momento (o momento_dia), ciudad, dia (o
+  // dia_dramatico), estado. Solo "numero" y "encabezado" son
+  // obligatorias — el resto queda vacío/"Pendiente" si no se llena.
+  Future<List<BulkRowResult>> _bulkCreate(List<Map<String, String>> rows) async {
+    final session = context.read<AuthSession>();
+    final service = SceneService(session.api);
+    final results = <BulkRowResult>[];
+
+    var fila = 1;
+    for (final row in rows) {
+      fila++;
+      final numero = _pick(row, ['numero_de_escena', 'numero', 'escena']);
+      final encabezado = _pick(row, ['encabezado', 'titulo', 'título']);
+
+      if (numero == null || encabezado == null) {
+        results.add(BulkRowResult(fila: fila, ok: false, detalle: 'Faltan columnas requeridas (numero, encabezado)'));
+        continue;
+      }
+
+      final estadoTexto = _pick(row, ['estado']);
+      final estado = estadoTexto != null && kEstadosEscena.contains(estadoTexto) ? estadoTexto : 'Pendiente';
+
+      try {
+        await service.create(Scene(
+          numeroDeEscena: numero,
+          encabezado: encabezado,
+          descripcion: _pick(row, ['descripcion', 'descripción']),
+          modoVista: _pick(row, ['modo_vista', 'vista']),
+          momentoDia: _pick(row, ['momento_dia', 'momento']),
+          ciudad: _pick(row, ['ciudad']),
+          diaDramatico: int.tryParse(_pick(row, ['dia_dramatico', 'dia', 'día']) ?? ''),
+          estado: estado,
+        ));
+        results.add(BulkRowResult(fila: fila, ok: true, detalle: 'Creada correctamente'));
+      } on ApiException catch (e) {
+        results.add(BulkRowResult(fila: fila, ok: false, detalle: e.message));
+      } catch (e) {
+        results.add(BulkRowResult(fila: fila, ok: false, detalle: e.toString()));
+      }
+    }
+
+    return results;
+  }
+
+  String? _pick(Map<String, String> row, List<String> posiblesLlaves) {
+    for (final key in posiblesLlaves) {
+      final value = row[key];
+      if (value != null && value.trim().isNotEmpty) return value.trim();
+    }
+    return null;
   }
 }
 
@@ -256,19 +437,36 @@ Color colorForEstadoEscena(String estado) {
 class _SceneRow extends StatelessWidget {
   final Scene scene;
   final bool canEdit;
+  final bool selected;
+  final VoidCallback? onTap;
   final VoidCallback onView;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _SceneRow({required this.scene, required this.canEdit, required this.onView, required this.onEdit});
+  const _SceneRow({
+    required this.scene,
+    required this.canEdit,
+    this.selected = false,
+    this.onTap,
+    required this.onView,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: selected ? AppColors.azulProfundo : AppColors.border, width: selected ? 2 : 1),
       ),
       child: Row(
         children: [
@@ -306,7 +504,15 @@ class _SceneRow extends StatelessWidget {
               tooltip: 'Editar escena',
               onPressed: onEdit,
             ),
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+              tooltip: 'Eliminar escena',
+              onPressed: onDelete,
+            ),
         ],
+      ),
+        ),
       ),
     );
   }

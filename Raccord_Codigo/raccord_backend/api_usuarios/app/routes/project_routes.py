@@ -42,7 +42,7 @@ def store_and_link(data: ProjectCreateSchema, db: Session = Depends(get_db), cur
 # GET PROJECTS BY CLIENT
 
 @router.get("/projects/client/{id_client}")
-def projects_by_client(id_client: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def projects_by_client(id_client: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return get_projects_by_client(id_client, db)
 
 @router.get("/projects/{id}")

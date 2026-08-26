@@ -59,6 +59,7 @@ def register(data, db: Session):
             contrasena=hashed_password,
             id_departamento=None,
             id_project=None,
+            id_client=new_client.id_cliente,
             id_rol=1001
         )
 
@@ -85,7 +86,14 @@ def register(data, db: Session):
 # ==========================================
 # INVITE USERS
 # ==========================================
-def invite_users(correos: list, id_project: str, id_client: int, id_rol: int, db: Session):
+# `invitados` es una lista de objetos {nombre_completo, mail,
+# id_departamento, id_rol} — un elemento para "Invitar persona" (el
+# diálogo del formulario), N elementos para "Carga masiva"
+# (Excel/CSV/JSON con esas mismas columnas). A diferencia de la versión
+# anterior, cada invitado ya trae su nombre y su departamento desde el
+# formulario, así que el usuario que se crea queda completo desde el
+# inicio (ya no queda como "Pendiente/Pendiente" sin departamento).
+def invite_users(invitados: list, id_project: str, id_client: str, db: Session):
     project = db.query(Project).filter(Project.id_project == id_project).first()
 
     if not project:
@@ -94,7 +102,13 @@ def invite_users(correos: list, id_project: str, id_client: int, id_rol: int, db
     usuarios_creados = []
     errores = []
 
-    for correo in correos:
+    for invitado in invitados:
+        correo = invitado.mail.strip().lower()
+        nombre_completo = invitado.nombre_completo.strip()
+        partes = nombre_completo.split(" ", 1)
+        nombre = partes[0] if partes else nombre_completo
+        apellido = partes[1] if len(partes) > 1 else ""
+
         existing = db.query(User).filter(User.mail == correo).first()
 
         if existing:
@@ -113,7 +127,7 @@ def invite_users(correos: list, id_project: str, id_client: int, id_rol: int, db
             user_project = UserProject(
                 id_user=existing.id_user,
                 id_project=id_project,
-                id_rol=id_rol
+                id_rol=invitado.id_rol
             )
             db.add(user_project)
             db.flush()
@@ -137,11 +151,11 @@ def invite_users(correos: list, id_project: str, id_client: int, id_rol: int, db
 
         try:
             new_user = User(
-                nombre="Pendiente",
-                apellido="Pendiente",
+                nombre=format_text(nombre) if nombre else "Pendiente",
+                apellido=format_text(apellido) if apellido else "Pendiente",
                 identificacion="CC",
                 id_identificacion=f"TEMP-{correo}",
-                mail=correo.strip().lower(),
+                mail=correo,
                 msisdn="",
                 direccion="",
                 fecha_de_nacimiento=datetime.now(),
@@ -149,9 +163,10 @@ def invite_users(correos: list, id_project: str, id_client: int, id_rol: int, db
                 fecha_de_creacion=datetime.now(),
                 ultimo_acceso=datetime.now(),
                 contrasena=hash_password(contrasena_temporal),
-                id_departamento=None,
-                id_project=None,
-                id_rol=id_rol
+                id_departamento=invitado.id_departamento,
+                id_project=id_project,
+                id_client=id_client,
+                id_rol=invitado.id_rol
             )
 
             db.add(new_user)
@@ -160,7 +175,7 @@ def invite_users(correos: list, id_project: str, id_client: int, id_rol: int, db
             user_project = UserProject(
                 id_user=new_user.id_user,
                 id_project=id_project,
-                id_rol=id_rol
+                id_rol=invitado.id_rol
             )
             db.add(user_project)
             db.flush()

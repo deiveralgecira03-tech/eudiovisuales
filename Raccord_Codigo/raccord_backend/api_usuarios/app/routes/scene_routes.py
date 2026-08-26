@@ -24,7 +24,7 @@ def scenes(db: Session = Depends(get_db), current_user: dict = Depends(get_curre
     return get_scenes(db)
 
 @router.get("/scenes/script/{id_guion}")
-def scenes_by_script(id_guion: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def scenes_by_script(id_guion: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return get_scenes_by_script(id_guion, db)
 
 @router.get("/scenes/rodaje/{id_rodaje}")

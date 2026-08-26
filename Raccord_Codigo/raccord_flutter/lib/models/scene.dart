@@ -9,7 +9,7 @@ class Scene {
   final String numeroDeEscena;
   final String encabezado;
   final String? descripcion;
-  final int? idGuion;
+  final String? idGuion;
   final String? modoVista;
   final String? momentoDia;
   final String? ciudad;
@@ -19,6 +19,15 @@ class Scene {
   final String? idRodaje;
   final String? idDesglose;
   final String estado;
+
+  // Datos PROPIOS del Plan de Rodaje (no de la escena narrativa) — se
+  // editan desde esa pantalla, no desde el editor general de Escenas.
+  // Ver app/models/scene_model.py y sql/007_plan_rodaje_datos_propios.sql.
+  final String? locacionRodaje;
+  final String? tiempoEstimado;
+  final String? horaInicioRodaje; // "HH:MM:SS" (formato hora backend)
+  final String? notasRodaje;
+  final int? ordenRodaje;
 
   Scene({
     this.idEscena,
@@ -35,6 +44,11 @@ class Scene {
     this.idRodaje,
     this.idDesglose,
     this.estado = 'Pendiente',
+    this.locacionRodaje,
+    this.tiempoEstimado,
+    this.horaInicioRodaje,
+    this.notasRodaje,
+    this.ordenRodaje,
   });
 
   String get modoYMomento {
@@ -51,7 +65,7 @@ class Scene {
       numeroDeEscena: asString(pick(json, ['numero_de_escena'])) ?? '',
       encabezado: asString(pick(json, ['encabezado'])) ?? '',
       descripcion: asString(pick(json, ['descripcion'])),
-      idGuion: asInt(pick(json, ['id_guion'])),
+      idGuion: asString(pick(json, ['id_guion'])),
       modoVista: asString(pick(json, ['modo_vista'])),
       momentoDia: asString(pick(json, ['momento_dia'])),
       ciudad: asString(pick(json, ['ciudad'])),
@@ -61,6 +75,11 @@ class Scene {
       idRodaje: asString(pick(json, ['id_rodaje'])),
       idDesglose: asString(pick(json, ['id_desglose'])),
       estado: asString(pick(json, ['estado'])) ?? 'Pendiente',
+      locacionRodaje: asString(pick(json, ['locacion_rodaje'])),
+      tiempoEstimado: asString(pick(json, ['tiempo_estimado'])),
+      horaInicioRodaje: asString(pick(json, ['hora_inicio_rodaje'])),
+      notasRodaje: asString(pick(json, ['notas_rodaje'])),
+      ordenRodaje: asInt(pick(json, ['orden_rodaje'])),
     );
   }
 
@@ -79,5 +98,10 @@ class Scene {
         if (idRodaje != null && idRodaje!.isNotEmpty) 'id_rodaje': idRodaje,
         if (idDesglose != null && idDesglose!.isNotEmpty) 'id_desglose': idDesglose,
         'estado': estado,
+        if (locacionRodaje != null && locacionRodaje!.isNotEmpty) 'locacion_rodaje': locacionRodaje,
+        if (tiempoEstimado != null && tiempoEstimado!.isNotEmpty) 'tiempo_estimado': tiempoEstimado,
+        if (horaInicioRodaje != null && horaInicioRodaje!.isNotEmpty) 'hora_inicio_rodaje': horaInicioRodaje,
+        if (notasRodaje != null && notasRodaje!.isNotEmpty) 'notas_rodaje': notasRodaje,
+        if (ordenRodaje != null) 'orden_rodaje': ordenRodaje,
       };
 }

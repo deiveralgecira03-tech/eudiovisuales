@@ -40,11 +40,11 @@ async def store_photo(
 
 # Ver/descargar el binario de la foto: cualquier usuario autenticado.
 @router.get("/fotos/{id_foto}/archivo")
-def download_photo_file(id_foto: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def download_photo_file(id_foto: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return get_photo_archivo(id_foto, db)
 
 
 # Eliminar foto: mismo permiso que subirla.
 @router.delete("/fotos/{id_foto}")
-def destroy_photo(id_foto: int, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("upload_photos"))):
+def destroy_photo(id_foto: str, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("upload_photos"))):
     return delete_photo(id_foto, db)

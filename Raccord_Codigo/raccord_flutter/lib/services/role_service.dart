@@ -11,20 +11,44 @@ class RoleService {
     return asListOfMap(data).map(RoleModel.fromJson).toList();
   }
 
-  /// Invita personas por correo a un proyecto con un rol determinado.
-  /// Requiere permiso invite_users (Administrador, Director, Jefe de
+  /// Invita a una o varias personas a un proyecto. Cada invitado trae
+  /// su propio nombre completo, correo, departamento y rol — "Invitar
+  /// persona" manda una lista de un elemento; "Carga masiva" manda la
+  /// misma estructura con N filas leídas de CSV/JSON. Requiere
+  /// permiso invite_users (Administrador, Director, Jefe de
   /// Departamento).
-  Future<void> invite({
-    required List<String> correos,
+  Future<Map<String, dynamic>> invite({
+    required List<InviteItem> invitados,
     required String idProject,
-    required int idClient,
-    required int idRol,
+    required String idClient,
   }) async {
-    await api.post('/users/invite', body: {
-      'correos': correos,
+    final data = await api.post('/users/invite', body: {
+      'invitados': invitados.map((i) => i.toJson()).toList(),
       'id_project': idProject,
       'id_client': idClient,
-      'id_rol': idRol,
     });
+    return Map<String, dynamic>.from(data as Map);
   }
+}
+
+/// Una fila del formulario/archivo de invitación.
+class InviteItem {
+  final String nombreCompleto;
+  final String mail;
+  final String idDepartamento;
+  final int idRol;
+
+  InviteItem({
+    required this.nombreCompleto,
+    required this.mail,
+    required this.idDepartamento,
+    required this.idRol,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'nombre_completo': nombreCompleto,
+        'mail': mail,
+        'id_departamento': idDepartamento,
+        'id_rol': idRol,
+      };
 }

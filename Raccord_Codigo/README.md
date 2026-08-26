@@ -136,7 +136,15 @@ CONTACT_EMAIL=<correo que recibe los mensajes del formulario de contacto>
 SECRET_KEY=<clave secreta para firmar los JWT>
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+MINIO_ENDPOINT=localhost:9000
+MINIO_PUBLIC_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=raccord_admin
+MINIO_SECRET_KEY=raccord_minio_2026
+MINIO_SECURE=false
 ```
+
+> Las variables `MINIO_*` solo se usan si corres el backend **fuera** de Docker (sección 6). Levantando todo con `docker compose up -d --build` (sección 4) ya quedan configuradas solas en `docker-compose.yml`, no hay que tocar nada acá.
 
 **`SECRET_KEY`**: debe ser un valor largo y aleatorio, distinto por entorno. Si tienes Python instalado, se genera uno con:
 ```bash
@@ -173,6 +181,7 @@ Y accede desde el navegador:
 | Backend (API) | http://localhost:8000 | FastAPI |
 | Adminer | http://localhost:8080 | Administrar la base de datos desde el navegador |
 | PostgreSQL | localhost:5432 | Base de datos (se conecta con un cliente de BD, no desde el navegador) |
+| MinIO (consola) | http://localhost:9001 | Ver/administrar los PDFs de guiones y fotos de continuidad. Usuario/contraseña: los valores de `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` (por defecto `raccord_admin` / `raccord_minio_2026`, ver `docker-compose.yml`) |
 
 > Nota para el equipo de desarrollo original: si esta es la máquina donde ya existía un contenedor `postgres-db` corriendo desde antes (creado con `docker run`, con datos reales), hay que liberar ese nombre **una sola vez** antes del primer `docker compose up` (esto no borra los datos, solo el contenedor):
 > ```bash
@@ -182,6 +191,20 @@ Y accede desde el navegador:
 ### 4.1 Máquina nueva sin datos previos
 
 Si esta es una máquina completamente nueva (nadie ha corrido el proyecto ahí antes), la base de datos arrancará vacía. Hace falta cargar el esquema completo (tablas, tipos, triggers) una vez. Consulta con el equipo si ya existe un archivo de respaldo (`sql/000_schema_completo.sql`); si no existe todavía, pídanle a quien tenga la base de datos original que genere ese respaldo antes de desplegar en una máquina nueva.
+
+Los buckets de MinIO (`guiones`, `imagenes`, `perfiles`) no necesitan nada manual: el backend los crea solos la primera vez que arranca.
+
+### 4.2 Almacenamiento de archivos (MinIO)
+
+Los PDFs de guiones, las fotos de continuidad y las fotos de perfil **no** se guardan en PostgreSQL — se suben a [MinIO](https://min.io/) (almacenamiento de objetos compatible con S3), otro contenedor más del mismo `docker-compose.yml`, en tres buckets separados:
+
+| Bucket | Contenido |
+|---|---|
+| `guiones` | PDFs de guiones (`POST /scripts/{id}/archivo`) |
+| `imagenes` | Fotos de continuidad (`POST /scenes/{id_escena}/fotos`) |
+| `perfiles` | Fotos de perfil de usuario (`POST /users/me/foto`) |
+
+En Postgres solo queda guardada la ruta del archivo (`archivo_key` / `foto_perfil_key`) y los metadatos (nombre, tipo, tamaño) — nunca el binario. Al pedir un archivo (`GET /scripts/{id}/archivo`, `GET /fotos/{id_foto}/archivo` o `GET /users/{id}/foto`), el backend valida el permiso como siempre y **sirve el archivo él mismo** (descarga el binario de MinIO y lo devuelve en la respuesta) en vez de redirigir a una URL de MinIO — así el navegador nunca pide el archivo directo al puerto de MinIO, lo que evita problemas de CORS entre dominios distintos.
 
 ---
 
@@ -236,7 +259,7 @@ Correr el servidor en modo desarrollo (se reinicia solo cada vez que guardas un 
 ```bash
 uvicorn app.main:app --reload
 ```
-El backend queda disponible en http://localhost:8000. Para esto necesitas también tener una base de datos PostgreSQL accesible con los datos del `.env` (puedes seguir usando la de Docker: `docker compose up -d db`, y dejar `DB_HOST=localhost` en el `.env` ya que el puerto 5432 queda publicado al sistema).
+El backend queda disponible en http://localhost:8000. Para esto necesitas también tener una base de datos PostgreSQL y MinIO accesibles con los datos del `.env` (puedes seguir usando los de Docker: `docker compose up -d db minio`, y dejar `DB_HOST=localhost`/`MINIO_ENDPOINT=localhost:9000` en el `.env`, ya que los puertos 5432 y 9000 quedan publicados al sistema).
 
 Para salir del entorno virtual cuando termines: `deactivate`
 
@@ -292,3 +315,5 @@ El resultado queda en `build/web/`.
 **Adminer:** para conectarte a la base desde http://localhost:8080, el campo "Servidor" debe ser `db` (el nombre del servicio en `docker-compose.yml`), no `localhost`.
 
 **`flutter doctor` marca errores de Android/iOS:** no es necesario resolverlos si solo vas a correr/compilar la versión web. Esos ítems solo son obligatorios para compilar `.apk` o la app de iOS.
+
+**Un PDF o foto no carga / da 404:** el backend sirve estos archivos él mismo (los descarga de MinIO y los devuelve en la respuesta, ver sección 4.2), así que el navegador nunca habla directo con MinIO para esto — revisa que el contenedor `raccord-minio` esté corriendo (`docker compose ps`) y que las variables `MINIO_ENDPOINT`/`MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` del backend sean correctas (`docker compose logs -f backend` suele mostrar el error real si no logra conectarse).

@@ -46,7 +46,7 @@ class Department {
 }
 
 class ClientModel {
-  final int? idClient;
+  final String? idClient;
   final String document;
   final String razonSocial;
   final String representanteLegal;
@@ -62,7 +62,7 @@ class ClientModel {
 
   factory ClientModel.fromJson(Map<String, dynamic> json) {
     return ClientModel(
-      idClient: asInt(pick(json, ['id_client'])),
+      idClient: asString(pick(json, ['id_client'])),
       document: asString(pick(json, ['document'])) ?? '',
       razonSocial: asString(pick(json, ['razon_social'])) ?? '',
       representanteLegal: asString(pick(json, ['representante_legal'])) ?? '',

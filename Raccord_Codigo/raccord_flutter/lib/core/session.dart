@@ -53,12 +53,13 @@ class AuthSession extends ChangeNotifier {
     final mail = prefs.getString('${_kUser}_mail');
     if (_token != null && mail != null) {
       _user = SessionUser(
-        idUser: prefs.getInt('${_kUser}_id') ?? 0,
+        idUser: prefs.getString('${_kUser}_id') ?? '',
         nombre: prefs.getString('${_kUser}_nombre') ?? '',
         apellido: prefs.getString('${_kUser}_apellido') ?? '',
         mail: mail,
         idRol: prefs.getInt('${_kUser}_rol') ?? 0,
-        idClient: prefs.getInt('${_kUser}_client'),
+        idClient: prefs.getString('${_kUser}_client'),
+        idDepartamento: prefs.getString('${_kUser}_departamento'),
       );
     }
 
@@ -75,13 +76,16 @@ class AuthSession extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kToken, token);
-    await prefs.setInt('${_kUser}_id', user.idUser);
+    await prefs.setString('${_kUser}_id', user.idUser);
     await prefs.setString('${_kUser}_nombre', user.nombre);
     await prefs.setString('${_kUser}_apellido', user.apellido);
     await prefs.setString('${_kUser}_mail', user.mail);
     await prefs.setInt('${_kUser}_rol', user.idRol);
     if (user.idClient != null) {
-      await prefs.setInt('${_kUser}_client', user.idClient!);
+      await prefs.setString('${_kUser}_client', user.idClient!);
+    }
+    if (user.idDepartamento != null) {
+      await prefs.setString('${_kUser}_departamento', user.idDepartamento!);
     }
 
     notifyListeners();
@@ -96,6 +100,7 @@ class AuthSession extends ChangeNotifier {
       mail: _user!.mail,
       idRol: _user!.idRol,
       idClient: _user!.idClient,
+      idDepartamento: _user!.idDepartamento,
     );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('${_kUser}_nombre', nombre);
@@ -137,6 +142,7 @@ class AuthSession extends ChangeNotifier {
     await prefs.remove('${_kUser}_mail');
     await prefs.remove('${_kUser}_rol');
     await prefs.remove('${_kUser}_client');
+    await prefs.remove('${_kUser}_departamento');
     await prefs.remove(_kProjectId);
     await prefs.remove(_kProjectName);
 

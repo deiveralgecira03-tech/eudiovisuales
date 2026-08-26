@@ -25,7 +25,12 @@ def _serialize(s: Scene):
         "dia_dramatico": s.dia_dramatico,
         "id_rodaje": s.id_rodaje,
         "id_desglose": s.id_desglose,
-        "estado": s.estado
+        "estado": s.estado,
+        "locacion_rodaje": s.locacion_rodaje,
+        "tiempo_estimado": s.tiempo_estimado,
+        "hora_inicio_rodaje": str(s.hora_inicio_rodaje) if s.hora_inicio_rodaje else None,
+        "notas_rodaje": s.notas_rodaje,
+        "orden_rodaje": s.orden_rodaje
     }
 
 
@@ -52,7 +57,7 @@ def get_scene(id: str, db: Session):
 # ==========================================
 # GET SCENES BY SCRIPT (GUION)
 # ==========================================
-def get_scenes_by_script(id_guion: int, db: Session):
+def get_scenes_by_script(id_guion: str, db: Session):
     scenes = db.query(Scene).filter(Scene.id_guion == id_guion).order_by(Scene.id_escena).all()
     return api_response(True, "Escenas del guion", [_serialize(s) for s in scenes])
 
@@ -90,7 +95,12 @@ def create_scene(scene: SceneSchema, db: Session):
         dia_dramatico=scene.dia_dramatico,
         id_rodaje=scene.id_rodaje,
         id_desglose=scene.id_desglose,
-        estado=scene.estado or "Pendiente"
+        estado=scene.estado or "Pendiente",
+        locacion_rodaje=scene.locacion_rodaje,
+        tiempo_estimado=scene.tiempo_estimado,
+        hora_inicio_rodaje=scene.hora_inicio_rodaje,
+        notas_rodaje=scene.notas_rodaje,
+        orden_rodaje=scene.orden_rodaje
     )
 
     db.add(new_scene)
@@ -122,6 +132,11 @@ def update_scene_full(id: str, scene: SceneSchema, db: Session):
     scene_db.id_rodaje = scene.id_rodaje
     scene_db.id_desglose = scene.id_desglose
     scene_db.estado = scene.estado or scene_db.estado
+    scene_db.locacion_rodaje = scene.locacion_rodaje
+    scene_db.tiempo_estimado = scene.tiempo_estimado
+    scene_db.hora_inicio_rodaje = scene.hora_inicio_rodaje
+    scene_db.notas_rodaje = scene.notas_rodaje
+    scene_db.orden_rodaje = scene.orden_rodaje
 
     db.commit()
     db.refresh(scene_db)

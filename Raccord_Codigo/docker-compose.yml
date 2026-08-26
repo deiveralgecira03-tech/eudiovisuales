@@ -49,6 +49,30 @@ services:
     depends_on:
       - db
 
+  # Almacén de objetos S3-compatible para los binarios que antes vivían
+  # como BYTEA en Postgres (PDFs de guiones, fotos de continuidad).
+  # Dos buckets: "guiones" y "imagenes" — se crean solos al arrancar el
+  # backend (ver app/utils/minio_client.py), no hace falta crearlos a
+  # mano. Consola web en el puerto 9001 para revisar los archivos.
+  minio:
+    image: minio/minio
+    container_name: raccord-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-raccord_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-raccord_minio_2026}
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # Consola web
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./raccord_backend/api_usuarios
@@ -57,14 +81,26 @@ services:
     env_file:
       - ./raccord_backend/api_usuarios/.env
     environment:
-      # Dentro de la red de docker compose, el host de la BD es el
-      # nombre del servicio ("db"), no localhost. Todo lo demás
-      # (usuario, contraseña, SECRET_KEY, correo, etc.) sale del .env.
+      # Dentro de la red de docker compose, el host de la BD y de MinIO
+      # es el nombre del servicio ("db" / "minio"), no localhost. Todo
+      # lo demás (usuario, contraseña, SECRET_KEY, correo, etc.) sale
+      # del .env.
       DB_HOST: db
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-raccord_admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-raccord_minio_2026}
+      MINIO_SECURE: "false"
+      # Para que las URLs prefirmadas que se generan (para ver/descargar
+      # PDFs y fotos) apunten a algo que el navegador del usuario pueda
+      # resolver, no al nombre interno "minio" que solo existe dentro de
+      # la red de docker compose.
+      MINIO_PUBLIC_ENDPOINT: localhost:9000
     ports:
       - "8000:8000"
     depends_on:
       db:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   frontend:
@@ -84,3 +120,6 @@ volumes:
     # "docker inspect postgres-db"). "external: true" le dice a
     # compose que NO cree un volumen nuevo, que use este que ya existe.
     name: afbf8ec9e0032afaa85fa6ec45ae734bbafde776efede1686bcdbc21addaf709
+  minio_data:
+    # Este sí lo crea compose solo (no existía antes), no necesita
+    # "external: true".

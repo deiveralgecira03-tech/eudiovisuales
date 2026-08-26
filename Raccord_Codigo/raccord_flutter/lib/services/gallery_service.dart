@@ -40,11 +40,11 @@ class GalleryService {
     return GalleryPhoto.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
-  Future<List<int>> archivoBytes(int idFoto) {
+  Future<List<int>> archivoBytes(String idFoto) {
     return api.getBytes('/fotos/$idFoto/archivo');
   }
 
-  Future<void> delete(int idFoto) async {
+  Future<void> delete(String idFoto) async {
     await api.delete('/fotos/$idFoto');
   }
 }

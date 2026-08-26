@@ -24,6 +24,7 @@ from app.routes.gallery_photo_routes import router as gallery_photo_router
 from app.routes.contact_routes import router as contact_router
 
 from app.config.database import Base, engine
+from app.utils.minio_client import ensure_buckets
 from app.models.user_project_model import UserProject
 from app.models.department_model import Department
 from app.models.script_model import Script
@@ -41,6 +42,9 @@ logger = logging.getLogger("raccord")
 
 # CREATE TABLES
 Base.metadata.create_all(bind=engine)
+
+# ASEGURAR BUCKETS DE MINIO (guiones, imagenes) - los crea si no existen
+ensure_buckets()
 
 # FASTAPI
 

@@ -1,9 +1,10 @@
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:provider/provider.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/date_utils.dart';
@@ -30,7 +31,7 @@ class _ScriptsScreenState extends State<ScriptsScreen> {
   // null = "Todos los estados".
   String? _filtroEstado;
   // Id del guión cuya tarjeta de edición está abierta (solo una a la vez).
-  int? _editingId;
+  String? _editingId;
 
   @override
   void initState() {
@@ -114,6 +115,7 @@ class _ScriptsScreenState extends State<ScriptsScreen> {
                                     MaterialPageRoute(builder: (_) => ScriptDetailScreen(script: s)),
                                   ),
                                   onEditTap: () => setState(() => _editingId = isEditing ? null : s.idGuion),
+                                  onDeleteTap: () => _delete(s),
                                 ),
                                 if (isEditing)
                                   _ScriptEditCard(
@@ -143,6 +145,30 @@ class _ScriptsScreenState extends State<ScriptsScreen> {
       const _ScriptFormSheet(),
     );
     if (created == true) _reload();
+  }
+
+  Future<void> _delete(Script s) async {
+    final idGuion = s.idGuion;
+    if (idGuion == null) return;
+
+    final confirmed = await confirmDelete(
+      context,
+      message: '¿Eliminar el guión "${s.nombre}"? Esto borra también TODAS sus escenas, desglose y fotos de continuidad asociadas. Esta acción no se puede deshacer.',
+    );
+    if (!confirmed) return;
+
+    final session = context.read<AuthSession>();
+    try {
+      await ScriptService(session.api).delete(idGuion);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guión eliminado')));
+      }
+      _reload();
+    } on ApiException catch (e) {
+      // Ej. "SCRIPT_IN_USE" si el guión todavía tiene escenas asociadas
+      // — el mensaje ya viene listo para mostrar desde el backend.
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 }
 
@@ -187,8 +213,15 @@ class _ScriptTile extends StatelessWidget {
   final bool canEdit;
   final VoidCallback onTap;
   final VoidCallback onEditTap;
+  final VoidCallback onDeleteTap;
 
-  const _ScriptTile({required this.script, required this.canEdit, required this.onTap, required this.onEditTap});
+  const _ScriptTile({
+    required this.script,
+    required this.canEdit,
+    required this.onTap,
+    required this.onEditTap,
+    required this.onDeleteTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -240,6 +273,12 @@ class _ScriptTile extends StatelessWidget {
                 icon: const Icon(Icons.edit_outlined, size: 20),
                 tooltip: 'Editar',
                 onPressed: onEditTap,
+              ),
+            if (canEdit)
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                tooltip: 'Eliminar',
+                onPressed: onDeleteTap,
               ),
           ],
         ),
@@ -311,7 +350,7 @@ class _ScriptEditCardState extends State<_ScriptEditCard> {
             ],
           ),
           const SizedBox(height: 16),
-          Text('Archivo PDF', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          const Text('Archivo PDF', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: _loading ? null : _pickPdf,
@@ -387,9 +426,10 @@ class _ScriptEditCardState extends State<_ScriptEditCard> {
 }
 
 /// Vista completa de un guión (mockup 8.1): metadatos + el PDF real
-/// embebido con Syncfusion PDF Viewer. El PDF vive en la base de datos
-/// (GET /scripts/{id}/archivo) — se descarga una vez a memoria y se
-/// renderiza con SfPdfViewer.memory, sin escribir nada a disco.
+/// embebido con pdfrx (motor pdfium, el mismo que usa Chrome). El PDF
+/// vive en la base de datos (GET /scripts/{id}/archivo) — se descarga
+/// una vez a memoria y se renderiza con PdfViewer.data, sin escribir
+/// nada a disco.
 class ScriptDetailScreen extends StatefulWidget {
   final Script script;
   const ScriptDetailScreen({super.key, required this.script});
@@ -400,7 +440,7 @@ class ScriptDetailScreen extends StatefulWidget {
 
 class _ScriptDetailScreenState extends State<ScriptDetailScreen> {
   Future<List<int>>? _pdfBytes;
-  String? _pdfViewerError;
+  bool _segmentando = false;
 
   @override
   void initState() {
@@ -431,18 +471,109 @@ class _ScriptDetailScreenState extends State<ScriptDetailScreen> {
     final idGuion = widget.script.idGuion;
     if (idGuion == null) return;
     setState(() {
-      _pdfViewerError = null;
       _pdfBytes = ScriptService(session.api).archivoBytes(idGuion);
     });
+  }
+
+  /// Descarga el PDF al disco (o dispara la descarga del navegador en
+  /// Web) reusando los bytes que ya trajo el visor — evita pedirlos de
+  /// nuevo al backend. Solo visible para roles con `download_files`
+  /// (ver matriz de permisos: Administrador, Director, Jefe de
+  /// Departamento; Onset y Usuario no la tienen).
+  Future<void> _download() async {
+    final future = _pdfBytes;
+    if (future == null) return;
+
+    try {
+      final bytes = await future;
+      var nombre = widget.script.archivoNombre?.trim();
+      if (nombre == null || nombre.isEmpty) nombre = '${widget.script.nombre}.pdf';
+      if (nombre.toLowerCase().endsWith('.pdf')) {
+        nombre = nombre.substring(0, nombre.length - 4);
+      }
+
+      await FileSaver.instance.saveFile(
+        name: nombre,
+        bytes: Uint8List.fromList(bytes),
+        fileExtension: 'pdf',
+        mimeType: MimeType.pdf,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Descarga iniciada')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo descargar el archivo.')),
+        );
+      }
+    }
+  }
+
+  /// Punto de entrada del botón "Segmentar en escenas": pide la vista
+  /// previa (sin escribir nada todavía) y, si el backend detectó
+  /// escenas, abre el diálogo para revisar y confirmar. Si el guion no
+  /// cumple los requisitos (estado, sin PDF, no se detectó nada), el
+  /// backend ya manda un mensaje completo lista para mostrar tal cual.
+  Future<void> _startSegmentation() async {
+    final idGuion = widget.script.idGuion;
+    if (idGuion == null) return;
+
+    setState(() => _segmentando = true);
+    final session = context.read<AuthSession>();
+
+    try {
+      final preview = await ScriptService(session.api).segmentar(idGuion, confirmar: false);
+      if (!mounted) return;
+
+      final resultado = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (_) => _SegmentPreviewDialog(idGuion: idGuion, preview: preview),
+      );
+
+      if (resultado != null && mounted) {
+        final escenasCreadas = (resultado['escenas_creadas'] as List? ?? []).length;
+        final personajesCreados = (resultado['personajes_creados'] as List? ?? []).length;
+        final partes = <String>['$escenasCreadas escena(s) creada(s)'];
+        if (personajesCreados > 0) partes.add('$personajesCreados personaje(s) nuevo(s)');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${partes.join(', ')}. Revísalas en Escenas y Personajes.')),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _segmentando = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final script = widget.script;
+    final session = context.watch<AuthSession>();
+    final canDownload = session.can('download_files');
+    final canSegment = session.can('create_scenes');
 
     return AppScaffold(
       title: script.nombre,
       showBack: true,
+      actions: [
+        if (canSegment)
+          IconButton(
+            icon: _segmentando
+                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.auto_awesome_outlined),
+            tooltip: 'Segmentar en escenas (automático)',
+            onPressed: _segmentando ? null : _startSegmentation,
+          ),
+        if (canDownload)
+          IconButton(
+            icon: const Icon(Icons.download_outlined),
+            tooltip: 'Descargar PDF',
+            onPressed: _download,
+          ),
+      ],
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -501,8 +632,7 @@ class _ScriptDetailScreenState extends State<ScriptDetailScreen> {
 
         // Chequeo mínimo: todo PDF válido empieza con la firma "%PDF".
         // Si esto no se cumple, el archivo llegó corrupto (problema de
-        // red/descarga) y no tiene sentido pasárselo al visor — así
-        // evitamos que Syncfusion falle en silencio y quede en blanco.
+        // red/descarga) y no tiene sentido pasárselo al visor.
         final looksLikePdf = bytes.length > 4 &&
             bytes[0] == 0x25 && // %
             bytes[1] == 0x50 && // P
@@ -515,24 +645,146 @@ class _ScriptDetailScreenState extends State<ScriptDetailScreen> {
           );
         }
 
-        if (_pdfViewerError != null) {
-          return ErrorView(message: _pdfViewerError!, onRetry: _loadPdf);
-        }
+        final idGuion = widget.script.idGuion ?? 'guion-desconocido';
 
-        return SfPdfViewer.memory(
+        return PdfViewer.data(
           Uint8List.fromList(bytes),
-          onDocumentLoadFailed: (details) {
-            debugPrint('SfPdfViewer onDocumentLoadFailed: ${details.description}');
-            // No se puede llamar setState() de forma síncrona dentro de
-            // este callback si todavía estamos construyendo el frame,
-            // así que se difiere al próximo microtask.
-            Future.microtask(() {
-              if (mounted) setState(() => _pdfViewerError = details.description);
-            });
-          },
+          // sourceName solo se usa como llave interna de cache de pdfrx
+          // (para no re-decodificar el mismo PDF dos veces); no se
+          // muestra en pantalla.
+          sourceName: 'guion-$idGuion',
+          params: PdfViewerParams(
+            backgroundColor: AppColors.bg,
+            loadingBannerBuilder: (context, bytesDownloaded, totalBytes) => const _PdfLoadingView(),
+            // Acá es donde antes fallaba en silencio con Syncfusion: si
+            // pdfium no puede parsear el archivo (corrupto, encriptado,
+            // etc.), este builder muestra el motivo real en pantalla en
+            // vez de una vista en blanco.
+            errorBannerBuilder: (context, error, stackTrace, documentRef) {
+              debugPrint('PdfViewer errorBannerBuilder: $error');
+              return ErrorView(
+                message: 'No se pudo abrir el PDF: $error',
+                onRetry: _loadPdf,
+              );
+            },
+          ),
         );
       },
     );
+  }
+}
+
+/// Vista previa de la segmentación automática (POST /scripts/{id}/segmentar
+/// con confirmar=false ya se llamó antes de abrir este diálogo). Muestra
+/// las escenas y personajes detectados y, si la persona confirma, hace
+/// la segunda llamada con confirmar=true para crearlas de verdad.
+/// Devuelve `true` por Navigator.pop si se llegaron a crear escenas.
+class _SegmentPreviewDialog extends StatefulWidget {
+  final String idGuion;
+  final Map<String, dynamic> preview;
+  const _SegmentPreviewDialog({required this.idGuion, required this.preview});
+
+  @override
+  State<_SegmentPreviewDialog> createState() => _SegmentPreviewDialogState();
+}
+
+class _SegmentPreviewDialogState extends State<_SegmentPreviewDialog> {
+  bool _confirmando = false;
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) {
+    final escenas = (widget.preview['escenas'] as List? ?? []).cast<Map<String, dynamic>>();
+    final personajes = (widget.preview['personajes_detectados'] as List? ?? []).cast<String>();
+
+    return Dialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Segmentar guion en escenas', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+              const SizedBox(height: 4),
+              Text(
+                'Se detectaron ${escenas.length} escena(s). Revisa y confirma para crearlas en el módulo de Escenas.',
+                style: const TextStyle(color: AppColors.grisMedio, fontSize: 13),
+              ),
+              if (personajes.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('Personajes detectados en todo el guion (${personajes.length}):', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: personajes.map((p) => Chip(label: Text(p, style: const TextStyle(fontSize: 11)), visualDensity: VisualDensity.compact)).toList(),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: escenas.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, i) {
+                    final e = escenas[i];
+                    final personajesEscena = (e['personajes_detectados'] as List? ?? []).cast<String>();
+                    return ListTile(
+                      dense: true,
+                      leading: CircleAvatar(radius: 14, backgroundColor: AppColors.surfaceVariant, child: Text('${e['numero_de_escena']}', style: const TextStyle(fontSize: 11))),
+                      title: Text(e['encabezado']?.toString() ?? '', style: const TextStyle(fontSize: 13)),
+                      subtitle: personajesEscena.isEmpty ? null : Text(personajesEscena.join(', '), style: const TextStyle(fontSize: 11, color: AppColors.grisMedio)),
+                    );
+                  },
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
+              ],
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _confirmando ? null : () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _confirmando ? null : _confirmar,
+                    child: _confirmando
+                        ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Text('Confirmar y crear ${escenas.length} escena(s)'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmar() async {
+    setState(() {
+      _confirmando = true;
+      _error = null;
+    });
+    final session = context.read<AuthSession>();
+
+    try {
+      final resultado = await ScriptService(session.api).segmentar(widget.idGuion, confirmar: true);
+      if (mounted) Navigator.of(context).pop(resultado);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _confirmando = false);
+    }
   }
 }
 
@@ -604,7 +856,7 @@ class _ScriptFormSheetState extends State<_ScriptFormSheet> {
               ],
             ),
             const SizedBox(height: 16),
-            Text('Archivo PDF', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const Text('Archivo PDF', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: _loading ? null : _pickPdf,

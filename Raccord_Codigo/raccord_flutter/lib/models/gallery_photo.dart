@@ -3,13 +3,13 @@ import '../core/json_utils.dart';
 /// Catálogo de tipos de foto de continuidad (mockup "Continuidad
 /// Visual"). Debe coincidir con TIPOS_FOTO en
 /// gallery_photo_schema.py del backend.
-const kTiposFoto = ['Set', 'Personaje', 'Vestuario', 'Maquillaje', 'Props', 'Locación', 'Otro'];
+const kTiposFoto = ['Locación', 'Propuesta', 'Prueba', 'En Rodaje'];
 
 /// Foto de continuidad asociada a una escena — el binario vive en la
 /// base de datos (ver GalleryService.archivoBytes), acá solo van los
 /// metadatos que trae GET /scenes/{id}/fotos.
 class GalleryPhoto {
-  final int idFoto;
+  final String idFoto;
   final String idEscena;
   final String tipoFoto;
   final String? personajeCodigo;
@@ -34,9 +34,9 @@ class GalleryPhoto {
   factory GalleryPhoto.fromJson(Map<String, dynamic> json) {
     final fecha = asString(pick(json, ['fecha_subida']));
     return GalleryPhoto(
-      idFoto: asInt(pick(json, ['id_foto'])) ?? 0,
+      idFoto: asString(pick(json, ['id_foto'])) ?? '',
       idEscena: asString(pick(json, ['id_escena'])) ?? '',
-      tipoFoto: asString(pick(json, ['tipo_foto'])) ?? 'Set',
+      tipoFoto: asString(pick(json, ['tipo_foto'])) ?? 'Propuesta',
       personajeCodigo: asString(pick(json, ['personaje_codigo'])),
       descripcion: asString(pick(json, ['descripcion'])),
       notasContinuidad: asString(pick(json, ['notas_continuidad'])),

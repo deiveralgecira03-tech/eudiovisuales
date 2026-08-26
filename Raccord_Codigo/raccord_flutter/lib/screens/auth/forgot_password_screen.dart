@@ -23,8 +23,62 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _mailCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
   bool _codeSent = false;
   bool _loading = false;
+  bool _obscurePass = true;
+  bool _obscureConfirm = true;
+
+  // Mismas reglas que en el registro (ver login_register_screen.dart).
+  List<String> get _reglasFaltantes {
+    final p = _passCtrl.text;
+    final faltantes = <String>[];
+    if (p.length < 8) faltantes.add('Mínimo 8 caracteres');
+    if (!RegExp(r'[a-z]').hasMatch(p)) faltantes.add('Una letra minúscula');
+    if (!RegExp(r'[A-Z]').hasMatch(p)) faltantes.add('Una letra mayúscula');
+    if (!RegExp(r'[0-9]').hasMatch(p)) faltantes.add('Un número');
+    if (!RegExp(r'''[!@#$%^&*()_+\-=\[\]{};:'"\\|,.<>/?]''').hasMatch(p)) faltantes.add('Un carácter especial');
+    return faltantes;
+  }
+
+  static const _reglasTexto = [
+    'Mínimo 8 caracteres',
+    'Una letra minúscula',
+    'Una letra mayúscula',
+    'Un número',
+    'Un carácter especial',
+  ];
+
+  bool get _puedeRestablecer =>
+      _codeCtrl.text.trim().isNotEmpty &&
+      _reglasFaltantes.isEmpty &&
+      _confirmCtrl.text == _passCtrl.text &&
+      _confirmCtrl.text.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    // Los campos de contraseña necesitan repintar el checklist de
+    // reglas y el aviso de "no coinciden" en cada tecla, no solo al
+    // enviar el formulario.
+    for (final c in [_codeCtrl, _passCtrl, _confirmCtrl]) {
+      c.addListener(_onFormChanged);
+    }
+  }
+
+  void _onFormChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    for (final c in [_codeCtrl, _passCtrl, _confirmCtrl]) {
+      c.removeListener(_onFormChanged);
+    }
+    _mailCtrl.dispose();
+    _codeCtrl.dispose();
+    _passCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,10 +143,62 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 20),
         AppTextField(label: 'Código', hint: '000000', controller: _codeCtrl, keyboardType: TextInputType.number),
         const SizedBox(height: 16),
-        AppTextField(label: 'Nueva contraseña', hint: 'Crea una nueva contraseña', controller: _passCtrl, obscureText: true),
+        AppTextField(
+          label: 'Nueva contraseña',
+          hint: 'Crea una nueva contraseña',
+          controller: _passCtrl,
+          obscureText: _obscurePass,
+          textCapitalization: TextCapitalization.none,
+          suffixIcon: IconButton(
+            icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+            onPressed: () => setState(() => _obscurePass = !_obscurePass),
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppTextField(
+          label: 'Confirmar contraseña',
+          hint: 'Confirma tu nueva contraseña',
+          controller: _confirmCtrl,
+          obscureText: _obscureConfirm,
+          textCapitalization: TextCapitalization.none,
+          suffixIcon: IconButton(
+            icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+            onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+          ),
+        ),
+        if (_passCtrl.text.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.bg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 4,
+              children: _reglasTexto.map((regla) {
+                final falta = _reglasFaltantes.contains(regla);
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(falta ? Icons.circle_outlined : Icons.check_circle, size: 14, color: falta ? AppColors.grisMedio : AppColors.success),
+                    const SizedBox(width: 6),
+                    Text(regla, style: TextStyle(fontSize: 11, color: falta ? AppColors.grisMedio : AppColors.success)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+        if (_confirmCtrl.text.isNotEmpty && _confirmCtrl.text != _passCtrl.text) ...[
+          const SizedBox(height: 8),
+          const Text('Las contraseñas no coinciden', style: TextStyle(color: AppColors.error, fontSize: 12)),
+        ],
         const SizedBox(height: 20),
         ElevatedButton(
-          onPressed: _loading ? null : _reset,
+          onPressed: (_loading || !_puedeRestablecer) ? null : _reset,
           child: _loading
               ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Text('Restablecer'),

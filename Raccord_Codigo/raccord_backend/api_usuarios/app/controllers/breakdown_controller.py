@@ -71,7 +71,7 @@ def get_items_by_scene(id_escena: str, db: Session):
     return api_response(True, "Desglose general de la escena", [_serialize_item(i) for i in items])
 
 
-def get_item(id: int, db: Session):
+def get_item(id: str, db: Session):
     item = db.query(DesgloseItem).filter(DesgloseItem.id_desglose_item == id).first()
 
     if not item:
@@ -98,7 +98,7 @@ def create_item(item: DesgloseItemSchema, db: Session, current_user: dict):
     return api_response(True, "Item de desglose creado", _serialize_item(new_item))
 
 
-def update_item_full(id: int, item: DesgloseItemSchema, db: Session):
+def update_item_full(id: str, item: DesgloseItemSchema, db: Session):
     item_db = db.query(DesgloseItem).filter(DesgloseItem.id_desglose_item == id).first()
 
     if not item_db:
@@ -117,7 +117,7 @@ def update_item_full(id: int, item: DesgloseItemSchema, db: Session):
     return api_response(True, "Item de desglose actualizado", _serialize_item(item_db))
 
 
-def update_item(id: int, item, db: Session):
+def update_item(id: str, item, db: Session):
     item_db = db.query(DesgloseItem).filter(DesgloseItem.id_desglose_item == id).first()
 
     if not item_db:
@@ -137,7 +137,7 @@ def update_item(id: int, item, db: Session):
 # id_desglose_item.detalle tiene ON DELETE CASCADE hacia desglose_items:
 # borrar el item general borra también la segmentación que haya hecho
 # el departamento. Se avisa cuántas filas de detalle se pierden.
-def delete_item(id: int, db: Session):
+def delete_item(id: str, db: Session):
     item = db.query(DesgloseItem).filter(DesgloseItem.id_desglose_item == id).first()
 
     if not item:
@@ -166,7 +166,7 @@ def delete_item(id: int, db: Session):
 # es que el usuario (Jefe/Onset/Usuario) pertenezca al MISMO
 # departamento dueño del item — si no, no ve ni edita, aunque tenga el
 # permiso de rol.
-def get_detalle_by_item(id_desglose_item: int, db: Session, current_user: dict):
+def get_detalle_by_item(id_desglose_item: str, db: Session, current_user: dict):
     item = db.query(DesgloseItem).filter(DesgloseItem.id_desglose_item == id_desglose_item).first()
 
     if not item:
@@ -182,7 +182,7 @@ def get_detalle_by_item(id_desglose_item: int, db: Session, current_user: dict):
     return api_response(True, "Segmentación del departamento", [_serialize_detalle(d) for d in detalle])
 
 
-def create_detalle(id_desglose_item: int, detalle: DesgloseDetalleSchema, db: Session, current_user: dict):
+def create_detalle(id_desglose_item: str, detalle: DesgloseDetalleSchema, db: Session, current_user: dict):
     item = db.query(DesgloseItem).filter(DesgloseItem.id_desglose_item == id_desglose_item).first()
 
     if not item:
@@ -208,7 +208,7 @@ def create_detalle(id_desglose_item: int, detalle: DesgloseDetalleSchema, db: Se
     return api_response(True, "Segmentación creada", _serialize_detalle(new_detalle))
 
 
-def _get_detalle_con_item(id_detalle: int, db: Session):
+def _get_detalle_con_item(id_detalle: str, db: Session):
     detalle = db.query(DesgloseItemDetalle).filter(DesgloseItemDetalle.id_detalle == id_detalle).first()
 
     if not detalle:
@@ -219,7 +219,7 @@ def _get_detalle_con_item(id_detalle: int, db: Session):
     return detalle, item
 
 
-def update_detalle_full(id_detalle: int, detalle: DesgloseDetalleSchema, db: Session, current_user: dict):
+def update_detalle_full(id_detalle: str, detalle: DesgloseDetalleSchema, db: Session, current_user: dict):
     detalle_db, item = _get_detalle_con_item(id_detalle, db)
 
     if not detalle_db:
@@ -241,7 +241,7 @@ def update_detalle_full(id_detalle: int, detalle: DesgloseDetalleSchema, db: Ses
     return api_response(True, "Segmentación actualizada", _serialize_detalle(detalle_db))
 
 
-def update_detalle(id_detalle: int, detalle, db: Session, current_user: dict):
+def update_detalle(id_detalle: str, detalle, db: Session, current_user: dict):
     detalle_db, item = _get_detalle_con_item(id_detalle, db)
 
     if not detalle_db:
@@ -263,7 +263,7 @@ def update_detalle(id_detalle: int, detalle, db: Session, current_user: dict):
     return api_response(True, "Segmentación actualizada", _serialize_detalle(detalle_db))
 
 
-def delete_detalle(id_detalle: int, db: Session, current_user: dict):
+def delete_detalle(id_detalle: str, db: Session, current_user: dict):
     detalle_db, item = _get_detalle_con_item(id_detalle, db)
 
     if not detalle_db:

@@ -6,7 +6,7 @@ class ProjectService {
   final ApiClient api;
   ProjectService(this.api);
 
-  Future<List<Project>> myProjects(int idUser) async {
+  Future<List<Project>> myProjects(String idUser) async {
     final data = await api.get('/users/$idUser/projects');
     return asListOfMap(data).map(Project.fromJson).toList();
   }
@@ -30,8 +30,8 @@ class ProjectService {
     required String genero,
     String? sinopsis,
     String? director,
-    required int idClient,
-    required int idUser,
+    required String idClient,
+    required String idUser,
   }) async {
     final data = await api.post('/projects/create', body: {
       'project_name': projectName,

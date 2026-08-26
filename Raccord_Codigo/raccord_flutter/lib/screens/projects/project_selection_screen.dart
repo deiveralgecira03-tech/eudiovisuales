@@ -44,7 +44,7 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
   Future<List<Project>> _load() {
     final session = context.read<AuthSession>();
     final service = ProjectService(session.api);
-    return service.myProjects(session.user?.idUser ?? 0);
+    return service.myProjects(session.user?.idUser ?? '');
   }
 
   void _reload() => setState(() => _future = _load());
@@ -252,7 +252,7 @@ class _ProjectTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
-      leading: const CircleAvatar(backgroundColor: AppColors.surfaceVariant, child: Icon(Icons.movie_outlined, color: AppColors.azulProfundo)),
+      leading: CircleAvatar(backgroundColor: AppColors.surfaceVariant, child: const Icon(Icons.movie_outlined, color: AppColors.azulProfundo)),
       title: Text(project.projectName, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(project.resumen, style: const TextStyle(color: AppColors.grisMedio)),
       trailing: const Icon(Icons.chevron_right),

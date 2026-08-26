@@ -1,13 +1,16 @@
-from sqlalchemy import Column, Integer, String, Text, LargeBinary, DateTime, ForeignKey, func
+import uuid
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func
+from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
 # ==========================================
 # GALLERY PHOTO MODEL (tabla "fotos_continuidad")
 # ==========================================
 # Fotos de continuidad visual asociadas a una escena (mockup 6.1):
-# vestuario, maquillaje, props, set, etc. La imagen se guarda como
-# BYTEA en Postgres, mismo patrón que el PDF de guiones
-# (archivo_contenido en script_model.py) — se sube con
+# vestuario, maquillaje, props, set, etc. La imagen se sube al bucket
+# "imagenes" de MinIO (mismo patrón que el PDF de guiones en el bucket
+# "guiones" — ver script_model.py y app/utils/minio_client.py); acá
+# solo se guarda la ruta del objeto (archivo_key). Se sube con
 # POST /scenes/{id_escena}/fotos y se sirve con
 # GET /fotos/{id_foto}/archivo, nunca dentro del JSON normal de la
 # lista (para no inflar esas respuestas).
@@ -19,25 +22,25 @@ class GalleryPhoto(Base):
     __tablename__ = "fotos_continuidad"
 
     id_foto = Column(
-        Integer,
+        UUID(as_uuid=True),
         primary_key=True,
         index=True,
-        autoincrement=True
+        default=uuid.uuid4
     )
 
     id_escena = Column(  # llave foránea -> escenas.id_escena
-        Text,
+        UUID(as_uuid=True),
         ForeignKey("escenas.id_escena", ondelete="CASCADE"),
         nullable=False
     )
 
-    # Tipo de foto (Set, Personaje, Vestuario, Maquillaje, Props,
-    # Locación, Otro) — texto libre validado del lado de la API
-    # (ver TipoFoto en gallery_photo_schema.py).
+    # Tipo de foto: Locación, Propuesta, Prueba, En Rodaje — texto libre
+    # validado del lado de la API (ver TIPOS_FOTO en
+    # gallery_photo_schema.py).
     tipo_foto = Column(
         String(30),
         nullable=False,
-        server_default="Set"
+        server_default="Propuesta"
     )
 
     # Código del personaje al que aplica esta foto (ej. "P001"), texto
@@ -60,7 +63,7 @@ class GalleryPhoto(Base):
     )
 
     archivo_nombre = Column(String(255), nullable=False)
-    archivo_contenido = Column(LargeBinary, nullable=False)
+    archivo_key = Column(Text, nullable=False)
     archivo_tipo = Column(String(100), nullable=False)
     archivo_tamano = Column(Integer, nullable=False)
 

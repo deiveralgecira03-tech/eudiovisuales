@@ -1,17 +1,23 @@
-from sqlalchemy import Column, Integer, String, DateTime
+import uuid
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.config.database import Base
 
 # USER MODEL
-
+#
+# id_user es UUID (antes SERIAL) — ver sql/009_uuid_primary_keys.sql.
+# id_rol se deja como entero a propósito: el sistema de permisos
+# (app/utils/permissions.py) está hardcodeado con los IDs fijos
+# 1001-1005 de la tabla "roles", que NO se convirtió a UUID.
 class User(Base):
     __tablename__ = "users"
 
     id_user = Column(
-        Integer,
+        UUID(as_uuid=True),
         primary_key=True,
         index=True,
-        autoincrement=True
+        default=uuid.uuid4
     )
 
     nombre = Column(
@@ -74,17 +80,42 @@ class User(Base):
         nullable=False
     )
 
-    id_departamento = Column( ## llave foranea
-        String(20),
-        nullable=False
+    # Nullable a propósito: al registrarse (POST /register), el usuario
+    # se crea sin departamento ni proyecto asignado todavía (ver
+    # register_controller.register), igual que en el esquema original.
+    id_departamento = Column(  # llave foránea -> departamentos.id_departamento
+        UUID(as_uuid=True),
+        ForeignKey("departamentos.id_departamento", ondelete="CASCADE"),
+        nullable=True
     )
 
-    id_project = Column( ## llave foranea
-        String(20),
-        nullable=False
+    id_project = Column(  # referencia a projects.id_project (sin FK declarada en la BD)
+        UUID(as_uuid=True),
+        nullable=True
+    )
+
+    # A qué empresa/cliente pertenece este usuario — se setea al crearlo
+    # (registro propio o invitación), NO se deriva de sus proyectos. Ver
+    # sql/011_users_id_client.sql para el porqué: antes se calculaba vía
+    # user_projects -> projects.id_client, pero eso falla para un
+    # usuario recién registrado que todavía no tiene ningún proyecto.
+    id_client = Column(
+        UUID(as_uuid=True),
+        ForeignKey("clients.id_cliente", ondelete="CASCADE"),
+        nullable=True
     )
 
     id_rol = Column(
         Integer,
         nullable=False
+    )
+
+    # Ruta del objeto en el bucket "perfiles" de MinIO (ver
+    # app/utils/minio_client.py) — igual que con guiones/fotos de
+    # continuidad, el binario NO se guarda en Postgres, solo la ruta.
+    # Se sube con POST /users/me/foto y se sirve con
+    # GET /users/{id}/foto.
+    foto_perfil_key = Column(
+        Text,
+        nullable=True
     )

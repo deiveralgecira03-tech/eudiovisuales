@@ -17,6 +17,10 @@ class ShootingDayService {
     return day;
   }
 
+  Future<void> update(String id, Map<String, dynamic> changes) async {
+    await api.patch('/shooting-days/$id', body: changes);
+  }
+
   Future<void> delete(String id) async {
     await api.delete('/shooting-days/$id');
   }

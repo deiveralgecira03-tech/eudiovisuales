@@ -1,13 +1,18 @@
-from sqlalchemy import Column, Integer, String, Text
+import uuid
+from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
+# id_project es UUID (antes texto "projNNNN" generado por una función
+# de Postgres con secuencia central) — ver sql/009_uuid_primary_keys.sql.
 class Project(Base):
     __tablename__ = "projects"
 
     id_project = Column(
-        String(20),
+        UUID(as_uuid=True),
         primary_key=True,
-        index=True
+        index=True,
+        default=uuid.uuid4
     )
 
     project_name = Column(
@@ -33,7 +38,8 @@ class Project(Base):
         String(255)
     )
 
-    id_client = Column(
-        Integer,
+    id_client = Column(  # llave foránea -> clients.id_cliente
+        UUID(as_uuid=True),
+        ForeignKey("clients.id_cliente", ondelete="CASCADE"),
         nullable=False
     )

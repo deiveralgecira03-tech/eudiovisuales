@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, Date, LargeBinary
+import uuid
+from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
 # ==========================================
@@ -14,10 +16,10 @@ class Script(Base):
     __tablename__ = "guiones"
 
     id_guion = Column(
-        Integer,
+        UUID(as_uuid=True),
         primary_key=True,
         index=True,
-        autoincrement=True
+        default=uuid.uuid4
     )
 
     numero_de_version = Column(
@@ -54,17 +56,22 @@ class Script(Base):
     )
 
     # ==========================================
-    # PDF real del guión, guardado en la base de datos (BYTEA en
-    # Postgres). Se sube con POST /scripts/{id}/archivo y se sirve con
-    # GET /scripts/{id}/archivo — nunca viaja dentro del JSON normal de
-    # /scripts para no inflar esas respuestas.
+    # PDF real del guión. Se sube con POST /scripts/{id}/archivo y se
+    # sirve con GET /scripts/{id}/archivo — nunca viaja dentro del JSON
+    # normal de /scripts para no inflar esas respuestas.
+    #
+    # El binario NO vive en Postgres: se sube al bucket "guiones" de
+    # MinIO (ver app/utils/minio_client.py) y acá solo se guarda la
+    # ruta del objeto (archivo_key). Antes esto era una columna BYTEA
+    # (archivo_contenido) directo en esta tabla.
     # ==========================================
     archivo_nombre = Column(String(255), nullable=True)
-    archivo_contenido = Column(LargeBinary, nullable=True)
+    archivo_key = Column(Text, nullable=True)
     archivo_tipo = Column(String(100), nullable=True)
     archivo_tamano = Column(Integer, nullable=True)
 
     id_project = Column(  # llave foránea -> projects.id_project
-        String(20),
+        UUID(as_uuid=True),
+        ForeignKey("projects.id_project", ondelete="CASCADE"),
         nullable=True
     )

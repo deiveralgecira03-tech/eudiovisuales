@@ -17,6 +17,10 @@ class CharacterService {
     return character;
   }
 
+  Future<void> update(String id, Map<String, dynamic> changes) async {
+    await api.patch('/characters/$id', body: changes);
+  }
+
   Future<void> delete(String id) async {
     await api.delete('/characters/$id');
   }

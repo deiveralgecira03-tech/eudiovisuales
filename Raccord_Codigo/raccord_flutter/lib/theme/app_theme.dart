@@ -20,10 +20,44 @@ class AppColors {
 
   // Superficies (mockups usan fondos oscuros con tarjetas ligeramente
   // más claras que el fondo).
-  static const bg = Color(0xFF0A0A0A);
-  static const surface = Color(0xFF16171B);
-  static const surfaceVariant = Color(0xFF1E2026);
-  static const border = Color(0xFF2A2C33);
+  //
+  // IMPORTANTE: la mayoría de pantallas pintan sus superficies con
+  // `Container(color: AppColors.surface/bg/...)` directo en vez de leer
+  // `Theme.of(context).colorScheme`. Para que el modo claro se vea bien
+  // sin tener que tocar cada pantalla una por una, `bg`/`surface`/
+  // `surfaceVariant`/`border` dejaron de ser `const` y ahora son
+  // getters que devuelven el color oscuro o claro según [isDark].
+  // [isDark] se mantiene sincronizado por `ThemeController` cada vez
+  // que el usuario cambia de modo (ver core/theme_controller.dart).
+  static bool isDark = true;
+
+  // Antes era negro puro (0xFF0A0A0A, R=G=B). Se cambió a un azul
+  // marino casi negro (mismo matiz que azulProfundo, muy oscurecido)
+  // porque el negro puro se veía "plano"/sin vida en pantallas grandes.
+  // El resto de la escala (surface/surfaceVariant/border) se corrió al
+  // mismo matiz para que todo el modo oscuro se sienta cohesivo.
+  static const _bgDark = Color(0xFF0B0E14);
+  static const _surfaceDark = Color(0xFF12151D);
+  static const _surfaceVariantDark = Color(0xFF1A1E29);
+  static const _borderDark = Color(0xFF272C3A);
+
+  // Tono "hueso"/crema (no blanco puro) pedido explícitamente por el
+  // usuario, tomado con cuentagotas de las capturas de FilmScript
+  // adjuntadas (fondo ~#F5F0E8, tarjetas ~#FEFCF6).
+  static const _bgLight = Color(0xFFF5F0E8);
+  static const _surfaceLight = Color(0xFFFEFCF6);
+  static const _surfaceVariantLight = Color(0xFFEFEADD);
+  static const _borderLight = Color(0xFFE3DDCE);
+
+  static Color get bg => isDark ? _bgDark : _bgLight;
+  static Color get surface => isDark ? _surfaceDark : _surfaceLight;
+  static Color get surfaceVariant => isDark ? _surfaceVariantDark : _surfaceVariantLight;
+  static Color get border => isDark ? _borderDark : _borderLight;
+
+  /// Color de texto/ícono "normal" sobre [surface]/[bg]: blanco en modo
+  /// oscuro, negro en modo claro. Útil para textos que hoy están fijos
+  /// en `AppColors.blanco` fuera de los botones/badges de color.
+  static Color get textPrimary => isDark ? blanco : negro;
 
   static const gradientLogo = LinearGradient(
     colors: [azulProfundo, moradoTech, coral],
@@ -37,15 +71,19 @@ class AppTheme {
 
   static ThemeData get dark {
     final base = ThemeData.dark(useMaterial3: true);
+    const bgDark = Color(0xFF0B0E14);
+    const surfaceDark = Color(0xFF12151D);
+    const surfaceVariantDark = Color(0xFF1A1E29);
+    const borderDark = Color(0xFF272C3A);
 
     return base.copyWith(
-      scaffoldBackgroundColor: AppColors.bg,
+      scaffoldBackgroundColor: bgDark,
       primaryColor: AppColors.azulProfundo,
       colorScheme: const ColorScheme.dark(
         primary: AppColors.azulProfundo,
         secondary: AppColors.moradoTech,
         tertiary: AppColors.coral,
-        surface: AppColors.surface,
+        surface: surfaceDark,
         error: AppColors.error,
       ),
       textTheme: base.textTheme.apply(
@@ -54,31 +92,31 @@ class AppTheme {
         displayColor: AppColors.blanco,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.surface,
+        backgroundColor: surfaceDark,
         elevation: 0,
         centerTitle: false,
         foregroundColor: AppColors.blanco,
       ),
       cardTheme: CardThemeData(
-        color: AppColors.surface,
+        color: surfaceDark,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.border),
+          side: const BorderSide(color: borderDark),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.bg,
+        fillColor: bgDark,
         hintStyle: const TextStyle(color: AppColors.grisMedio),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: borderDark),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: borderDark),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -101,7 +139,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.blanco,
-          side: const BorderSide(color: AppColors.border),
+          side: const BorderSide(color: borderDark),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
@@ -109,9 +147,9 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: AppColors.azulProfundo),
       ),
-      dividerTheme: const DividerThemeData(color: AppColors.border),
+      dividerTheme: const DividerThemeData(color: borderDark),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: AppColors.surfaceVariant,
+        backgroundColor: surfaceVariantDark,
         contentTextStyle: const TextStyle(color: AppColors.blanco),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -122,23 +160,16 @@ class AppTheme {
   // ==========================================
   // TEMA CLARO
   // ==========================================
-  // IMPORTANTE (dejar documentado para el próximo cambio): esta app
-  // pinta la mayoría de sus superficies con `Container(color:
-  // AppColors.surface/bg/...)` directo, en vez de leer
-  // `Theme.of(context).colorScheme`. Ese theme claro sí cambia todo lo
-  // que Flutter arma automáticamente a partir del Theme (AppBar,
-  // botones, campos de texto, Card por defecto, SnackBar, texto base),
-  // pero las superficies con color fijo (tarjetas de escenas/guiones,
-  // fondos de pantalla, etc.) van a seguir viéndose oscuras hasta que
-  // se reemplacen esos `AppColors.xxx` fijos por colores que salgan del
-  // Theme activo. Es un cambio grande porque toca casi cada pantalla —
-  // se puede hacer como una tanda de trabajo aparte si se quiere un
-  // modo claro 100% consistente.
+  // Las superficies con color "fijo" (tarjetas de escenas/guiones,
+  // fondos de pantalla, etc.) que usan `AppColors.bg/surface/
+  // surfaceVariant/border` directo ya no quedan oscuras en este modo:
+  // esos 4 colores son getters dinámicos (ver AppColors.isDark) que
+  // ThemeController mantiene sincronizados con el modo activo.
   static ThemeData get light {
     final base = ThemeData.light(useMaterial3: true);
-    const bgLight = Color(0xFFF5F5F7);
-    const surfaceLight = Color(0xFFFFFFFF);
-    const borderLight = Color(0xFFE1E1E6);
+    const bgLight = Color(0xFFF5F0E8);
+    const surfaceLight = Color(0xFFFEFCF6);
+    const borderLight = Color(0xFFE3DDCE);
 
     return base.copyWith(
       scaffoldBackgroundColor: bgLight,

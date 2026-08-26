@@ -11,7 +11,7 @@ class SceneService {
     return asListOfMap(data).map(Scene.fromJson).toList();
   }
 
-  Future<List<Scene>> byScript(int idGuion) async {
+  Future<List<Scene>> byScript(String idGuion) async {
     final data = await api.get('/scenes/script/$idGuion');
     return asListOfMap(data).map(Scene.fromJson).toList();
   }

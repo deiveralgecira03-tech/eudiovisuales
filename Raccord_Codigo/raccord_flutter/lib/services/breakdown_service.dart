@@ -17,7 +17,11 @@ class BreakdownService {
     return item;
   }
 
-  Future<void> deleteItem(int id) async {
+  Future<void> updateItem(String id, Map<String, dynamic> changes) async {
+    await api.patch('/breakdown/items/$id', body: changes);
+  }
+
+  Future<void> deleteItem(String id) async {
     await api.delete('/breakdown/items/$id');
   }
 

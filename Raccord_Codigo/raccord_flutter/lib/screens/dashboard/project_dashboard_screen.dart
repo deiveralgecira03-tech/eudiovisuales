@@ -19,8 +19,8 @@ class _ModuleDef {
 const _modules = [
   _ModuleDef('Guión', Icons.description_outlined, AppColors.azulProfundo, '/guiones'),
   _ModuleDef('Escenas', Icons.movie_filter_outlined, AppColors.moradoTech, '/escenas'),
-  _ModuleDef('Plan de Rodaje', Icons.event_note_outlined, AppColors.coral, '/plan-rodaje'),
   _ModuleDef('Desglose', Icons.checklist_outlined, AppColors.grisMedio, '/desglose'),
+  _ModuleDef('Plan de Rodaje', Icons.event_note_outlined, AppColors.coral, '/plan-rodaje'),
 ];
 
 /// Shell del proyecto (mockups 7, 7.1, 7.2): header, menú lateral con
@@ -39,6 +39,9 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
 
     return AppScaffold(
       title: session.projectName ?? 'Proyecto',
+      // Ya estamos en el Dashboard: no tiene sentido mostrar el ícono de
+      // casa que lleva ahí mismo.
+      showHome: false,
       // Flecha para volver a "Gestión de Proyectos": la persona puede
       // trabajar en varios proyectos sin tener que salir de la plataforma
       // (cerrar sesión) para cambiar de uno a otro.

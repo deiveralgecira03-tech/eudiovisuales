@@ -30,3 +30,16 @@ class ScriptUpdateSchema(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     id_project: Optional[str] = None
+
+
+# ==========================================
+# SEGMENTACIÓN AUTOMÁTICA POR ESCENAS
+# ==========================================
+# confirmar=False (default): solo analiza el PDF y devuelve una vista
+# previa de las escenas/personajes detectados, SIN escribir en la BD.
+# confirmar=True: repite el mismo análisis y esta vez sí crea las
+# escenas. Se re-analiza en vez de guardar un resultado intermedio en
+# sesión porque el parseo es barato (texto + regex, sin IA de por
+# medio) y así el endpoint queda sin estado entre llamadas.
+class SegmentarScriptSchema(BaseModel):
+    confirmar: bool = False

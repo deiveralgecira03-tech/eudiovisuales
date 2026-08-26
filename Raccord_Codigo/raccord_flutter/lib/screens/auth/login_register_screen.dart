@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/session.dart';
+import '../../models/document_type.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_logo.dart';
@@ -141,6 +142,10 @@ class _LoginFormState extends State<_LoginForm> {
             controller: _mailCtrl,
             keyboardType: TextInputType.emailAddress,
             validator: (v) => (v == null || v.isEmpty) ? 'Ingresa tu correo' : null,
+            // Fuerza minúscula de verdad (no solo evita el autocapitalizado
+            // del teclado) — pedido explícito: en login/registro solo la
+            // contraseña puede tener mayúsculas.
+            inputFormatters: const [LowerCaseTextFormatter()],
           ),
           const SizedBox(height: 16),
           AppTextField(
@@ -149,6 +154,7 @@ class _LoginFormState extends State<_LoginForm> {
             controller: _passCtrl,
             obscureText: _obscure,
             validator: (v) => (v == null || v.isEmpty) ? 'Ingresa tu contraseña' : null,
+            textCapitalization: TextCapitalization.none,
             suffixIcon: IconButton(
               icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
               onPressed: () => setState(() => _obscure = !_obscure),
@@ -233,8 +239,6 @@ class _LoginFormState extends State<_LoginForm> {
   }
 }
 
-const _tiposDocumento = ['CC', 'TI', 'NIT', 'CE', 'PA'];
-
 class _RegisterForm extends StatefulWidget {
   const _RegisterForm({super.key});
 
@@ -250,9 +254,8 @@ class _RegisterFormState extends State<_RegisterForm> {
   final _idDocumentNumero = TextEditingController();
   final _emailEmpresa = TextEditingController();
   final _address = TextEditingController();
-  final _telephone = TextEditingController();
   final _numberCellphone = TextEditingController();
-  String _tipoDocumento = _tiposDocumento.first;
+  String _tipoDocumento = kTiposDocumento.first;
 
   // Datos de usuario (RegisterSchema)
   final _nombres = TextEditingController();
@@ -270,21 +273,47 @@ class _RegisterFormState extends State<_RegisterForm> {
   @override
   void initState() {
     super.initState();
-    // Refresca el checklist de requisitos de contraseña en vivo.
-    _pass.addListener(_onPasswordChanged);
+    // Refresca el checklist de requisitos de contraseña en vivo, y
+    // reevalúa si el botón "Registrar" debe habilitarse o no —
+    // pedido explícito: el botón no se habilita hasta que todos los
+    // campos visibles requeridos y la aceptación de términos estén
+    // completos.
+    for (final c in _camposRequeridos) {
+      c.addListener(_onFormChanged);
+    }
   }
 
-  void _onPasswordChanged() => setState(() {});
+  void _onFormChanged() => setState(() {});
+
+  List<TextEditingController> get _camposRequeridos => [
+        _razonSocial,
+        _idDocumentNumero,
+        _emailEmpresa,
+        _nombres,
+        _apellidos,
+        _mail,
+        _msisdn,
+        _pass,
+        _confirmPass,
+      ];
+
+  bool get _formularioCompleto {
+    for (final c in _camposRequeridos) {
+      if (c.text.trim().isEmpty) return false;
+    }
+    return _reglasFaltantes.isEmpty && _pass.text == _confirmPass.text && _aceptaTerminos;
+  }
 
   @override
   void dispose() {
-    _pass.removeListener(_onPasswordChanged);
+    for (final c in _camposRequeridos) {
+      c.removeListener(_onFormChanged);
+    }
     for (final c in [
       _razonSocial,
       _idDocumentNumero,
       _emailEmpresa,
       _address,
-      _telephone,
       _numberCellphone,
       _nombres,
       _apellidos,
@@ -329,19 +358,48 @@ class _RegisterFormState extends State<_RegisterForm> {
               style: TextStyle(color: AppColors.azulProfundo, fontWeight: FontWeight.w700, fontSize: 13)),
           const SizedBox(height: 12),
           _FieldGrid(children: [
-            AppTextField(label: 'Razón Social', hint: 'Nombre de la empresa', controller: _razonSocial, validator: _req),
+            AppTextField(
+              label: 'Razón Social',
+              hint: 'Nombre de la empresa',
+              controller: _razonSocial,
+              validator: _req,
+              inputFormatters: const [LowerCaseTextFormatter()],
+            ),
             AppDropdown<String>(
               label: 'Tipo de documento',
               value: _tipoDocumento,
-              items: _tiposDocumento,
-              labelBuilder: (e) => e,
+              items: kTiposDocumento,
+              labelBuilder: tipoDocumentoLabel,
               onChanged: (v) => setState(() => _tipoDocumento = v ?? _tipoDocumento),
             ),
-            AppTextField(label: 'Nº Documento', hint: 'Número de documento', controller: _idDocumentNumero, validator: _req),
-            AppTextField(label: 'Email Empresa', hint: 'correo@empresa.com', controller: _emailEmpresa, keyboardType: TextInputType.emailAddress, validator: _req),
-            AppTextField(label: 'Dirección', hint: 'Dirección de la empresa (opcional)', controller: _address),
-            AppTextField(label: 'Teléfono', hint: 'Teléfono fijo (opcional)', controller: _telephone, keyboardType: TextInputType.phone),
-            AppTextField(label: 'Celular Empresa', hint: 'Celular de la empresa (opcional)', controller: _numberCellphone, keyboardType: TextInputType.phone),
+            AppTextField(
+              label: 'Nº Documento',
+              hint: 'Número de documento',
+              controller: _idDocumentNumero,
+              validator: _req,
+              inputFormatters: const [LowerCaseTextFormatter()],
+            ),
+            AppTextField(
+              label: 'Email Empresa',
+              hint: 'correo@empresa.com',
+              controller: _emailEmpresa,
+              keyboardType: TextInputType.emailAddress,
+              validator: _req,
+              inputFormatters: const [LowerCaseTextFormatter()],
+            ),
+            AppTextField(
+              label: 'Dirección',
+              hint: 'Dirección de la empresa (opcional)',
+              controller: _address,
+              inputFormatters: const [LowerCaseTextFormatter()],
+            ),
+            AppTextField(
+              label: 'Celular Empresa',
+              hint: 'Celular de la empresa (opcional)',
+              controller: _numberCellphone,
+              keyboardType: TextInputType.phone,
+              inputFormatters: const [LowerCaseTextFormatter()],
+            ),
           ]),
           const SizedBox(height: 20),
           const Divider(height: 1),
@@ -350,16 +408,43 @@ class _RegisterFormState extends State<_RegisterForm> {
               style: TextStyle(color: AppColors.azulProfundo, fontWeight: FontWeight.w700, fontSize: 13)),
           const SizedBox(height: 12),
           _FieldGrid(children: [
-            AppTextField(label: 'Nombres', hint: 'Ingresa tus nombres', controller: _nombres, validator: _req),
-            AppTextField(label: 'Apellidos', hint: 'Ingresa tus apellidos', controller: _apellidos, validator: _req),
-            AppTextField(label: 'Email Personal', hint: 'tu@correo.com', controller: _mail, keyboardType: TextInputType.emailAddress, validator: _req),
-            AppTextField(label: 'Celular', hint: 'Tu número de celular', controller: _msisdn, keyboardType: TextInputType.phone, validator: _req),
+            AppTextField(
+              label: 'Nombres',
+              hint: 'Ingresa tus nombres',
+              controller: _nombres,
+              validator: _req,
+              inputFormatters: const [LowerCaseTextFormatter()],
+            ),
+            AppTextField(
+              label: 'Apellidos',
+              hint: 'Ingresa tus apellidos',
+              controller: _apellidos,
+              validator: _req,
+              inputFormatters: const [LowerCaseTextFormatter()],
+            ),
+            AppTextField(
+              label: 'Email Personal',
+              hint: 'tu@correo.com',
+              controller: _mail,
+              keyboardType: TextInputType.emailAddress,
+              validator: _req,
+              inputFormatters: const [LowerCaseTextFormatter()],
+            ),
+            AppTextField(
+              label: 'Celular',
+              hint: 'Tu número de celular',
+              controller: _msisdn,
+              keyboardType: TextInputType.phone,
+              validator: _req,
+              inputFormatters: const [LowerCaseTextFormatter()],
+            ),
             AppTextField(
               label: 'Contraseña',
               hint: 'Crea una contraseña',
               controller: _pass,
               obscureText: _obscurePass,
               validator: _req,
+              textCapitalization: TextCapitalization.none,
               suffixIcon: IconButton(
                 icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                 onPressed: () => setState(() => _obscurePass = !_obscurePass),
@@ -371,6 +456,7 @@ class _RegisterFormState extends State<_RegisterForm> {
               controller: _confirmPass,
               obscureText: _obscureConfirm,
               validator: (v) => v != _pass.text ? 'Las contraseñas no coinciden' : null,
+              textCapitalization: TextCapitalization.none,
               suffixIcon: IconButton(
                 icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                 onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
@@ -408,12 +494,12 @@ class _RegisterFormState extends State<_RegisterForm> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Checkbox(value: _aceptaTerminos, onChanged: (v) => setState(() => _aceptaTerminos = v ?? false)),
-              Expanded(
+              const Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: EdgeInsets.only(top: 12),
                   child: Text(
                     'Acepto los Términos y Condiciones y autorizo el tratamiento de mis datos personales conforme a la Política de Privacidad.',
-                    style: const TextStyle(color: AppColors.grisMedio, fontSize: 12),
+                    style: TextStyle(color: AppColors.grisMedio, fontSize: 12),
                   ),
                 ),
               ),
@@ -421,14 +507,42 @@ class _RegisterFormState extends State<_RegisterForm> {
           ),
           const SizedBox(height: 12),
           ElevatedButton(
-            onPressed: _loading ? null : _submit,
+            onPressed: (_loading || !_formularioCompleto) ? null : _submit,
             child: _loading
                 ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Text('Registrar'),
           ),
+          if (!_formularioCompleto && !_loading) ...[
+            const SizedBox(height: 8),
+            Text(
+              _motivoIncompleto,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.grisMedio, fontSize: 11),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// Mensaje corto explicando qué falta para poder registrar — pedido
+  /// explícito del usuario: si falta algo (o no se aceptaron los
+  /// términos) debe mencionarse, no solo deshabilitar el botón en
+  /// silencio. Solo evalúa los campos VISIBLES del formulario.
+  String get _motivoIncompleto {
+    if (_camposRequeridos.any((c) => c.text.trim().isEmpty)) {
+      return 'Completa todos los campos requeridos para registrarte.';
+    }
+    if (_reglasFaltantes.isNotEmpty) {
+      return 'La contraseña debe cumplir: ${_reglasFaltantes.join(", ")}.';
+    }
+    if (_pass.text != _confirmPass.text) {
+      return 'Las contraseñas no coinciden.';
+    }
+    if (!_aceptaTerminos) {
+      return 'Debes aceptar los Términos y Condiciones para registrarte.';
+    }
+    return '';
   }
 
   String? _req(String? v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null;
@@ -458,7 +572,6 @@ class _RegisterFormState extends State<_RegisterForm> {
         representanteLegal: '${_nombres.text.trim()} ${_apellidos.text.trim()}',
         emailEmpresa: _emailEmpresa.text.trim(),
         address: _address.text.trim(),
-        telephone: _telephone.text.trim(),
         numberCellphone: _numberCellphone.text.trim(),
         document: _tipoDocumento,
         idDocument: _idDocumentNumero.text.trim(),

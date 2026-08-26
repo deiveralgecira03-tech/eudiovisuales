@@ -9,8 +9,6 @@ from sqlalchemy.sql import func
 logger = logging.getLogger("raccord")
 
 from app.models.user_model import User
-from app.models.project_model import Project
-from app.models.user_project_model import UserProject
 
 from app.utils.hash import verify_password
 from app.utils.security import create_access_token
@@ -31,27 +29,27 @@ two_factor_codes = {}
 # ==========================================
 # OBTENER id_client A PARTIR DEL USUARIO
 # ==========================================
+# id_client vive directamente en users.id_client (ver
+# sql/011_users_id_client.sql) — se setea al crear el usuario (registro
+# propio o invitación), NO se deriva de sus proyectos. Antes se
+# calculaba vía user_projects -> projects.id_client, pero eso fallaba
+# para un usuario recién registrado que todavía no tiene ningún
+# proyecto (justo el caso de la pantalla obligatoria "Registra
+# Proyecto" tras crear la cuenta).
 def _get_client_from_user(user: User, db: Session):
-    user_project = db.query(UserProject).filter(
-        UserProject.id_user == user.id_user
-    ).first()
-
-    if not user_project:
-        return None
-
-    project = db.query(Project).filter(
-        Project.id_project == user_project.id_project
-    ).first()
-
-    return project.id_client if project else None
+    return user.id_client
 
 
 # ==========================================
 # CONSTRUIR RESPUESTA DE SESION (TOKEN + USUARIO)
 # ==========================================
 def _build_session_response(user: User, db: Session, message: str, extra: dict = None):
+    # id_user es UUID (uuid.UUID) en el modelo: hay que convertirlo a
+    # str explícitamente porque jose.jwt.encode no sabe serializar
+    # objetos UUID (a diferencia de la respuesta JSON de FastAPI, que sí
+    # lo hace sola vía jsonable_encoder).
     token = create_access_token({
-        "id_user": user.id_user,
+        "id_user": str(user.id_user),
         "mail": user.mail,
         "id_rol": user.id_rol
     })
@@ -65,6 +63,7 @@ def _build_session_response(user: User, db: Session, message: str, extra: dict =
             "apellido": user.apellido,
             "mail": user.mail,
             "id_rol": user.id_rol,
+            "id_departamento": user.id_departamento,
             "id_client": _get_client_from_user(user, db)
         }
     }
@@ -106,6 +105,17 @@ def _validar_credenciales(mail: str, contrasena: str, db: Session):
     if not password_ok:
         return None, api_response(False, "Contraseña incorrecta", error="INVALID_PASSWORD")
 
+    # Suspendido por un Administrador/Director (o el Jefe de su propio
+    # departamento) desde "Roles del Equipo" — no se borra ninguna de
+    # sus escenas/fotos/etc., simplemente no puede volver a entrar hasta
+    # que alguien con permiso lo reactive.
+    if user.estado == "suspendido":
+        return None, api_response(
+            False,
+            "Tu acceso a este proyecto fue suspendido. Contacta a un administrador de tu equipo.",
+            error="USER_SUSPENDED"
+        )
+
     return user, None
 
 
@@ -117,6 +127,11 @@ def login_user(mail: str, contrasena: str, db: Session):
 
     if error:
         return error
+
+    # Primer ingreso real de un usuario invitado: "pendiente" (invitación
+    # enviada, todavía no entró) pasa a "activo" (ya usó el sistema).
+    if user.estado == "pendiente":
+        user.estado = "activo"
 
     user.ultimo_acceso = func.now()
     db.commit()
@@ -228,6 +243,10 @@ def verify_2fa_code(mail: str, codigo: str, device_id: str, contrasena: str, db:
     verified_devices[key] = datetime.now() + timedelta(hours=DEVICE_TRUST_HOURS)
 
     del two_factor_codes[mail]
+
+    # Mismo caso que login_user: primer ingreso real de un invitado.
+    if user.estado == "pendiente":
+        user.estado = "activo"
 
     user.ultimo_acceso = func.now()
     db.commit()

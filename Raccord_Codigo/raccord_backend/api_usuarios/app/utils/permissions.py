@@ -60,6 +60,7 @@ ROLE_PERMISSIONS = {
         "manage_projects": True,     # editar / eliminar proyectos
         "invite_users": True,
         "delete_admin_users": True,  # puede eliminar usuarios con id_rol 1001
+        "manage_team_status": True,  # suspender/reactivar (todo el proyecto)
         "download_files": True,
         "upload_scripts": True,
         "create_scenes": True,
@@ -77,6 +78,7 @@ ROLE_PERMISSIONS = {
         "manage_projects": True,
         "invite_users": True,
         "delete_admin_users": False,
+        "manage_team_status": True,  # suspender/reactivar (todo el proyecto)
         "download_files": True,
         "upload_scripts": True,
         "create_scenes": True,
@@ -94,6 +96,7 @@ ROLE_PERMISSIONS = {
         "manage_projects": False,
         "invite_users": True,
         "delete_admin_users": False,
+        "manage_team_status": True,  # suspender/reactivar, SOLO su propio departamento (ver set_user_estado)
         "download_files": True,
         "upload_scripts": False,
         "create_scenes": False,
@@ -111,6 +114,7 @@ ROLE_PERMISSIONS = {
         "manage_projects": False,
         "invite_users": False,
         "delete_admin_users": False,
+        "manage_team_status": False,
         "download_files": False,
         "upload_scripts": False,
         "create_scenes": False,
@@ -128,6 +132,7 @@ ROLE_PERMISSIONS = {
         "manage_projects": False,
         "invite_users": False,
         "delete_admin_users": False,
+        "manage_team_status": False,
         "download_files": False,
         "upload_scripts": False,
         "create_scenes": False,

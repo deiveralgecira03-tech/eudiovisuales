@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Text, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
 # ==========================================
@@ -14,13 +15,13 @@ class SceneCharacter(Base):
     __tablename__ = "escenas_personajes"
 
     id_escena = Column(
-        Text,
+        UUID(as_uuid=True),
         ForeignKey("escenas.id_escena", ondelete="CASCADE"),
         primary_key=True
     )
 
     id_personaje = Column(
-        Text,
+        UUID(as_uuid=True),
         ForeignKey("personajes.id_personaje", ondelete="CASCADE"),
         primary_key=True
     )

@@ -7,7 +7,7 @@ from datetime import datetime
 # subida (multipart no permite un Literal de Pydantic ahí directo),
 # así que este catálogo queda documentado acá como referencia para el
 # frontend, no como validación estricta del backend.
-TIPOS_FOTO = ["Set", "Personaje", "Vestuario", "Maquillaje", "Props", "Locación", "Otro"]
+TIPOS_FOTO = ["Locación", "Propuesta", "Prueba", "En Rodaje"]
 
 
 # ==========================================
@@ -16,7 +16,7 @@ TIPOS_FOTO = ["Set", "Personaje", "Vestuario", "Maquillaje", "Props", "Locación
 # Nunca incluye el binario (archivo_contenido) — eso se descarga aparte
 # con GET /fotos/{id_foto}/archivo.
 class GalleryPhotoOut(BaseModel):
-    id_foto: int
+    id_foto: str
     id_escena: str
     tipo_foto: str
     personaje_codigo: Optional[str] = None

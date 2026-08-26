@@ -13,11 +13,14 @@ const appSideMenuItems = [
   ('Guión', Icons.description_outlined, '/guiones'),
   ('Crear Escenas', Icons.movie_filter_outlined, '/escenas'),
   ('Personajes', Icons.people_outline, '/personajes'),
-  ('Crew List', Icons.badge_outlined, '/crew-list'),
-  ('Actores', Icons.theater_comedy_outlined, '/actores'),
+  ('Cast List', Icons.theater_comedy_outlined, '/actores'),
   ('Plan de Rodaje', Icons.event_note_outlined, '/plan-rodaje'),
   ('Desglose', Icons.checklist_outlined, '/desglose'),
   ('Galería', Icons.photo_library_outlined, '/galeria'),
+  // Crew List va casi al final del menú porque es el listado de TODAS
+  // las personas del proyecto (no solo elenco) — pedido explícito del
+  // usuario para no confundirlo con "Cast List".
+  ('Crew List', Icons.badge_outlined, '/crew-list'),
   ('Roles', Icons.admin_panel_settings_outlined, '/roles'),
 ];
 
@@ -96,6 +99,10 @@ class AppScaffold extends StatelessWidget {
   // hamburguesa sin tener que repetir el drawer en cada una.
   final Widget? endDrawer;
   final bool showModuleMenu;
+  // Ícono de casa en la barra superior que lleva directo al Dashboard —
+  // en todas las pantallas menos el Dashboard mismo (ahí no tiene
+  // sentido, ya está en el dashboard).
+  final bool showHome;
 
   const AppScaffold({
     super.key,
@@ -107,6 +114,7 @@ class AppScaffold extends StatelessWidget {
     this.onBack,
     this.endDrawer,
     this.showModuleMenu = true,
+    this.showHome = true,
   });
 
   @override
@@ -150,7 +158,30 @@ class AppScaffold extends StatelessWidget {
           ],
         ),
         actions: [
+          if (showHome)
+            IconButton(
+              icon: const Icon(Icons.home_outlined),
+              tooltip: 'Ir al Dashboard',
+              onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (r) => false),
+            ),
           ...?actions,
+          // Solo el ícono por ahora (decisión explícita del usuario):
+          // todavía no hay sistema de notificaciones real (ni tabla en
+          // BD, ni eventos que las disparen) — eso queda como una
+          // siguiente fase, a definir qué eventos notificar. Por ahora
+          // solo reserva el espacio visual, como en la referencia de
+          // FilmScript, y avisa que la función viene después.
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.notifications_outlined),
+              tooltip: 'Notificaciones (próximamente)',
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Notificaciones: disponible próximamente')),
+                );
+              },
+            ),
+          ),
           if (effectiveEndDrawer != null)
             Builder(
               builder: (context) => IconButton(

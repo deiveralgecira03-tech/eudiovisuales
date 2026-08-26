@@ -25,7 +25,7 @@ const kEstadosDesglose = ['pendiente', 'en_progreso', 'completado'];
 const kPrioridadesDesglose = ['alta', 'media', 'baja'];
 
 class DesgloseItem {
-  final int? id;
+  final String? id;
   final String idEscena;
   final String? idDepartamento;
   final String categoria;
@@ -45,7 +45,7 @@ class DesgloseItem {
 
   factory DesgloseItem.fromJson(Map<String, dynamic> json) {
     return DesgloseItem(
-      id: asInt(pick(json, ['id', 'id_desglose_item'])),
+      id: asString(pick(json, ['id', 'id_desglose_item'])),
       idEscena: asString(pick(json, ['id_escena'])) ?? '',
       idDepartamento: asString(pick(json, ['id_departamento'])),
       categoria: asString(pick(json, ['categoria'])) ?? '',

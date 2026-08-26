@@ -27,7 +27,7 @@ def get_clients(db: Session):
 
 # GET CLIENT BY ID
 
-def get_client(id: int, db: Session):
+def get_client(id: str, db: Session):
     client = db.query(Client).filter(Client.id_cliente == id).first()
 
     if not client:
@@ -78,7 +78,7 @@ def create_client(client: ClientSchema, db: Session):
 
 # UPDATE CLIENT (PUT)
 
-def update_client_full(id: int, client: ClientSchema, db: Session):
+def update_client_full(id: str, client: ClientSchema, db: Session):
     client_db = db.query(Client).filter(Client.id_cliente == id).first()
 
     if not client_db:
@@ -105,7 +105,7 @@ def update_client_full(id: int, client: ClientSchema, db: Session):
 
 # UPDATE CLIENT (PATCH)
 
-def update_client(id: int, client, db: Session):
+def update_client(id: str, client, db: Session):
     client_db = db.query(Client).filter(Client.id_cliente == id).first()
 
     if not client_db:
@@ -128,7 +128,7 @@ def update_client(id: int, client, db: Session):
 
 # DELETE CLIENT
 
-def delete_client(id: int, db: Session):
+def delete_client(id: str, db: Session):
     client = db.query(Client).filter(Client.id_cliente == id).first()
 
     if not client:

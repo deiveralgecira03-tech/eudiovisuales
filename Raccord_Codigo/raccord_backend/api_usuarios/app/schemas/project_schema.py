@@ -8,7 +8,7 @@ class ProjectSchema(BaseModel):
     genero: str
     sinopsis: Optional[str] = None
     director: Optional[str] = None
-    id_client: int
+    id_client: str
 
 class ProjectUpdateSchema(BaseModel):
     project_name: Optional[str] = None
@@ -16,7 +16,7 @@ class ProjectUpdateSchema(BaseModel):
     genero: Optional[str] = None
     sinopsis: Optional[str] = None
     director: Optional[str] = None
-    id_client: Optional[int] = None
+    id_client: Optional[str] = None
 
 class ProjectSchema(BaseModel):
     id_project: Optional[str] = None
@@ -25,7 +25,7 @@ class ProjectSchema(BaseModel):
     genero: str
     sinopsis: Optional[str] = None
     director: Optional[str] = None
-    id_client: int
+    id_client: str
 
 class ProjectCreateSchema(BaseModel):
     project_name: str
@@ -33,5 +33,5 @@ class ProjectCreateSchema(BaseModel):
     genero: str
     sinopsis: Optional[str] = None
     director: Optional[str] = None
-    id_client: int
-    id_user: int
+    id_client: str
+    id_user: str

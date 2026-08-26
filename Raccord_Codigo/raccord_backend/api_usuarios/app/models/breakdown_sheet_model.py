@@ -1,4 +1,6 @@
+import uuid
 from sqlalchemy import Column, Integer, String, Text, Time, Boolean
+from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
 # ==========================================
@@ -23,9 +25,10 @@ class BreakdownSheet(Base):
     __tablename__ = "desgloses"
 
     id_desglose = Column(
-        Text,
+        UUID(as_uuid=True),
         primary_key=True,
-        index=True
+        index=True,
+        default=uuid.uuid4
     )
 
     version = Column(

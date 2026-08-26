@@ -21,7 +21,7 @@ def clients(db: Session = Depends(get_db), current_user: dict = Depends(get_curr
     return get_clients(db)
 
 @router.get("/clients/{id}")
-def client(id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def client(id: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return get_client(id, db)
 
 @router.post("/clients")
@@ -29,13 +29,13 @@ def store_client(client: ClientSchema, db: Session = Depends(get_db), current_us
     return create_client(client, db)
 
 @router.put("/clients/{id}")
-def edit_client(id: int, client: ClientSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("full_management"))):
+def edit_client(id: str, client: ClientSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("full_management"))):
     return update_client_full(id, client, db)
 
 @router.patch("/clients/{id}")
-def patch_client(id: int, client: ClientUpdateSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("full_management"))):
+def patch_client(id: str, client: ClientUpdateSchema, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("full_management"))):
     return update_client(id, client, db)
 
 @router.delete("/clients/{id}")
-def destroy_client(id: int, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("full_management"))):
+def destroy_client(id: str, db: Session = Depends(get_db), current_user: dict = Depends(require_permission("full_management"))):
     return delete_client(id, db)

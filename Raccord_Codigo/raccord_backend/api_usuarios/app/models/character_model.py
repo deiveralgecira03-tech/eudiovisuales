@@ -1,20 +1,22 @@
+import uuid
 from sqlalchemy import Column, String, Integer, Text
+from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
 # ==========================================
 # CHARACTER MODEL (tabla "personajes")
 # ==========================================
-# id_personaje NO se genera acá: la BD tiene un trigger
-# (gen_id_personaje) que arma 'cast' + consecutivo (cast1, cast2, ...)
-# en el INSERT. Igual que Department/Scene, se deja sin default para
-# que el trigger la complete y SQLAlchemy la recupere con RETURNING.
+# id_personaje es UUID, generado en Python (uuid.uuid4) — ver
+# sql/009_uuid_primary_keys.sql. Antes lo armaba un trigger
+# (gen_id_personaje, 'cast1', 'cast2'...) con una secuencia central.
 class Character(Base):
     __tablename__ = "personajes"
 
     id_personaje = Column(
-        Text,
+        UUID(as_uuid=True),
         primary_key=True,
-        index=True
+        index=True,
+        default=uuid.uuid4
     )
 
     nombre = Column(

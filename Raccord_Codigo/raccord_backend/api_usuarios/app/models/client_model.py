@@ -1,14 +1,17 @@
+import uuid
 from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
+# id_cliente es UUID (antes SERIAL) — ver sql/009_uuid_primary_keys.sql.
 class Client(Base):
     __tablename__ = "clients"
 
     id_cliente = Column(
-        Integer,
+        UUID(as_uuid=True),
         primary_key=True,
         index=True,
-        autoincrement=True
+        default=uuid.uuid4
     )
 
     document = Column(
@@ -41,9 +44,11 @@ class Client(Base):
         String(100)
     )
 
+    # Nullable a propósito: el formulario de registro ya no pide
+    # teléfono de la empresa (ver RegisterSchema.telephone, opcional).
     telephone = Column(
         String(15),
-        nullable=False
+        nullable=True
     )
 
     number_cellphone = Column(

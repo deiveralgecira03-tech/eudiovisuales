@@ -100,8 +100,8 @@ class _ProjectFormContentState extends State<ProjectFormContent> {
         genero: _genero!,
         sinopsis: _sinopsis.text.trim(),
         director: _director.text.trim(),
-        idClient: session.user?.idClient ?? 0,
-        idUser: session.user?.idUser ?? 0,
+        idClient: session.user?.idClient ?? '',
+        idUser: session.user?.idUser ?? '',
       );
       widget.onCreated(project);
     } on ApiException catch (e) {
@@ -166,7 +166,7 @@ class RegisterProjectScreen extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 620),
               child: Column(
                 children: [
-                  const AppWordmark(fontSize: 34, asset: AppLogos.logoNegativo),
+                  const AppWordmark(fontSize: 34, darkAsset: AppLogos.logoNegativo, lightAsset: AppLogos.logoNegro),
                   const SizedBox(height: 32),
                   Container(
                     width: double.infinity,
