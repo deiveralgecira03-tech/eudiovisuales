@@ -826,7 +826,12 @@ class _ScriptFormSheetState extends State<_ScriptFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
+      // Este formulario es el más largo de los "form sheet" (nombre +
+      // estado/versión + selector de PDF + descripción): sin scroll
+      // propio, con el teclado abierto en móvil desborda con facilidad
+      // dentro del maxHeight fijo del diálogo — ver auditoría de
+      // responsive.
       padding: const EdgeInsets.all(20),
       child: Form(
         key: _formKey,

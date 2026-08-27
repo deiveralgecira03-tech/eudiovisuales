@@ -129,6 +129,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           }
           final data = snap.data!;
           final user = data.user;
+          final session = context.watch<AuthSession>();
+          // Rol EFECTIVO en el proyecto activo (user_projects.id_rol), no
+          // el rol global de la cuenta (users.id_rol/user.idRol) — ver
+          // comentario junto al StatusPill más abajo.
+          final effectiveRol = session.hasProject ? session.projectRole : user.idRol;
+          final canEditDepartamentoAqui = effectiveRol == 1001 || effectiveRol == 1002;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -151,7 +157,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         Text(user.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
                         const SizedBox(height: 4),
-                        StatusPill(label: Roles.label(user.idRol), color: AppColors.moradoTech),
+                        // El badge debe reflejar el rol EFECTIVO en el
+                        // proyecto activo (user_projects.id_rol), no el
+                        // rol global de la cuenta (users.id_rol): una
+                        // misma persona puede ser Administrador de su
+                        // propio proyecto y, a la vez, Usuario en un
+                        // proyecto ajeno al que fue invitada — mostrar
+                        // siempre el rol global aquí confundía a
+                        // cualquiera que viera "Administrador" mientras
+                        // sus permisos reales eran los de Usuario.
+                        StatusPill(label: Roles.label(effectiveRol), color: AppColors.moradoTech),
                       ],
                     ),
                   ),
@@ -230,7 +245,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: (user.idRol == 1001 || user.idRol == 1002)
+                        child: canEditDepartamentoAqui
                             ? AppDropdown<String>(
                                 label: 'Nombre del Departamento',
                                 value: _departamentos.any((d) => d.idDepartamento == _selectedDepartamentoId)
@@ -408,7 +423,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveInfo() async {
     setState(() => _savingInfo = true);
     final session = context.read<AuthSession>();
-    final canEditDepartamento = session.user?.idRol == 1001 || session.user?.idRol == 1002;
+    // Mismo criterio que en el build: rol EFECTIVO en el proyecto activo,
+    // no el rol global de la cuenta.
+    final effectiveRol = session.hasProject ? session.projectRole : session.user?.idRol;
+    final canEditDepartamento = effectiveRol == 1001 || effectiveRol == 1002;
 
     try {
       await UserService(session.api).updateOwnProfile({

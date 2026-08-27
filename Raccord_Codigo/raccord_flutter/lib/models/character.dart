@@ -5,12 +5,17 @@ class CharacterModel {
   final String nombre;
   final int edad;
   final String codigoPersonaje;
+  // Obligatorio para crear (ver character_schema.py en el backend): a
+  // qué proyecto pertenece este personaje. Se fija al crear y nunca se
+  // reenvía en updates (ver nota en character_controller.py).
+  final String? idProject;
 
   CharacterModel({
     this.idPersonaje,
     required this.nombre,
     required this.edad,
     required this.codigoPersonaje,
+    this.idProject,
   });
 
   factory CharacterModel.fromJson(Map<String, dynamic> json) {
@@ -19,6 +24,7 @@ class CharacterModel {
       nombre: asString(pick(json, ['nombre'])) ?? '',
       edad: asInt(pick(json, ['edad'])) ?? 0,
       codigoPersonaje: asString(pick(json, ['codigo_personaje'])) ?? '',
+      idProject: asString(pick(json, ['id_project'])),
     );
   }
 
@@ -26,6 +32,7 @@ class CharacterModel {
         'nombre': nombre,
         'edad': edad,
         'codigo_personaje': codigoPersonaje,
+        if (idProject != null) 'id_project': idProject,
       };
 }
 
@@ -62,6 +69,8 @@ class ActorModel {
   final String nacionalidad;
   final bool dobleRiesgo;
   final String? idPersonaje;
+  // Obligatorio para crear (ver actor_schema.py en el backend).
+  final String? idProject;
 
   ActorModel({
     this.idActor,
@@ -90,6 +99,7 @@ class ActorModel {
     required this.nacionalidad,
     required this.dobleRiesgo,
     this.idPersonaje,
+    this.idProject,
   });
 
   String get nombreCompleto => '$nombre $apellido'.trim();
@@ -123,6 +133,7 @@ class ActorModel {
       nacionalidad: asString(pick(json, ['nacionalidad'])) ?? '',
       dobleRiesgo: asBool(pick(json, ['doble_riesgo'])) ?? false,
       idPersonaje: asString(pick(json, ['id_personaje'])),
+      idProject: asString(pick(json, ['id_project'])),
     );
   }
 
@@ -154,5 +165,6 @@ class ActorModel {
         'nacionalidad': nacionalidad,
         'doble_riesgo': dobleRiesgo,
         if (idPersonaje != null && idPersonaje!.isNotEmpty) 'id_personaje': idPersonaje,
+        if (idProject != null) 'id_project': idProject,
       };
 }

@@ -1,8 +1,56 @@
 import '../core/json_utils.dart';
 
+// "Espacio" (INT/EXT) y "Momento" (Día/Noche/...) son dos catálogos
+// independientes — pedido explícito del usuario: en toda la app deben
+// mostrarse y editarse como dos campos separados, nunca como un único
+// valor combinado tipo "int/noche" (la única excepción es el texto
+// libre del encabezado de la escena, que no se toca).
 const kModosVista = ['int', 'ext', 'int/ext', 'ext/int'];
-const kMomentosDia = ['dia', 'noche', 'amanecer', 'atardecer', 'amanecer/dia', 'dia/noche'];
-const kEstadosEscena = ['Pendiente', 'En proceso', 'Finalizada'];
+const kMomentosDia = ['dia', 'noche', 'amanecer', 'atardecer', 'anochecer'];
+const kEstadosEscena = ['Pendiente', 'En proceso', 'Finalizada', 'Eliminada'];
+
+/// Etiqueta legible de cada valor de `momentoDia` (ej. 'dia' -> 'Día').
+const kMomentoLabels = {
+  'dia': 'Día',
+  'noche': 'Noche',
+  'amanecer': 'Amanecer',
+  'atardecer': 'Atardecer',
+  'anochecer': 'Anochecer',
+};
+
+/// Devuelve la etiqueta legible de [momento] (o '?' si no hay valor) —
+/// nunca lanza, para no tumbar una pantalla por un dato viejo que ya no
+/// esté en el catálogo (ej. una combinación tipo "amanecer/dia" creada
+/// antes de este cambio).
+String labelMomento(String? momento) {
+  if (momento == null || momento.isEmpty) return '?';
+  return kMomentoLabels[momento] ?? momento;
+}
+
+/// Un ícono (emoji) pequeño y claro por cada momento del día — pedido
+/// explícito del usuario para REEMPLAZAR el color como forma de
+/// distinguir día/noche/etc. en Plan de Rodaje: el cliente ya usa
+/// colores para su propia segmentación y el color-coding de la app
+/// interfería con eso. El texto (ver [labelMomento]) se mantiene, el
+/// ícono solo sustituye el color, nunca al texto.
+///
+/// NOTA: la UI ya NO usa estos emojis directamente (ver
+/// `iconoMomentoData` en shooting_days_screen.dart) — Flutter Web no
+/// trae ninguna fuente que incluya estos glifos y el navegador tiraba
+/// la advertencia de consola "Could not find a set of Noto fonts...".
+/// Se dejan acá por si algún export de texto plano (CSV) los necesita.
+const kMomentoIconos = {
+  'dia': '☀️',
+  'noche': '🌙',
+  'amanecer': '🌄', // "Sunrise Over Mountains"
+  'atardecer': '🌇', // "Sunset"
+  'anochecer': '🌆', // "Cityscape at Dusk"
+};
+
+String iconoMomento(String? momento) {
+  if (momento == null) return '';
+  return kMomentoIconos[momento] ?? '';
+}
 
 class Scene {
   final String? idEscena;
@@ -28,6 +76,10 @@ class Scene {
   final String? horaInicioRodaje; // "HH:MM:SS" (formato hora backend)
   final String? notasRodaje;
   final int? ordenRodaje;
+  // Agrupación manual (1, 2, 3...) para filtrar escenas por "bloque de
+  // grabación" — independiente del día de rodaje asignado. Visible y
+  // editable tanto en Plan de Rodaje como filtrable en Escenas.
+  final int? bloqueGrabacion;
 
   Scene({
     this.idEscena,
@@ -49,6 +101,7 @@ class Scene {
     this.horaInicioRodaje,
     this.notasRodaje,
     this.ordenRodaje,
+    this.bloqueGrabacion,
   });
 
   String get modoYMomento {
@@ -80,6 +133,7 @@ class Scene {
       horaInicioRodaje: asString(pick(json, ['hora_inicio_rodaje'])),
       notasRodaje: asString(pick(json, ['notas_rodaje'])),
       ordenRodaje: asInt(pick(json, ['orden_rodaje'])),
+      bloqueGrabacion: asInt(pick(json, ['bloque_grabacion'])),
     );
   }
 
@@ -103,5 +157,6 @@ class Scene {
         if (horaInicioRodaje != null && horaInicioRodaje!.isNotEmpty) 'hora_inicio_rodaje': horaInicioRodaje,
         if (notasRodaje != null && notasRodaje!.isNotEmpty) 'notas_rodaje': notasRodaje,
         if (ordenRodaje != null) 'orden_rodaje': ordenRodaje,
+        if (bloqueGrabacion != null) 'bloque_grabacion': bloqueGrabacion,
       };
 }

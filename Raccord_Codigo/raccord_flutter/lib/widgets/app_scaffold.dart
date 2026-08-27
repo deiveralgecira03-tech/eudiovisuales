@@ -11,7 +11,7 @@ import 'app_logo.dart';
 /// "dentro" de un proyecto.
 const appSideMenuItems = [
   ('Guión', Icons.description_outlined, '/guiones'),
-  ('Crear Escenas', Icons.movie_filter_outlined, '/escenas'),
+  ('Escenas', Icons.movie_filter_outlined, '/escenas'),
   ('Personajes', Icons.people_outline, '/personajes'),
   ('Cast List', Icons.theater_comedy_outlined, '/actores'),
   ('Plan de Rodaje', Icons.event_note_outlined, '/plan-rodaje'),
@@ -23,6 +23,13 @@ const appSideMenuItems = [
   ('Crew List', Icons.badge_outlined, '/crew-list'),
   ('Roles', Icons.admin_panel_settings_outlined, '/roles'),
 ];
+
+// Nombre de la ruta que solo debe verse para roles que sí invitan gente
+// al proyecto (Administrador/Director/Jefe de Departamento) — Onset y
+// Usuario nunca invitan a nadie, así que ni siquiera deben ver la
+// entrada "Roles" en el menú (antes salía para todos los roles, aunque
+// el backend ya la rechazaba con 403 para estos dos).
+const _kRestrictedMenuRoute = '/roles';
 
 /// Reemplaza los `showModalBottomSheet` (hoja pegada al borde inferior)
 /// por un diálogo centrado en pantalla — se ve mejor en Web/Desktop, que
@@ -56,11 +63,21 @@ class AppSideMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeController = context.watch<ThemeController>();
+    final session = context.watch<AuthSession>();
+    // "Roles" (invitar/gestionar el equipo) solo tiene sentido para
+    // quienes SÍ pueden invitar gente al proyecto (Administrador,
+    // Director, Jefe de Departamento) — Onset y Usuario nunca invitan a
+    // nadie, así que ni siquiera deben ver la entrada en el menú, aunque
+    // el backend ya la rechazaba con 403 para ellos. Se evalúa contra el
+    // rol EFECTIVO en el proyecto activo (session.can), no el rol global.
+    final visibleItems = appSideMenuItems.where(
+      (item) => item.$3 != _kRestrictedMenuRoute || session.can('invite_users'),
+    );
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
-        ...appSideMenuItems.map((item) => ListTile(
+        ...visibleItems.map((item) => ListTile(
               leading: Icon(item.$2, size: 20),
               title: Text(item.$1),
               onTap: () => onSelect(item.$3),
@@ -121,6 +138,39 @@ class AppScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = context.watch<AuthSession>();
 
+    // Fuerza que TODO lo que esta pantalla recibe ya construido (body,
+    // endDrawer personalizado, acciones, FAB) se tire y se reconstruya
+    // desde cero al cambiar de modo claro/oscuro — pedido explícito del
+    // usuario ("si o si todo debe quedar ajustado al nuevo modo"). El
+    // problema: muchas pantallas pintan con `AppColors.bg/surface/...`
+    // (getters planos, no un InheritedWidget) en vez de
+    // `Theme.of(context)`. Cuando el usuario cambia el modo desde el
+    // menú, `ThemeController.notifyListeners()` solo obliga a
+    // reconstruirse a los widgets que lo escuchan directamente — y como
+    // `body`/`actions`/etc. ya vienen armados por la pantalla que llama
+    // a `AppScaffold` (son la MISMA instancia de widget de antes),
+    // Flutter los da por "sin cambios" y nunca vuelve a ejecutar su
+    // build(), dejándolos con los colores del modo anterior hasta que
+    // algo más los reconstruya (navegar y volver, etc.). Envolverlos acá
+    // en una Key distinta por modo obliga a Flutter a descartar ese
+    // árbol entero y reconstruirlo, sin tocar la pila de navegación.
+    final themeMode = context.watch<ThemeController>().mode;
+    final themeKey = ValueKey(themeMode);
+
+    // En móvil/tablet vertical, el wordmark ("Raccord") no se encoge por
+    // sí solo (es una imagen de ancho fijo, no un texto) y el bloque de
+    // `actions` con scroll horizontal reportaba su ancho de CONTENIDO
+    // completo (no el disponible) al AppBar, lo que hacía que el
+    // NavigationToolbar le diera todo ese espacio y el wordmark quedara
+    // tapado/solapado por los íconos. La solución: 1) achicar el
+    // wordmark en pantallas angostas, y 2) acotar explícitamente el
+    // ancho máximo del bloque de acciones con un `ConstrainedBox`, para
+    // que reporte ESE ancho (y no el de todo su contenido) y realmente
+    // recorte/scrollee en vez de solaparse con el título.
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isNarrow = screenWidth < 600;
+    final wordmarkFontSize = isNarrow ? 14.0 : 20.0;
+
     final effectiveEndDrawer = endDrawer ??
         (showModuleMenu
             ? Drawer(
@@ -134,7 +184,7 @@ class AppScaffold extends StatelessWidget {
             : null);
 
     return Scaffold(
-      endDrawer: effectiveEndDrawer,
+      endDrawer: effectiveEndDrawer == null ? null : KeyedSubtree(key: themeKey, child: effectiveEndDrawer),
       appBar: AppBar(
         leading: showBack
             ? IconButton(
@@ -146,86 +196,110 @@ class AppScaffold extends StatelessWidget {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const AppWordmark(fontSize: 20),
+            AppWordmark(fontSize: wordmarkFontSize),
             if (title.isNotEmpty) ...[
               const SizedBox(width: 12),
               Container(width: 1, height: 18, color: AppColors.border),
               const SizedBox(width: 12),
               Flexible(
-                child: Text(title, style: const TextStyle(fontSize: 16, overflow: TextOverflow.ellipsis)),
+                child: Text(title, style: TextStyle(fontSize: isNarrow ? 14 : 16, overflow: TextOverflow.ellipsis)),
               ),
             ],
           ],
         ),
+        // Todas las acciones (home, las que trae cada pantalla,
+        // notificaciones, menú y avatar) se envuelven en un solo scroll
+        // horizontal en vez de una Row plana: con varias pantallas
+        // agregando 1-2 íconos propios (Roles, Escenas, Desglose...),
+        // en móvil angosto (~360-400px) la suma de íconos ya no cabe y
+        // una Row normal dentro de `actions` no protege contra overflow
+        // (a diferencia del `title`, que sí tiene `Flexible`+ellipsis).
+        // El scroll horizontal garantiza que nunca se corte ni se salga
+        // de pantalla, a costa de requerir un swipe si sobran íconos.
         actions: [
-          if (showHome)
-            IconButton(
-              icon: const Icon(Icons.home_outlined),
-              tooltip: 'Ir al Dashboard',
-              onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (r) => false),
-            ),
-          ...?actions,
-          // Solo el ícono por ahora (decisión explícita del usuario):
-          // todavía no hay sistema de notificaciones real (ni tabla en
-          // BD, ni eventos que las disparen) — eso queda como una
-          // siguiente fase, a definir qué eventos notificar. Por ahora
-          // solo reserva el espacio visual, como en la referencia de
-          // FilmScript, y avisa que la función viene después.
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              tooltip: 'Notificaciones (próximamente)',
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notificaciones: disponible próximamente')),
-                );
-              },
-            ),
-          ),
-          if (effectiveEndDrawer != null)
-            Builder(
-              builder: (context) => IconButton(
-                icon: const Icon(Icons.menu),
-                tooltip: 'Menú',
-                onPressed: () => Scaffold.of(context).openEndDrawer(),
+          ConstrainedBox(
+            // Sin este límite explícito, un SingleChildScrollView dentro
+            // de `actions` reporta el ancho de TODO su contenido (no el
+            // disponible) al AppBar — acotarlo fuerza a que realmente
+            // recorte/scrollee en vez de solaparse con el wordmark.
+            constraints: BoxConstraints(maxWidth: isNarrow ? screenWidth * 0.42 : double.infinity),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showHome)
+                    IconButton(
+                      icon: const Icon(Icons.home_outlined),
+                      tooltip: 'Ir al Dashboard',
+                      onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (r) => false),
+                    ),
+                if (actions != null) KeyedSubtree(key: themeKey, child: Row(mainAxisSize: MainAxisSize.min, children: actions!)),
+                // Solo el ícono por ahora (decisión explícita del usuario):
+                // todavía no hay sistema de notificaciones real (ni tabla en
+                // BD, ni eventos que las disparen) — eso queda como una
+                // siguiente fase, a definir qué eventos notificar. Por ahora
+                // solo reserva el espacio visual, como en la referencia de
+                // FilmScript, y avisa que la función viene después.
+                Builder(
+                  builder: (context) => IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: 'Notificaciones (próximamente)',
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Notificaciones: disponible próximamente')),
+                      );
+                    },
+                  ),
+                ),
+                if (effectiveEndDrawer != null)
+                  Builder(
+                    builder: (context) => IconButton(
+                      icon: const Icon(Icons.menu),
+                      tooltip: 'Menú',
+                      onPressed: () => Scaffold.of(context).openEndDrawer(),
+                    ),
+                  ),
+                PopupMenuButton<String>(
+                  icon: CircleAvatar(
+                    backgroundColor: AppColors.azulProfundo,
+                    radius: 16,
+                    child: Text(
+                      (session.user?.nombre.isNotEmpty ?? false) ? session.user!.nombre[0].toUpperCase() : '?',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  onSelected: (value) async {
+                    if (value == 'perfil') {
+                      Navigator.of(context).pushNamed('/perfil');
+                    } else if (value == 'proyectos') {
+                      await session.clearProject();
+                      if (context.mounted) {
+                        Navigator.of(context).pushNamedAndRemoveUntil('/proyectos', (r) => false);
+                      }
+                    } else if (value == 'salir') {
+                      await session.logout();
+                      if (context.mounted) {
+                        Navigator.of(context).pushNamedAndRemoveUntil('/login', (r) => false);
+                      }
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(value: 'perfil', child: Row(children: [Icon(Icons.person_outline, size: 18), SizedBox(width: 10), Text('Perfil')])),
+                    PopupMenuItem(value: 'proyectos', child: Row(children: [Icon(Icons.movie_creation_outlined, size: 18), SizedBox(width: 10), Text('Cambiar proyecto')])),
+                    PopupMenuDivider(),
+                    PopupMenuItem(value: 'salir', child: Row(children: [Icon(Icons.logout, size: 18, color: AppColors.error), SizedBox(width: 10), Text('Salir', style: TextStyle(color: AppColors.error))])),
+                  ],
+                ),
+                  const SizedBox(width: 8),
+                ],
               ),
             ),
-          PopupMenuButton<String>(
-            icon: CircleAvatar(
-              backgroundColor: AppColors.azulProfundo,
-              radius: 16,
-              child: Text(
-                (session.user?.nombre.isNotEmpty ?? false) ? session.user!.nombre[0].toUpperCase() : '?',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            onSelected: (value) async {
-              if (value == 'perfil') {
-                Navigator.of(context).pushNamed('/perfil');
-              } else if (value == 'proyectos') {
-                await session.clearProject();
-                if (context.mounted) {
-                  Navigator.of(context).pushNamedAndRemoveUntil('/proyectos', (r) => false);
-                }
-              } else if (value == 'salir') {
-                await session.logout();
-                if (context.mounted) {
-                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (r) => false);
-                }
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'perfil', child: Row(children: [Icon(Icons.person_outline, size: 18), SizedBox(width: 10), Text('Perfil')])),
-              PopupMenuItem(value: 'proyectos', child: Row(children: [Icon(Icons.movie_creation_outlined, size: 18), SizedBox(width: 10), Text('Cambiar proyecto')])),
-              PopupMenuDivider(),
-              PopupMenuItem(value: 'salir', child: Row(children: [Icon(Icons.logout, size: 18, color: AppColors.error), SizedBox(width: 10), Text('Salir', style: TextStyle(color: AppColors.error))])),
-            ],
           ),
-          const SizedBox(width: 8),
         ],
       ),
-      body: SafeArea(child: body),
-      floatingActionButton: floatingActionButton,
+      body: SafeArea(child: KeyedSubtree(key: themeKey, child: body)),
+      floatingActionButton: floatingActionButton == null ? null : KeyedSubtree(key: themeKey, child: floatingActionButton!),
     );
   }
 }

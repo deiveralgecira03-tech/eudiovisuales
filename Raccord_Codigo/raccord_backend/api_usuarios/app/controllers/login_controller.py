@@ -88,11 +88,26 @@ def _build_session_response(user: User, db: Session, message: str, extra: dict =
 # igual, sin que la contraseña importara. Ahora la contraseña se
 # revalida en cada paso, incluido verify_2fa_code, que es el punto
 # donde realmente se emite el token.
+    # Mensaje único e indistinguible para "correo no existe" y
+    # "contraseña incorrecta": si se devolviera un mensaje distinto para
+    # cada caso, alguien podría usar el login como oráculo para
+    # confirmar qué correos están registrados (enumeración de
+    # usuarios), probando direcciones al azar. Con el mismo texto y el
+    # mismo código de error en ambos casos, esa distinción desaparece
+    # del todo lado del cliente.
+def _credenciales_invalidas():
+    return api_response(
+        False,
+        "Verifica tu correo y tu contraseña: alguno de los dos no es correcto.",
+        error="INVALID_CREDENTIALS",
+    )
+
+
 def _validar_credenciales(mail: str, contrasena: str, db: Session):
     user = db.query(User).filter(User.mail == mail).first()
 
     if not user:
-        return None, api_response(False, "Correo no registrado", error="USER_NOT_FOUND")
+        return None, _credenciales_invalidas()
 
     try:
         password_ok = verify_password(contrasena, user.contrasena)
@@ -103,7 +118,7 @@ def _validar_credenciales(mail: str, contrasena: str, db: Session):
         return None, api_response(False, "No fue posible validar las credenciales", error="AUTH_ERROR")
 
     if not password_ok:
-        return None, api_response(False, "Contraseña incorrecta", error="INVALID_PASSWORD")
+        return None, _credenciales_invalidas()
 
     # Suspendido por un Administrador/Director (o el Jefe de su propio
     # departamento) desde "Roles del Equipo" — no se borra ninguna de

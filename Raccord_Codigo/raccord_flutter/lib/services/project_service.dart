@@ -44,9 +44,14 @@ class ProjectService {
     });
     // El endpoint devuelve el id_project creado (string) según el
     // controller; para tener el objeto completo, se recarga la lista.
+    // En ambos casos, quien crea el proyecto SIEMPRE queda vinculado
+    // con rol Administrador (1001) — ver create_project_and_link en
+    // project_controller.py — así que se fija a mano acá: ni GET
+    // /projects/{id} ni la respuesta de creación traen id_rol (ese
+    // campo solo lo agrega GET /users/{id}/projects).
     if (data is String) {
-      return get(data);
+      return (await get(data)).withIdRol(1001);
     }
-    return Project.fromJson(Map<String, dynamic>.from(data as Map));
+    return Project.fromJson(Map<String, dynamic>.from(data as Map)).withIdRol(1001);
   }
 }

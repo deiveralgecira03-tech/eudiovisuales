@@ -6,8 +6,10 @@ class CharacterService {
   final ApiClient api;
   CharacterService(this.api);
 
-  Future<List<CharacterModel>> all() async {
-    final data = await api.get('/characters');
+  // Antes /characters sin filtro devolvía los personajes de TODOS los
+  // proyectos — ahora requiere el proyecto activo.
+  Future<List<CharacterModel>> all(String idProject) async {
+    final data = await api.get('/characters/project/$idProject');
     return asListOfMap(data).map(CharacterModel.fromJson).toList();
   }
 
@@ -30,8 +32,10 @@ class ActorService {
   final ApiClient api;
   ActorService(this.api);
 
-  Future<List<ActorModel>> all() async {
-    final data = await api.get('/actors');
+  // Antes /actors sin filtro devolvía los actores de TODOS los
+  // proyectos — ahora requiere el proyecto activo.
+  Future<List<ActorModel>> all(String idProject) async {
+    final data = await api.get('/actors/project/$idProject');
     return asListOfMap(data).map(ActorModel.fromJson).toList();
   }
 

@@ -172,6 +172,7 @@ class _ActorFormScreenState extends State<ActorFormScreen> {
         nacionalidad: _nacionalidad.text.trim(),
         dobleRiesgo: _dobleRiesgo,
         idPersonaje: widget.idPersonaje,
+        idProject: session.projectId,
       ));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ficha técnica guardada')));

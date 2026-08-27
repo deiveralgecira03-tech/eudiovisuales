@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.scene_model import Scene
+from app.models.script_model import Script
 
 from app.schemas.scene_schema import SceneSchema
 
@@ -30,15 +31,25 @@ def _serialize(s: Scene):
         "tiempo_estimado": s.tiempo_estimado,
         "hora_inicio_rodaje": str(s.hora_inicio_rodaje) if s.hora_inicio_rodaje else None,
         "notas_rodaje": s.notas_rodaje,
-        "orden_rodaje": s.orden_rodaje
+        "orden_rodaje": s.orden_rodaje,
+        "bloque_grabacion": s.bloque_grabacion
     }
 
 
 # ==========================================
-# GET ALL SCENES
+# GET ALL SCENES (de UN proyecto)
 # ==========================================
-def get_scenes(db: Session):
-    scenes = db.query(Scene).order_by(Scene.id_escena).all()
+# Antes traía las escenas de TODOS los proyectos sin filtro. Scene no
+# tiene columna id_project propia (ver scene_model.py) — se resuelve
+# subiendo por escenas.id_guion -> guiones.id_project.
+def get_scenes(id_project: str, db: Session):
+    scenes = (
+        db.query(Scene)
+        .join(Script, Scene.id_guion == Script.id_guion)
+        .filter(Script.id_project == id_project)
+        .order_by(Scene.id_escena)
+        .all()
+    )
     return api_response(True, "Lista de escenas", [_serialize(s) for s in scenes])
 
 
@@ -81,7 +92,15 @@ def get_scenes_by_desglose(id_desglose: str, db: Session):
 # ==========================================
 # CREATE SCENE
 # ==========================================
+# id_guion es obligatorio EN LA PRÁCTICA aunque el schema lo marque
+# opcional (compatibilidad con datos viejos): sin un guion no hay forma
+# de resolver a qué proyecto pertenece la escena, y eso rompería el
+# aislamiento por proyecto. El permiso ya se validó en la ruta contra
+# el proyecto del guion (ver scene_routes.py) antes de llegar acá.
 def create_scene(scene: SceneSchema, db: Session):
+    if not scene.id_guion:
+        return api_response(False, "id_guion es obligatorio para crear una escena", error="MISSING_SCRIPT")
+
     new_scene = Scene(
         numero_de_escena=scene.numero_de_escena,
         encabezado=scene.encabezado,
@@ -100,7 +119,8 @@ def create_scene(scene: SceneSchema, db: Session):
         tiempo_estimado=scene.tiempo_estimado,
         hora_inicio_rodaje=scene.hora_inicio_rodaje,
         notas_rodaje=scene.notas_rodaje,
-        orden_rodaje=scene.orden_rodaje
+        orden_rodaje=scene.orden_rodaje,
+        bloque_grabacion=scene.bloque_grabacion
     )
 
     db.add(new_scene)
@@ -113,11 +133,29 @@ def create_scene(scene: SceneSchema, db: Session):
 # ==========================================
 # UPDATE SCENE (PUT - completo)
 # ==========================================
+# NOTA DE SEGURIDAD: scene.id_guion SÍ se copia (a diferencia de
+# id_project en los otros controllers) porque reasignar una escena a
+# otro guion DEL MISMO proyecto es un caso de uso legítimo. Lo que no
+# se permite es mover la escena a un guion de OTRO proyecto (eso
+# evadiría el aislamiento) — se bloquea explícitamente abajo.
 def update_scene_full(id: str, scene: SceneSchema, db: Session):
     scene_db = db.query(Scene).filter(Scene.id_escena == id).first()
 
     if not scene_db:
         return api_response(False, "Escena no encontrada")
+
+    if scene.id_guion and scene.id_guion != str(scene_db.id_guion):
+        proyecto_actual = (
+            db.query(Script.id_project).filter(Script.id_guion == scene_db.id_guion).scalar()
+            if scene_db.id_guion else None
+        )
+        proyecto_nuevo = db.query(Script.id_project).filter(Script.id_guion == scene.id_guion).scalar()
+        if proyecto_nuevo != proyecto_actual:
+            return api_response(
+                False,
+                "No se puede mover una escena a un guion de otro proyecto",
+                error="CROSS_PROJECT_MOVE",
+            )
 
     scene_db.numero_de_escena = scene.numero_de_escena
     scene_db.encabezado = scene.encabezado
@@ -137,6 +175,7 @@ def update_scene_full(id: str, scene: SceneSchema, db: Session):
     scene_db.hora_inicio_rodaje = scene.hora_inicio_rodaje
     scene_db.notas_rodaje = scene.notas_rodaje
     scene_db.orden_rodaje = scene.orden_rodaje
+    scene_db.bloque_grabacion = scene.bloque_grabacion
 
     db.commit()
     db.refresh(scene_db)
@@ -154,6 +193,21 @@ def update_scene(id: str, scene, db: Session):
         return api_response(False, "Escena no encontrada")
 
     update_data = scene.model_dump(exclude_unset=True)
+
+    # Mismo guard que en update_scene_full: no se puede mover la escena
+    # a un guion de otro proyecto.
+    if update_data.get("id_guion") and update_data["id_guion"] != str(scene_db.id_guion):
+        proyecto_actual = (
+            db.query(Script.id_project).filter(Script.id_guion == scene_db.id_guion).scalar()
+            if scene_db.id_guion else None
+        )
+        proyecto_nuevo = db.query(Script.id_project).filter(Script.id_guion == update_data["id_guion"]).scalar()
+        if proyecto_nuevo != proyecto_actual:
+            return api_response(
+                False,
+                "No se puede mover una escena a un guion de otro proyecto",
+                error="CROSS_PROJECT_MOVE",
+            )
 
     for key, value in update_data.items():
         setattr(scene_db, key, value)

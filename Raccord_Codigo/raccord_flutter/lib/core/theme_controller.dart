@@ -21,8 +21,14 @@ class ThemeController extends ChangeNotifier {
   }
 
   void toggle() {
-    _mode = isDark ? ThemeMode.light : ThemeMode.dark;
-    AppColors.isDark = isDark;
+    // Se calcula el modo nuevo UNA sola vez y se usa para las dos
+    // asignaciones — antes se leía el getter `isDark` de nuevo después
+    // de reasignar `_mode`, lo cual daba el resultado correcto por
+    // casualidad (el getter ya reflejaba el modo nuevo) pero era
+    // confuso de leer y frágil ante cualquier cambio futuro.
+    final nuevoModo = isDark ? ThemeMode.light : ThemeMode.dark;
+    _mode = nuevoModo;
+    AppColors.isDark = nuevoModo == ThemeMode.dark;
     notifyListeners();
   }
 }

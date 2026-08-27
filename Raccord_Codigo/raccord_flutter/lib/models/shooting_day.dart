@@ -10,6 +10,8 @@ class ShootingDay {
   final String? location;
   final String? notas;
   final bool activo;
+  // Obligatorio para crear (ver shooting_day_schema.py en el backend).
+  final String? idProject;
 
   ShootingDay({
     this.idRodaje,
@@ -21,6 +23,7 @@ class ShootingDay {
     this.location,
     this.notas,
     this.activo = true,
+    this.idProject,
   });
 
   factory ShootingDay.fromJson(Map<String, dynamic> json) {
@@ -34,6 +37,7 @@ class ShootingDay {
       location: asString(pick(json, ['location'])),
       notas: asString(pick(json, ['notas'])),
       activo: asBool(pick(json, ['activo'])) ?? true,
+      idProject: asString(pick(json, ['id_project'])),
     );
   }
 
@@ -46,5 +50,6 @@ class ShootingDay {
         if (location != null && location!.isNotEmpty) 'location': location,
         if (notas != null && notas!.isNotEmpty) 'notas': notas,
         'activo': activo,
+        if (idProject != null) 'id_project': idProject,
       };
 }

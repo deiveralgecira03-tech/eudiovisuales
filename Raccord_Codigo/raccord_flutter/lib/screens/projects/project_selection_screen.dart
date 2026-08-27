@@ -76,19 +76,21 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 32),
           // Se centra todo el contenido y se limita su ancho máximo para
           // que, en pantallas anchas (navegador de escritorio), las
-          // tarjetas no queden estiradas pegadas a los bordes.
+          // tarjetas no queden estiradas pegadas a los bordes — 900 en
+          // vez de 640: aprovecha mejor pantallas grandes sin llegar a
+          // ocupar todo el ancho (pedido explícito del usuario).
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
+              constraints: const BoxConstraints(maxWidth: 900),
               child: Column(
                 children: [
-                  const Icon(Icons.movie_creation_outlined, color: AppColors.azulProfundo, size: 40),
-                  const SizedBox(height: 12),
-                  const Text('Gestión de Proyectos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24)),
-                  const SizedBox(height: 6),
+                  const Icon(Icons.movie_creation_outlined, color: AppColors.azulProfundo, size: 52),
+                  const SizedBox(height: 16),
+                  const Text('Gestión de Proyectos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 30)),
+                  const SizedBox(height: 8),
                   Builder(builder: (context) {
                     final session = context.watch<AuthSession>();
                     final canCreate = hasPermission(session.user?.idRol, 'create_project');
@@ -223,7 +225,7 @@ class _OptionCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
@@ -231,11 +233,11 @@ class _OptionCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            CircleAvatar(radius: 24, backgroundColor: AppColors.surfaceVariant, child: Icon(icon, color: AppColors.azulProfundo)),
-            const SizedBox(height: 12),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: AppColors.grisMedio, fontSize: 12), textAlign: TextAlign.center),
+            CircleAvatar(radius: 30, backgroundColor: AppColors.surfaceVariant, child: Icon(icon, color: AppColors.azulProfundo, size: 28)),
+            const SizedBox(height: 16),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+            const SizedBox(height: 6),
+            Text(subtitle, style: const TextStyle(color: AppColors.grisMedio, fontSize: 13), textAlign: TextAlign.center),
           ],
         ),
       ),

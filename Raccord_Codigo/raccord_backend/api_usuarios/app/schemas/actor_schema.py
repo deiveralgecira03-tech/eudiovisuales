@@ -46,6 +46,11 @@ class ActorSchema(BaseModel):
     doble_riesgo: bool
 
     id_personaje: Optional[str] = None
+    # Obligatorio (ver sql/015_project_scoping.sql y CharacterSchema):
+    # todo actor NUEVO debe quedar amarrado a un proyecto desde que se
+    # crea, tenga o no personaje asignado todavía. No se puede cambiar
+    # después (no está en ActorUpdateSchema).
+    id_project: str
 
 
 class ActorUpdateSchema(BaseModel):

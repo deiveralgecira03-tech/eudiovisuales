@@ -17,6 +17,10 @@ class ShootingDaySchema(BaseModel):
     location: Optional[str] = None
     notas: Optional[str] = None
     activo: Optional[bool] = True
+    # Obligatorio (ver sql/015_project_scoping.sql): un día de rodaje
+    # siempre pertenece a UN proyecto, incluso antes de asignarle
+    # escenas. No se puede cambiar después.
+    id_project: str
 
 
 class ShootingDayUpdateSchema(BaseModel):

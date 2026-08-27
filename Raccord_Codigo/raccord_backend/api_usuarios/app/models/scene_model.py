@@ -118,3 +118,7 @@ class Scene(Base):
     orden_rodaje = Column(  # posición manual (drag-and-drop) dentro del stripboard de su día
         Integer
     )
+
+    bloque_grabacion = Column(  # agrupación manual (1, 2, 3...) para filtrar en Plan de Rodaje/Escenas — ver sql/013_bloque_grabacion.sql
+        Integer
+    )

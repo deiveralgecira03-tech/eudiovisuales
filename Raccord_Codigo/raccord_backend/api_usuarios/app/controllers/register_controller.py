@@ -12,7 +12,7 @@ from app.models.user_project_model import UserProject
 from app.utils.hash import hash_password
 from app.utils.formatters import format_text
 from app.utils.response import api_response
-from app.utils.mail import send_invitation_email
+from app.utils.mail import send_invitation_email, send_welcome_email
 
 
 # ==========================================
@@ -67,6 +67,14 @@ def register(data, db: Session):
         db.commit()
         db.refresh(new_user)
         db.refresh(new_client)
+
+        # No debe tumbar el registro si el correo falla (ej. SMTP caído):
+        # la cuenta ya quedó creada, el email de bienvenida es solo un
+        # extra informativo/de seguridad.
+        try:
+            send_welcome_email(new_user.mail, new_user.nombre, new_client.razon_social)
+        except Exception as mail_error:
+            print(f"Error enviando correo de bienvenida a {new_user.mail}: {mail_error}")
 
         return api_response(True, "Registro exitoso", {
             "id_user": new_user.id_user,

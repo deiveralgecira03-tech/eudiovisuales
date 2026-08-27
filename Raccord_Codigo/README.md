@@ -317,3 +317,14 @@ El resultado queda en `build/web/`.
 **`flutter doctor` marca errores de Android/iOS:** no es necesario resolverlos si solo vas a correr/compilar la versión web. Esos ítems solo son obligatorios para compilar `.apk` o la app de iOS.
 
 **Un PDF o foto no carga / da 404:** el backend sirve estos archivos él mismo (los descarga de MinIO y los devuelve en la respuesta, ver sección 4.2), así que el navegador nunca habla directo con MinIO para esto — revisa que el contenedor `raccord-minio` esté corriendo (`docker compose ps`) y que las variables `MINIO_ENDPOINT`/`MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` del backend sean correctas (`docker compose logs -f backend` suele mostrar el error real si no logra conectarse).
+
+---
+
+## 8. Arquitectura y seguridad (resumen)
+
+- **Autenticación:** JWT (HS256, `python-jose`), firmado con `SECRET_KEY` y expiración configurable (`ACCESS_TOKEN_EXPIRE_MINUTES`). Login con 2FA por código enviado a correo.
+- **Contraseñas:** hasheadas con bcrypt (`passlib`), nunca se guardan ni se transmiten en texto plano.
+- **Aislamiento de datos por proyecto:** todo el contenido de producción (guiones, escenas, personajes, actores, desglose, plan de rodaje, galería, crew) queda asociado a un `id_project`, y cada endpoint valida que el usuario autenticado pertenezca a ese proyecto antes de responder — un usuario nunca puede ver ni modificar datos de un proyecto ajeno.
+- **Permisos por rol efectivo:** el rol que decide qué puede hacer un usuario es el que tiene **dentro de cada proyecto** (`user_projects.id_rol`), no un rol global fijo — la misma persona puede tener distinto rol en distintos proyectos.
+- **Archivos binarios:** PDFs de guiones y fotos (continuidad y perfil) se almacenan en MinIO (S3-compatible), no en la base de datos; el backend intermedia toda descarga para evitar exponer MinIO directamente al navegador.
+- **Correo:** SMTP directo contra Gmail (STARTTLS) para recuperación de contraseña, 2FA, invitaciones y bienvenida.

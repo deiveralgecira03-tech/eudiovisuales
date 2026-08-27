@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, Text, Time, Boolean
+from sqlalchemy import Column, Integer, String, Text, Time, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
@@ -24,6 +24,19 @@ class ShootingDay(Base):
         primary_key=True,
         index=True,
         default=uuid.uuid4
+    )
+
+    # Aislamiento por proyecto (ver sql/015_project_scoping.sql). No se
+    # puede resolver "hacia atrás" vía las escenas que apuntan a este día
+    # (escenas.id_rodaje) porque un día de rodaje puede crearse ANTES de
+    # asignarle ninguna escena — necesitaría su propio id_project desde
+    # el momento de creación. Nullable=True solo para la migración de
+    # filas existentes; toda fila nueva lo exige (ShootingDaySchema).
+    id_project = Column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id_project", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
     )
 
     version = Column(

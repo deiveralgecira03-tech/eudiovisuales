@@ -23,6 +23,7 @@ def _serialize(d: BreakdownSheet):
         "location": d.location,
         "requerimientos": d.requerimientos,
         "activo": d.activo,
+        "id_project": d.id_project,
     }
 
 
@@ -54,10 +55,13 @@ def _serialize_item(i: DesgloseItem):
 # ==========================================
 # GET ALL BREAKDOWN SHEETS
 # ==========================================
-def get_breakdown_sheets(db: Session):
-    sheets = db.query(BreakdownSheet).order_by(
-        BreakdownSheet.semana_grabacion, BreakdownSheet.dia_rodaje
-    ).all()
+def get_breakdown_sheets(id_project: str, db: Session):
+    sheets = (
+        db.query(BreakdownSheet)
+        .filter(BreakdownSheet.id_project == id_project)
+        .order_by(BreakdownSheet.semana_grabacion, BreakdownSheet.dia_rodaje)
+        .all()
+    )
 
     return api_response(True, "Lista de desgloses", [_serialize(d) for d in sheets])
 
@@ -103,7 +107,8 @@ def create_breakdown_sheet(sheet: BreakdownSheetSchema, db: Session):
         hora_fin=sheet.hora_fin,
         location=sheet.location,
         requerimientos=sheet.requerimientos,
-        activo=sheet.activo if sheet.activo is not None else True
+        activo=sheet.activo if sheet.activo is not None else True,
+        id_project=sheet.id_project,
     )
 
     db.add(new_sheet)
@@ -116,6 +121,9 @@ def create_breakdown_sheet(sheet: BreakdownSheetSchema, db: Session):
 # ==========================================
 # UPDATE BREAKDOWN SHEET (PUT - completo)
 # ==========================================
+# NOTA: BreakdownSheetSchema trae id_project (mismo schema que create),
+# pero a propósito NO se copia acá — ver la misma nota en
+# character_controller.py.
 def update_breakdown_sheet_full(id: str, sheet: BreakdownSheetSchema, db: Session):
     sheet_db = db.query(BreakdownSheet).filter(BreakdownSheet.id_desglose == id).first()
 

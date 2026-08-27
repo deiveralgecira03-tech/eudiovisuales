@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, Text, Time, Boolean
+from sqlalchemy import Column, Integer, String, Text, Time, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
@@ -29,6 +29,19 @@ class BreakdownSheet(Base):
         primary_key=True,
         index=True,
         default=uuid.uuid4
+    )
+
+    # Aislamiento por proyecto (ver sql/015_project_scoping.sql) — mismo
+    # razonamiento que ShootingDay: no se puede resolver únicamente vía
+    # las escenas que apuntan acá (escenas.id_desglose) porque este
+    # contenedor puede crearse antes de asignarle escenas. Nullable=True
+    # solo para la migración de filas existentes; toda fila nueva lo
+    # exige (BreakdownSheetSchema).
+    id_project = Column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id_project", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
     )
 
     version = Column(

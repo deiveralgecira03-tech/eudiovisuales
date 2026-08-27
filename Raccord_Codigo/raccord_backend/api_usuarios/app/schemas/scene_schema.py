@@ -2,10 +2,13 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 from datetime import date, time
 
-# Deben coincidir exactamente con los ENUM de la BD.
+# Deben coincidir exactamente con los catálogos del frontend
+# (kModosVista/kMomentosDia/kEstadosEscena en models/scene.dart) — ya no
+# son ENUM reales de Postgres (ver comentario en scene_model.py), la
+# columna es texto libre y esta validación vive solo acá.
 ModoVista = Literal["int", "ext", "int/ext", "ext/int"]
-MomentoDia = Literal["dia", "noche", "amanecer", "atardecer", "amanecer/dia", "dia/noche"]
-EstadoEscena = Literal["Pendiente", "En proceso", "Finalizada"]
+MomentoDia = Literal["dia", "noche", "amanecer", "atardecer", "anochecer"]
+EstadoEscena = Literal["Pendiente", "En proceso", "Finalizada", "Eliminada"]
 
 
 # ==========================================
@@ -34,6 +37,11 @@ class SceneSchema(BaseModel):
     hora_inicio_rodaje: Optional[time] = None
     notas_rodaje: Optional[str] = None
     orden_rodaje: Optional[int] = None
+    # Agrupación manual de escenas por "bloque de grabación" (1, 2, 3...)
+    # — independiente de a qué día de rodaje esté asignada la escena, se
+    # usa para filtrar en Plan de Rodaje y en Escenas (ver
+    # sql/013_bloque_grabacion.sql).
+    bloque_grabacion: Optional[int] = None
 
 
 class SceneUpdateSchema(BaseModel):
@@ -55,3 +63,8 @@ class SceneUpdateSchema(BaseModel):
     hora_inicio_rodaje: Optional[time] = None
     notas_rodaje: Optional[str] = None
     orden_rodaje: Optional[int] = None
+    # Agrupación manual de escenas por "bloque de grabación" (1, 2, 3...)
+    # — independiente de a qué día de rodaje esté asignada la escena, se
+    # usa para filtrar en Plan de Rodaje y en Escenas (ver
+    # sql/013_bloque_grabacion.sql).
+    bloque_grabacion: Optional[int] = None

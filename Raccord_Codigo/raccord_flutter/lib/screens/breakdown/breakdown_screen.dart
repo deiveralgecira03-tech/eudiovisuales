@@ -9,17 +9,14 @@ import '../../core/pdf_export.dart';
 import '../../core/session.dart';
 import '../../models/breakdown.dart';
 import '../../models/scene.dart';
-import '../../models/shooting_day.dart';
 import '../../services/breakdown_service.dart';
 import '../../services/scene_service.dart';
 import '../../services/script_service.dart';
-import '../../services/shooting_day_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/state_views.dart';
 import '../scenes/scenes_screen.dart' show colorForEstadoEscena;
-import '../shooting_days/shooting_days_screen.dart' show colorModoMomento, labelModoMomento;
 
 /// Íconos por categoría de desglose — puramente decorativo, para que la
 /// grilla se pueda "leer" de un vistazo en vez de solo texto plano
@@ -98,22 +95,24 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
 
   Future<List<int>>? _pdfBytes;
 
-  /// Días de rodaje — se cargan una sola vez para poder mostrar en el
-  /// header de la escena a qué día está asignada (si a alguno), sin
-  /// pedirle al backend un endpoint nuevo.
-  List<ShootingDay> _shootingDays = [];
+  /// Todas las escenas ya cargadas (mismo Future que alimenta el
+  /// selector de arriba) — se guardan acá aparte porque el header de la
+  /// escena seleccionada necesita ver las fechas de grabación de TODAS
+  /// las escenas para calcular el día de rodaje (ver
+  /// [_diaDeRodajeCalculado]), no solo la seleccionada.
+  List<Scene> _allScenes = [];
 
   @override
   void initState() {
     super.initState();
     _scenesFuture = _loadScenes();
-    _loadShootingDays();
   }
 
   Future<List<Scene>> _loadScenes() async {
     final session = context.read<AuthSession>();
-    final scenes = await SceneService(session.api).all();
+    final scenes = await SceneService(session.api).all(session.projectId ?? '');
     scenes.sort(_compareNumeroEscena);
+    if (mounted) setState(() => _allScenes = scenes);
     return scenes;
   }
 
@@ -129,22 +128,28 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
     return a.numeroDeEscena.compareTo(b.numeroDeEscena);
   }
 
-  Future<void> _loadShootingDays() async {
-    final session = context.read<AuthSession>();
-    try {
-      final days = await ShootingDayService(session.api).all();
-      if (mounted) setState(() => _shootingDays = days);
-    } catch (_) {
-      // No es crítico: el header simplemente no muestra el día de rodaje.
-    }
-  }
-
-  ShootingDay? _diaDeEscena(Scene scene) {
-    if (scene.idRodaje == null || scene.idRodaje!.isEmpty) return null;
-    for (final d in _shootingDays) {
-      if (d.idRodaje == scene.idRodaje) return d;
-    }
-    return null;
+  /// Día de rodaje = posición cronológica (1, 2, 3...) de la fecha de
+  /// grabación de esta escena entre TODAS las fechas de grabación
+  /// distintas usadas en las escenas del proyecto — no es un campo que
+  /// se edite a mano, se recalcula solo a partir de las fechas ya
+  /// asignadas. Ej.: fechas de grabación 01, 05, 06, 07, 12 de agosto ->
+  /// día de rodaje 1, 2, 3, 4, 5 respectivamente. Si luego alguien
+  /// asigna una fecha 10 de agosto a otra escena, esa pasa a ser el día
+  /// de rodaje 5 y el 12 de agosto pasa a ser el día 6 (pedido explícito
+  /// del usuario).
+  int? _diaDeRodajeCalculado(Scene scene, List<Scene> todasLasEscenas) {
+    final fecha = scene.fechaDeGrabacion;
+    if (fecha == null) return null;
+    final dia = DateTime(fecha.year, fecha.month, fecha.day);
+    final fechas = todasLasEscenas
+        .map((s) => s.fechaDeGrabacion)
+        .whereType<DateTime>()
+        .map((d) => DateTime(d.year, d.month, d.day))
+        .toSet()
+        .toList()
+      ..sort();
+    final idx = fechas.indexOf(dia);
+    return idx == -1 ? null : idx + 1;
   }
 
   Future<void> _selectScene(Scene scene) async {
@@ -242,15 +247,37 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
             else
               Expanded(
                 child: _vistaDividida
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(flex: 5, child: _buildScriptPane(context)),
-                          const SizedBox(width: 16),
-                          const VerticalDivider(width: 1),
-                          const SizedBox(width: 16),
-                          Expanded(flex: 6, child: _buildDesglosePane(context, canManage)),
-                        ],
+                    ? LayoutBuilder(
+                        builder: (context, constraints) {
+                          // Igual que en Escenas: en pantallas angostas
+                          // (móvil/tablet chico) el guion y el desglose lado
+                          // a lado quedan ilegibles. Por debajo de 760px se
+                          // apilan verticalmente (guion arriba con alto
+                          // fijo, desglose debajo con scroll propio).
+                          final wide = constraints.maxWidth > 760;
+                          if (wide) {
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(flex: 5, child: _buildScriptPane(context)),
+                                const SizedBox(width: 16),
+                                const VerticalDivider(width: 1),
+                                const SizedBox(width: 16),
+                                Expanded(flex: 6, child: _buildDesglosePane(context, canManage)),
+                              ],
+                            );
+                          }
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(height: 420, child: _buildScriptPane(context)),
+                              const SizedBox(height: 16),
+                              const Divider(height: 1),
+                              const SizedBox(height: 16),
+                              Expanded(child: _buildDesglosePane(context, canManage)),
+                            ],
+                          );
+                        },
                       )
                     : _buildDesglosePane(context, canManage),
               ),
@@ -304,7 +331,7 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
       children: [
         _SelectedSceneHeader(
           scene: _selectedScene!,
-          diaDeRodaje: _diaDeEscena(_selectedScene!),
+          diaDeRodaje: _diaDeRodajeCalculado(_selectedScene!, _allScenes),
         ),
         const SizedBox(height: 16),
         if (_loadingItems) const Expanded(child: LoadingView()),
@@ -389,17 +416,11 @@ class _SceneSearchField extends StatelessWidget {
 
   const _SceneSearchField({required this.scenes, required this.selected, required this.onSelected});
 
-  // El encabezado casi siempre ya viene con el número incluido (ej. "ESC
-  // 1. INT. REDACCIÓN..." si se generó por segmentación automática), así
-  // que mostrarlo como "ESC 1 — ESC 1. INT..." repite el número dos
-  // veces. Acá se quita ese prefijo redundante del encabezado antes de
-  // anteponerle el número una sola vez.
-  static String _label(Scene s) {
-    final n = s.numeroDeEscena;
-    final prefijo = RegExp(r'^\s*(ESC\.?|ESCENA)\s*' + RegExp.escape(n) + r'\s*[.:\-]?\s*', caseSensitive: false);
-    final resto = s.encabezado.replaceFirst(prefijo, '');
-    return '$n — ${resto.isEmpty ? s.encabezado : resto}';
-  }
+  // Pedido explícito del usuario: en este selector solo se muestra el
+  // encabezado de la escena, sin anteponer el número (antes se mostraba
+  // "1 — ESC 1. INT...", ahora solo "ESC 1. INT..." tal cual está
+  // guardado en la escena).
+  static String _label(Scene s) => s.encabezado;
 
   @override
   Widget build(BuildContext context) {
@@ -470,7 +491,7 @@ class _SceneSearchField extends StatelessWidget {
 /// filas editables del Plan de Rodaje).
 class _SelectedSceneHeader extends StatelessWidget {
   final Scene scene;
-  final ShootingDay? diaDeRodaje;
+  final int? diaDeRodaje;
   const _SelectedSceneHeader({required this.scene, this.diaDeRodaje});
 
   @override
@@ -507,12 +528,18 @@ class _SelectedSceneHeader extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _HeaderBadge(label: 'ESCENA', value: scene.numeroDeEscena),
+              // El número de escena queda oculto acá (pedido explícito
+              // del usuario) — sigue disponible en el modelo/BD, solo no
+              // se muestra en este header.
               if (scene.modoVista != null)
                 _HeaderBadge(
-                  label: 'INT/EXT · MOMENTO',
-                  value: labelModoMomento(scene.modoVista, scene.momentoDia),
-                  color: colorModoMomento(scene.modoVista, scene.momentoDia),
+                  label: 'ESPACIO',
+                  value: scene.modoVista!.toUpperCase(),
+                ),
+              if (scene.momentoDia != null)
+                _HeaderBadge(
+                  label: 'MOMENTO',
+                  value: labelMomento(scene.momentoDia),
                 ),
               if (scene.pagina != null) _HeaderBadge(label: 'PÁGINA', value: '${scene.pagina}'),
               if (scene.ciudad != null && scene.ciudad!.isNotEmpty) _HeaderBadge(label: 'CIUDAD/LOCACIÓN', value: scene.ciudad!),
@@ -520,12 +547,9 @@ class _SelectedSceneHeader extends StatelessWidget {
               if (scene.fechaDeGrabacion != null)
                 _HeaderBadge(label: 'FECHA DE GRABACIÓN', value: scene.fechaDeGrabacion!.toIso8601String().split('T').first),
               if (diaDeRodaje != null)
-                _HeaderBadge(
-                  label: 'DÍA DE RODAJE',
-                  value: diaDeRodaje!.diaRodaje != null ? 'Día ${diaDeRodaje!.diaRodaje} · v${diaDeRodaje!.version}' : 'v${diaDeRodaje!.version}',
-                )
+                _HeaderBadge(label: 'DÍA DE RODAJE', value: '$diaDeRodaje')
               else
-                const _HeaderBadge(label: 'DÍA DE RODAJE', value: 'Sin asignar'),
+                const _HeaderBadge(label: 'DÍA DE RODAJE', value: 'Sin fecha de grabación'),
             ],
           ),
         ],
@@ -752,7 +776,10 @@ class _BreakdownItemFormSheetState extends State<_BreakdownItemFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
+      // Sin esto, en móvil con el teclado abierto (el diálogo tiene
+      // maxHeight:680 fijo) el Form+Column plano se desborda — ver
+      // auditoría de responsive.
       padding: const EdgeInsets.all(20),
       child: Form(
         key: _formKey,
@@ -797,7 +824,6 @@ class _BreakdownItemFormSheetState extends State<_BreakdownItemFormSheet> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     final session = context.read<AuthSession>();
-
     try {
       if (_isEdit) {
         await BreakdownService(session.api).updateItem(widget.existing!.id!, {

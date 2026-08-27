@@ -33,7 +33,7 @@ class _ActorsScreenState extends State<ActorsScreen> {
 
   Future<List<ActorModel>> _load() {
     final session = context.read<AuthSession>();
-    return ActorService(session.api).all();
+    return ActorService(session.api).all(session.projectId ?? '');
   }
 
   void _reload() => setState(() => _future = _load());
@@ -263,6 +263,7 @@ class _ActorsScreenState extends State<ActorsScreen> {
           nacionalidad: nacionalidad!,
           dobleRiesgo: dobleRiesgo,
           idPersonaje: _pick(row, ['id_personaje']),
+          idProject: session.projectId,
         ));
         results.add(BulkRowResult(fila: fila, ok: true, detalle: 'Creado correctamente'));
       } on ApiException catch (e) {

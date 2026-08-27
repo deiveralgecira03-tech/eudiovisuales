@@ -14,6 +14,15 @@ class GalleryService {
     return asListOfMap(data).map(GalleryPhoto.fromJson).toList();
   }
 
+  /// Todas las fotos de todas las escenas del proyecto — Galería global
+  /// (gallery_screen.dart). Cada foto ya trae numero_de_escena/encabezado
+  /// embebidos (ver GalleryPhoto.numeroDeEscenaOrigen/encabezadoEscenaOrigen).
+  // Antes /fotos sin filtro devolvía las fotos de TODOS los proyectos.
+  Future<List<GalleryPhoto>> all(String idProject) async {
+    final data = await api.get('/fotos/project/$idProject');
+    return asListOfMap(data).map(GalleryPhoto.fromJson).toList();
+  }
+
   Future<GalleryPhoto> upload(
     String idEscena, {
     required String tipoFoto,

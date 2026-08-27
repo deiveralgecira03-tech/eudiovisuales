@@ -32,7 +32,7 @@ class _CharactersScreenState extends State<CharactersScreen> {
 
   Future<List<CharacterModel>> _load() {
     final session = context.read<AuthSession>();
-    return CharacterService(session.api).all();
+    return CharacterService(session.api).all(session.projectId ?? '');
   }
 
   void _reload() => setState(() => _future = _load());
@@ -178,7 +178,12 @@ class _CharactersScreenState extends State<CharactersScreen> {
       }
 
       try {
-        await service.create(CharacterModel(nombre: nombre, edad: edad, codigoPersonaje: codigo));
+        await service.create(CharacterModel(
+          nombre: nombre,
+          edad: edad,
+          codigoPersonaje: codigo,
+          idProject: session.projectId,
+        ));
         results.add(BulkRowResult(fila: fila, ok: true, detalle: 'Creado correctamente'));
       } on ApiException catch (e) {
         results.add(BulkRowResult(fila: fila, ok: false, detalle: e.message));
@@ -218,7 +223,9 @@ class _CharacterFormSheetState extends State<_CharacterFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
+      // Evita overflow con el teclado abierto en móvil (el diálogo tiene
+      // maxHeight fijo) — ver auditoría de responsive.
       padding: const EdgeInsets.all(20),
       child: Form(
         key: _formKey,
@@ -266,6 +273,7 @@ class _CharacterFormSheetState extends State<_CharacterFormSheet> {
           nombre: _nombre.text.trim(),
           edad: int.tryParse(_edad.text.trim()) ?? 0,
           codigoPersonaje: _codigo.text.trim(),
+          idProject: session.projectId,
         ));
       }
       if (!mounted) return;

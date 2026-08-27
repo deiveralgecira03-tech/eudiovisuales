@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Integer, Text
+from sqlalchemy import Column, String, Integer, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
@@ -32,4 +32,18 @@ class Character(Base):
     codigo_personaje = Column(
         String(30),
         nullable=False
+    )
+
+    # Aislamiento de datos por proyecto (ver sql/015_project_scoping.sql):
+    # antes esta tabla no tenía NINGUNA relación con "projects", así que
+    # GET /characters devolvía los personajes de TODOS los proyectos de
+    # TODOS los clientes sin distinción. Nullable=True a nivel de BD solo
+    # para permitir la migración de filas existentes (ver
+    # scripts/backfill_project_scoping.py); toda fila nueva SIEMPRE debe
+    # traer id_project (se exige en CharacterSchema).
+    id_project = Column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id_project", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
     )

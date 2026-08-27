@@ -16,29 +16,35 @@ import '../../widgets/state_views.dart';
 import '../scenes/scene_edit_screen.dart';
 
 // ==========================================
-// COLORES TIPO "STRIPBOARD" (INT/EXT · DÍA/NOCHE)
+// ESPACIO/MOMENTO SIN COLORES (antes stripboard con colores tipo
+// FilmScript: verde EXT día, amarillo INT día, azul INT noche, morado
+// EXT noche)
 // ==========================================
-// Convención estándar de la industria (la misma que usa el "Plan de
-// rodaje" de FilmScript: franjas verdes para EXT DAY, amarillas para
-// INT DAY, azules para INT NIGHT, moradas para EXT NIGHT) — pedido
-// explícito del usuario para que el plan se vea igual de intuitivo.
-const Color _kColorIntDia = Color(0xFFD9B23C);
-const Color _kColorExtDia = Color(0xFF4CAF6D);
-const Color _kColorIntNoche = Color(0xFF4A90D9);
-const Color _kColorExtNoche = Color(0xFF9A6FD0);
-const Color _kColorSinDato = AppColors.grisMedio;
-
-/// Público (sin guion bajo) porque `breakdown_screen.dart` reutiliza esta
-/// misma lógica de color para que INT/EXT · DÍA/NOCHE se vea igual en
-/// Desglose y en Plan de Rodaje.
-Color colorModoMomento(String? modoVista, String? momentoDia) {
-  if (modoVista == null && momentoDia == null) return _kColorSinDato;
-  final esNoche = momentoDia != null && momentoDia.contains('noche');
-  final esExt = modoVista != null && modoVista.startsWith('ext');
-  if (esExt && esNoche) return _kColorExtNoche;
-  if (esExt) return _kColorExtDia;
-  if (esNoche) return _kColorIntNoche;
-  return _kColorIntDia;
+// El cliente reportó que ese color-coding interfiere con su propio uso
+// de colores para otras segmentaciones — pedido explícito: reemplazar
+// el color por íconos (ver kMomentoIconos en models/scene.dart) sin
+// tocar el texto. `labelModoMomento` se mantiene solo como clave interna
+// de orden/comparación (Plan de Rodaje ordena por "Momento del Día"),
+// nunca se muestra combinado en pantalla.
+// Los emojis de `kMomentoIconos` (models/scene.dart) no están en la
+// fuente Montserrat de la app ni en ninguna que Flutter Web empaquete
+// por defecto — el navegador cae a un fallback "Noto" que no incluye
+// y tira la advertencia "Could not find a set of Noto fonts..." en la
+// consola. Se reemplazan acá por íconos reales de Material (mismo
+// propósito: distinguir el momento del día sin usar color), que sí
+// vienen en la fuente de íconos de Flutter.
+IconData iconoMomentoData(String? momento) {
+  switch (momento) {
+    case 'dia':
+    case 'amanecer':
+      return Icons.wb_sunny_outlined;
+    case 'noche':
+    case 'atardecer':
+    case 'anochecer':
+      return Icons.nightlight_outlined;
+    default:
+      return Icons.schedule_outlined;
+  }
 }
 
 String labelModoMomento(String? modoVista, String? momentoDia) {
@@ -172,6 +178,7 @@ Future<String?> _promptText(
   String? initial,
   String? hint,
   int maxLines = 1,
+  TextInputType? keyboardType,
 }) {
   final controller = TextEditingController(text: initial ?? '');
   return showDialog<String>(
@@ -182,6 +189,7 @@ Future<String?> _promptText(
         controller: controller,
         autofocus: true,
         maxLines: maxLines,
+        keyboardType: keyboardType,
         decoration: InputDecoration(hintText: hint),
       ),
       actions: [
@@ -192,31 +200,27 @@ Future<String?> _promptText(
   );
 }
 
-/// Leyenda de colores del stripboard — se muestra una sola vez arriba
-/// de la lista de días.
+/// Leyenda de íconos de Momento — se muestra una sola vez arriba de la
+/// lista de días. Reemplaza la antigua leyenda de colores (ver nota más
+/// arriba): cada ícono representa un momento del día, sin usar color.
 class _StripboardLegend extends StatelessWidget {
   const _StripboardLegend();
 
   @override
   Widget build(BuildContext context) {
-    Widget chip(Color color, String label) => Row(
+    Widget chip(String momento) => Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+            Icon(iconoMomentoData(momento), size: 14, color: AppColors.grisMedio),
             const SizedBox(width: 5),
-            Text(label, style: const TextStyle(fontSize: 11, color: AppColors.grisMedio, fontWeight: FontWeight.w600)),
+            Text(labelMomento(momento), style: const TextStyle(fontSize: 11, color: AppColors.grisMedio, fontWeight: FontWeight.w600)),
           ],
         );
 
     return Wrap(
       spacing: 16,
       runSpacing: 6,
-      children: [
-        chip(_kColorIntDia, 'INT DÍA'),
-        chip(_kColorExtDia, 'EXT DÍA'),
-        chip(_kColorIntNoche, 'INT NOCHE'),
-        chip(_kColorExtNoche, 'EXT NOCHE'),
-      ],
+      children: kMomentosDia.map(chip).toList(),
     );
   }
 }
@@ -254,6 +258,9 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
   // un día mantienen su orden manual (drag-and-drop), que es intencional.
   _SortField _sortField = _SortField.numero;
   bool _sortAsc = true;
+  // Filtro por bloque de grabación (null = todos) — pedido explícito del
+  // usuario, mismo filtro también disponible en la pantalla Escenas.
+  int? _filtroBloque;
 
   @override
   void initState() {
@@ -264,9 +271,10 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
   Future<_PlanData> _load() async {
     final session = context.read<AuthSession>();
     final sceneService = SceneService(session.api);
+    final idProject = session.projectId ?? '';
     final results = await Future.wait([
-      ShootingDayService(session.api).all(),
-      sceneService.all(),
+      ShootingDayService(session.api).all(idProject),
+      sceneService.all(idProject),
     ]);
     final days = results[0] as List<ShootingDay>;
     final scenes = results[1] as List<Scene>;
@@ -329,12 +337,20 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
               return a.version.compareTo(b.version);
             });
 
+          // Filtro por bloque de grabación — se calcula sobre TODAS las
+          // escenas (no solo las visibles) para que el dropdown siempre
+          // ofrezca todos los bloques que existen, incluso con un
+          // filtro ya aplicado.
+          final bloquesDisponibles = data.scenes.map((s) => s.bloqueGrabacion).whereType<int>().toSet().toList()..sort();
+          final scenesFiltradas =
+              _filtroBloque == null ? data.scenes : data.scenes.where((s) => s.bloqueGrabacion == _filtroBloque).toList();
+
           // Relación real: `Scene.idRodaje` apunta al día. Se agrupa acá
           // (una sola pasada) en vez de pedirle al backend un endpoint
           // por día, para no hacer N peticiones.
           final porDia = <String, List<Scene>>{};
           final sinDia = <Scene>[];
-          for (final s in data.scenes) {
+          for (final s in scenesFiltradas) {
             if (s.idRodaje != null && s.idRodaje!.isNotEmpty) {
               (porDia[s.idRodaje!] ??= []).add(s);
             } else {
@@ -361,6 +377,27 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
             children: [
               const _StripboardLegend(),
               const SizedBox(height: 16),
+              if (bloquesDisponibles.isNotEmpty) ...[
+                Row(
+                  children: [
+                    const Icon(Icons.filter_alt_outlined, size: 18, color: AppColors.grisMedio),
+                    const SizedBox(width: 8),
+                    const Text('Bloque de grabación: ', style: TextStyle(color: AppColors.grisMedio)),
+                    DropdownButton<int?>(
+                      value: _filtroBloque,
+                      underline: const SizedBox.shrink(),
+                      dropdownColor: AppColors.surfaceVariant,
+                      hint: const Text('Todos'),
+                      items: [
+                        const DropdownMenuItem<int?>(value: null, child: Text('Todos')),
+                        ...bloquesDisponibles.map((b) => DropdownMenuItem<int?>(value: b, child: Text('Bloque $b'))),
+                      ],
+                      onChanged: (v) => setState(() => _filtroBloque = v),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
               if (sinDia.isNotEmpty) ...[
                 _SinDiaBanner(count: sinDia.length),
                 const SizedBox(height: 12),
@@ -783,7 +820,15 @@ class _DayFooterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalPaginas = scenes.fold<int>(0, (sum, s) => sum + (s.pagina ?? 0));
+    // "pagina" es el número de página del GUION donde inicia cada
+    // escena (no una cantidad a sumar) — por eso aquí se muestra el
+    // rango de páginas que cubre el día, no una suma sin sentido.
+    final paginas = scenes.map((s) => s.pagina).whereType<int>().toList();
+    final rangoPaginas = paginas.isEmpty
+        ? null
+        : (paginas.reduce((a, b) => a < b ? a : b) == paginas.reduce((a, b) => a > b ? a : b)
+            ? 'Pág. ${paginas.first}'
+            : 'Págs. ${paginas.reduce((a, b) => a < b ? a : b)}–${paginas.reduce((a, b) => a > b ? a : b)}');
     final horas = scenes
         .map((s) => s.horaInicioRodaje)
         .where((h) => h != null && h.isNotEmpty)
@@ -802,7 +847,7 @@ class _DayFooterBar extends StatelessWidget {
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.4),
           ),
           Text(
-            '$horaLabel · $totalPaginas página(s)',
+            rangoPaginas == null ? horaLabel : '$horaLabel · $rangoPaginas',
             style: const TextStyle(color: Colors.white70, fontSize: 11),
           ),
         ],
@@ -907,7 +952,12 @@ const _kHeaderStyle = TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color:
 const double _kColHandle = 22;
 const double _kColEsc = 34;
 const double _kColSet = 190;
-const double _kColModo = 70;
+// Espacio (INT/EXT) y Momento (Día/Noche/...) son dos columnas
+// separadas — antes era una sola ("I/E Y MOMENTO") pero el usuario pidió
+// explícitamente que estos dos datos nunca se combinen en una sola
+// casilla en ningún lugar de la app.
+const double _kColEspacio = 46;
+const double _kColMomento = 78;
 const double _kColReparto = 90;
 const double _kColLocacion = 160;
 const double _kColFecha = 84;
@@ -915,7 +965,11 @@ const double _kColPaginas = 46;
 const double _kColTiempo = 92;
 const double _kColHora = 92;
 const double _kColNotas = 30;
-const double _kTableWidth = _kColHandle + _kColEsc + _kColSet + _kColModo + _kColReparto + _kColLocacion + _kColFecha + _kColPaginas + _kColTiempo + _kColHora + _kColNotas + 24;
+// Bloque de grabación: agrupación manual (1, 2, 3...) editable con tap,
+// independiente del día de rodaje — pedido explícito del usuario, junto
+// con el filtro por bloque (ver _filtroBloque más abajo).
+const double _kColBloque = 60;
+const double _kTableWidth = _kColHandle + _kColEsc + _kColSet + _kColEspacio + _kColMomento + _kColReparto + _kColLocacion + _kColFecha + _kColBloque + _kColPaginas + _kColTiempo + _kColHora + _kColNotas + 24;
 
 /// Tabla tipo "stripboard" (mismo lenguaje visual que el Plan de rodaje
 /// de FilmScript): encabezado de columnas + una fila por escena con una
@@ -975,12 +1029,14 @@ class _StripboardTable extends StatelessWidget {
                     children: [
                       SizedBox(width: _kColHandle),
                       SizedBox(width: _kColEsc, child: const Text('ESC', style: _kHeaderStyle)),
-                      SizedBox(width: colSet, child: const Text('SET', style: _kHeaderStyle)),
-                      SizedBox(width: _kColModo, child: const Text('I/E Y MOMENTO', style: _kHeaderStyle)),
+                      SizedBox(width: colSet, child: const Text('ENCABEZADO', style: _kHeaderStyle)),
+                      SizedBox(width: _kColEspacio, child: const Text('ESPACIO', style: _kHeaderStyle)),
+                      SizedBox(width: _kColMomento, child: const Text('MOMENTO', style: _kHeaderStyle)),
                       SizedBox(width: _kColReparto, child: const Text('ID DE REPARTO', style: _kHeaderStyle)),
                       SizedBox(width: colLocacion, child: const Text('LOCACIÓN DE RODAJE', style: _kHeaderStyle)),
                       SizedBox(width: _kColFecha, child: const Text('FECHA DE GRABACIÓN', style: _kHeaderStyle)),
-                      SizedBox(width: _kColPaginas, child: const Text('PÁGS.', style: _kHeaderStyle)),
+                      SizedBox(width: _kColBloque, child: const Text('BLOQUE', style: _kHeaderStyle)),
+                      SizedBox(width: _kColPaginas, child: const Text('PÁG. GUION', style: _kHeaderStyle)),
                       SizedBox(width: _kColTiempo, child: const Text('TIEMPO EST.', style: _kHeaderStyle)),
                       SizedBox(width: _kColHora, child: const Text('HORA DE INICIO', style: _kHeaderStyle)),
                       SizedBox(width: _kColNotas, child: const Text('NOTAS', style: _kHeaderStyle)),
@@ -1091,6 +1147,18 @@ class _StripboardRow extends StatelessWidget {
     if (value != null && context.mounted) _updateField(context, {'tiempo_estimado': value});
   }
 
+  Future<void> _editBloqueGrabacion(BuildContext context) async {
+    final value = await _promptText(
+      context,
+      title: 'Bloque de grabación',
+      initial: scene.bloqueGrabacion?.toString(),
+      hint: 'Ej: 1',
+      keyboardType: TextInputType.number,
+    );
+    if (value == null || !context.mounted) return;
+    _updateField(context, {'bloque_grabacion': value.trim().isEmpty ? null : int.tryParse(value.trim())});
+  }
+
   Future<void> _editNotas(BuildContext context) async {
     final value = await _promptText(
       context,
@@ -1113,12 +1181,11 @@ class _StripboardRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = colorModoMomento(scene.modoVista, scene.momentoDia);
     final tieneLocacion = scene.locacionRodaje != null && scene.locacionRodaje!.isNotEmpty;
     final tieneTiempo = scene.tiempoEstimado != null && scene.tiempoEstimado!.isNotEmpty;
     final tieneHora = scene.horaInicioRodaje != null && scene.horaInicioRodaje!.isNotEmpty;
     final tieneNotas = scene.notasRodaje != null && scene.notasRodaje!.isNotEmpty;
-    final setLabel = (scene.ciudad != null && scene.ciudad!.isNotEmpty) ? scene.ciudad! : scene.encabezado;
+    final tieneCiudad = scene.ciudad != null && scene.ciudad!.isNotEmpty;
 
     final handle = SizedBox(
       width: _kColHandle,
@@ -1133,7 +1200,7 @@ class _StripboardRow extends StatelessWidget {
     );
 
     return Container(
-      decoration: BoxDecoration(border: Border(left: BorderSide(color: color, width: 4))),
+      decoration: BoxDecoration(border: Border(left: BorderSide(color: AppColors.border, width: 1))),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 6),
         child: Row(
@@ -1153,35 +1220,56 @@ class _StripboardRow extends StatelessWidget {
                 onTap: canManage ? () => _editScene(context) : null,
                 child: Padding(
                   padding: const EdgeInsets.only(right: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(setLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                      Text(
-                        scene.encabezado,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 10, color: AppColors.grisMedio, fontStyle: FontStyle.italic),
-                      ),
-                    ],
+                  child: Text(
+                    scene.encabezado,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
             ),
             SizedBox(
-              width: _kColModo,
+              width: _kColEspacio,
+              child: InkWell(
+                onTap: canManage ? () => _editScene(context) : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(4)),
+                  alignment: Alignment.center,
+                  child: Text(
+                    (scene.modoVista ?? '?').toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: _kColMomento,
               child: InkWell(
                 onTap: canManage ? () => _editScene(context) : null,
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(4)),
                   alignment: Alignment.center,
-                  child: Text(
-                    labelModoMomento(scene.modoVista, scene.momentoDia),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: color),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(iconoMomentoData(scene.momentoDia), size: 12, color: AppColors.grisMedio),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          labelMomento(scene.momentoDia),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1201,11 +1289,24 @@ class _StripboardRow extends StatelessWidget {
                       Icon(Icons.location_on_outlined, size: 12, color: tieneLocacion ? AppColors.azulProfundo : AppColors.grisMedio),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text(
-                          tieneLocacion ? scene.locacionRodaje! : (canManage ? 'Asignar' : '—'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: tieneLocacion ? null : AppColors.grisMedio),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              tieneLocacion ? scene.locacionRodaje! : (canManage ? 'Asignar' : '—'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: tieneLocacion ? null : AppColors.grisMedio),
+                            ),
+                            if (tieneCiudad)
+                              Text(
+                                scene.ciudad!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 9, color: AppColors.grisMedio),
+                              ),
+                          ],
                         ),
                       ),
                     ],
@@ -1231,8 +1332,25 @@ class _StripboardRow extends StatelessWidget {
               ),
             ),
             SizedBox(
+              width: _kColBloque,
+              child: InkWell(
+                onTap: canManage ? () => _editBloqueGrabacion(context) : null,
+                child: Text(
+                  scene.bloqueGrabacion != null ? '${scene.bloqueGrabacion}' : (canManage ? 'Asignar' : '—'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: scene.bloqueGrabacion != null ? null : AppColors.grisMedio,
+                    fontStyle: scene.bloqueGrabacion != null ? FontStyle.normal : FontStyle.italic,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(
               width: _kColPaginas,
-              child: Text(scene.pagina != null ? '${scene.pagina}/8' : '—', style: const TextStyle(fontSize: 11, color: AppColors.grisMedio)),
+              child: Text(scene.pagina != null ? 'Pág. ${scene.pagina}' : '—', style: const TextStyle(fontSize: 11, color: AppColors.grisMedio)),
             ),
             SizedBox(
               width: _kColTiempo,
@@ -1603,6 +1721,7 @@ class _ShootingDayFormSheetState extends State<_ShootingDayFormSheet> {
           horaFin: horaFin,
           notas: _notas.text.trim(),
           activo: _activo,
+          idProject: session.projectId,
         ));
       }
       if (!mounted) return;

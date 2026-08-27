@@ -21,6 +21,7 @@ from app.routes.character_routes import router as character_router
 from app.routes.actor_routes import router as actor_router
 from app.routes.scene_character_routes import router as scene_character_router
 from app.routes.gallery_photo_routes import router as gallery_photo_router
+from app.routes.crew_member_routes import router as crew_member_router
 from app.routes.contact_routes import router as contact_router
 
 from app.config.database import Base, engine
@@ -36,6 +37,7 @@ from app.models.character_model import Character
 from app.models.actor_model import Actor
 from app.models.scene_character_model import SceneCharacter
 from app.models.gallery_photo_model import GalleryPhoto
+from app.models.crew_member_model import CrewMember
 from app.utils.response import api_response
 
 logger = logging.getLogger("raccord")
@@ -98,6 +100,7 @@ app.include_router(character_router)
 app.include_router(actor_router)
 app.include_router(scene_character_router)
 app.include_router(gallery_photo_router)
+app.include_router(crew_member_router)
 
 # Landing / contacto - público
 app.include_router(contact_router)

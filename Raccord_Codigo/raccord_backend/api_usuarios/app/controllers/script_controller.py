@@ -29,31 +29,6 @@ MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024  # 25 MB
 
 
 # ==========================================
-# GET ALL SCRIPTS
-# ==========================================
-def get_scripts(db: Session):
-    scripts = db.query(Script).order_by(Script.id_guion).all()
-
-    scripts_list = [
-        {
-            "id_guion": s.id_guion,
-            "numero_de_version": s.numero_de_version,
-            "fecha_de_emision": str(s.fecha_de_emision),
-            "estado": s.estado,
-            "archivo": s.archivo,
-            "archivo_nombre": s.archivo_nombre,
-            "archivo_tamano": s.archivo_tamano,
-            "nombre": s.nombre,
-            "descripcion": s.descripcion,
-            "id_project": s.id_project
-        }
-        for s in scripts
-    ]
-
-    return api_response(True, "Lista de guiones", scripts_list)
-
-
-# ==========================================
 # GET SCRIPT BY ID
 # ==========================================
 def get_script(id: str, db: Session):
@@ -79,6 +54,9 @@ def get_script(id: str, db: Session):
 # ==========================================
 # GET SCRIPTS BY PROJECT
 # ==========================================
+# Único listado que existe ahora (antes también había un GET /scripts
+# sin filtro que devolvía los guiones de TODOS los proyectos — se
+# eliminó).
 def get_scripts_by_project(id_project: str, db: Session):
     scripts = db.query(Script).filter(Script.id_project == id_project).order_by(Script.id_guion).all()
 
@@ -401,12 +379,15 @@ def segmentar_script(id: str, confirmar: bool, db: Session):
     # Personajes ya existentes en el catálogo (match por nombre, sin
     # importar mayúsculas/acentos de más o de menos): no se duplican si
     # ya hay un personaje con ese nombre creado a mano o por una
-    # segmentación anterior.
+    # segmentación anterior. Acotado al MISMO proyecto del guion — antes
+    # buscaba en TODOS los personajes de TODOS los proyectos, lo que
+    # además de ser un hueco de aislamiento podía "reutilizar" por error
+    # un personaje de otro proyecto que se llamara igual.
     personajes_existentes = {
         c.nombre.strip().upper(): c
-        for c in db.query(Character).all()
+        for c in db.query(Character).filter(Character.id_project == script.id_project).all()
     }
-    siguiente_codigo = db.query(Character).count() + 1
+    siguiente_codigo = db.query(Character).filter(Character.id_project == script.id_project).count() + 1
 
     def _personaje_para(nombre: str) -> Character:
         nonlocal siguiente_codigo
@@ -416,10 +397,15 @@ def segmentar_script(id: str, confirmar: bool, db: Session):
 
         # Código genérico editable después (mockup no pide un formato
         # fijo) — simplemente correlativo para que no choquen entre sí.
+        # id_project es obligatorio en el schema de creación manual
+        # (character_schema.py); acá se construye el ORM directo sin
+        # pasar por Pydantic, así que hay que setearlo a mano o el
+        # personaje quedaría huérfano de proyecto.
         nuevo = Character(
             nombre=nombre.title(),
             edad=0,
             codigo_personaje=f"PERS-{siguiente_codigo:03d}",
+            id_project=script.id_project,
         )
         siguiente_codigo += 1
         db.add(nuevo)

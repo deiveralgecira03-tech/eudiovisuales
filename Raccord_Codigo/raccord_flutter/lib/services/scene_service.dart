@@ -6,8 +6,11 @@ class SceneService {
   final ApiClient api;
   SceneService(this.api);
 
-  Future<List<Scene>> all() async {
-    final data = await api.get('/scenes');
+  // Antes /scenes sin filtro devolvía las escenas de TODOS los
+  // proyectos (ver scene_routes.py en el backend) — ahora requiere el
+  // proyecto activo.
+  Future<List<Scene>> all(String idProject) async {
+    final data = await api.get('/scenes/project/$idProject');
     return asListOfMap(data).map(Scene.fromJson).toList();
   }
 

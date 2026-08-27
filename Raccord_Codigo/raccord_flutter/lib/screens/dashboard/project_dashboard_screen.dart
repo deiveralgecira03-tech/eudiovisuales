@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/session.dart';
+import '../../models/scene.dart';
+import '../../services/character_service.dart';
 import '../../services/scene_service.dart';
 import '../../services/script_service.dart';
-import '../../services/shooting_day_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
+import '../../widgets/simple_bar_chart.dart';
 
 class _ModuleDef {
   final String title;
@@ -62,9 +64,12 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
         child: SingleChildScrollView(
           child: Center(
             child: ConstrainedBox(
-              // Ancho máximo para que, en pantallas anchas, las tarjetas
-              // queden centradas en vez de estiradas hasta los bordes.
-              constraints: const BoxConstraints(maxWidth: 1100),
+              // Ancho máximo generoso (pedido explícito del usuario: "que
+              // ocupe mayor pantalla, separada unos cms de los márgenes")
+              // — antes 1100 dejaba huecos enormes en pantallas anchas de
+              // escritorio; 1600 aprovecha mucho más el ancho real y solo
+              // dejará márgenes visibles en monitores muy grandes.
+              constraints: const BoxConstraints(maxWidth: 1600),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -88,7 +93,7 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                     );
                   }),
                   const SizedBox(height: 24),
-                  const _ProjectSummary(),
+                  const _ProjectCharts(),
                 ],
               ),
             ),
@@ -99,19 +104,30 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
   }
 }
 
-/// Resumen del proyecto con conteos reales (guiones, escenas, días de
-/// rodaje). Reemplaza el panel de "Noticias" del mockup, que no tiene
-/// respaldo en el backend todavía — mejor mostrar datos reales que
-/// simular contenido.
-class _ProjectSummary extends StatefulWidget {
-  const _ProjectSummary();
+/// Panel de gráficos "muy sencillo pero dinámico" (pedido explícito
+/// del usuario) con el resumen completo del proyecto: guiones,
+/// escenas, días dramáticos, fechas de grabación y personajes en una
+/// misma fila de tarjetas, y debajo los gráficos de barras (estado,
+/// espacio, momento, horario de grabación y ciudad). Reemplaza al
+/// antiguo panel oscuro de "Guiones/Escenas/Días de rodaje" — se pidió
+/// explícitamente fusionar esos conteos acá y quitar "días de rodaje"
+/// (el conteo manual de Plan de Rodaje, no el calculado por fecha).
+/// Todo se calcula en el cliente a partir de datos que ya trae el
+/// backend — no hace falta ningún endpoint nuevo. Colores suaves
+/// (opacidad reducida sobre la paleta de marca) en vez de los tonos
+/// planos y saturados que ya usa el resto de la app, también pedido
+/// explícito del usuario.
+class _ProjectCharts extends StatefulWidget {
+  const _ProjectCharts();
 
   @override
-  State<_ProjectSummary> createState() => _ProjectSummaryState();
+  State<_ProjectCharts> createState() => _ProjectChartsState();
 }
 
-class _ProjectSummaryState extends State<_ProjectSummary> {
-  int? _guiones, _escenas, _rodajes;
+class _ProjectChartsState extends State<_ProjectCharts> {
+  List<Scene>? _scenes;
+  int? _guiones;
+  int? _personajes;
   bool _loading = true;
 
   @override
@@ -127,19 +143,19 @@ class _ProjectSummaryState extends State<_ProjectSummary> {
 
     try {
       final scripts = await ScriptService(session.api).byProject(projectId);
-      int escenas = 0;
+      final scenes = <Scene>[];
       for (final s in scripts) {
         if (s.idGuion != null) {
-          escenas += (await SceneService(session.api).byScript(s.idGuion!)).length;
+          scenes.addAll(await SceneService(session.api).byScript(s.idGuion!));
         }
       }
-      final rodajes = await ShootingDayService(session.api).all();
+      final personajes = await CharacterService(session.api).all(projectId);
 
       if (!mounted) return;
       setState(() {
+        _scenes = scenes;
         _guiones = scripts.length;
-        _escenas = escenas;
-        _rodajes = rodajes.length;
+        _personajes = personajes.length;
         _loading = false;
       });
     } catch (_) {
@@ -152,32 +168,202 @@ class _ProjectSummaryState extends State<_ProjectSummary> {
     if (_loading) {
       return const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator());
     }
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          _stat('Guiones', _guiones),
-          _stat('Escenas', _escenas),
-          _stat('Días de rodaje', _rodajes),
-        ],
-      ),
+
+    // Ya no se corta todo el panel si aún no hay escenas: Guiones,
+    // Escenas y Personajes deben verse igual (antes vivían en una barra
+    // aparte que siempre se mostraba) — solo los gráficos de barras
+    // quedan con su mensaje vacío propio cuando no hay datos.
+    final scenes = _scenes ?? [];
+    final porEstado = _contarPorEstado(scenes);
+    final porEspacio = _contarPorEspacio(scenes);
+    final porMomento = _contarPorMomento(scenes);
+    final porCiudad = _contarPorCiudad(scenes);
+    final diasDramaticos = scenes.map((s) => s.diaDramatico).whereType<int>().toSet().length;
+    final diasRodaje = _diasDeRodaje(scenes);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Resumen del proyecto', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary)),
+        const SizedBox(height: 12),
+        LayoutBuilder(builder: (context, constraints) {
+          final cols = constraints.maxWidth > 900
+              ? 5
+              : (constraints.maxWidth > 680 ? 3 : (constraints.maxWidth > 420 ? 2 : 1));
+          return GridView.count(
+            crossAxisCount: cols,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 2.6,
+            children: [
+              StatCard(label: 'Guiones', value: '${_guiones ?? 0}', icon: Icons.description_outlined, color: AppColors.azulProfundo),
+              StatCard(label: 'Escenas', value: '${scenes.length}', icon: Icons.movie_filter_outlined, color: AppColors.moradoTech),
+              StatCard(label: 'Días Dramáticos', value: '$diasDramaticos', icon: Icons.auto_stories_outlined, color: AppColors.coral),
+              StatCard(label: 'Fechas de Grabación', value: '${diasRodaje.total}', icon: Icons.calendar_month_outlined, color: AppColors.azulProfundo),
+              StatCard(label: 'Personajes', value: '${_personajes ?? 0}', icon: Icons.people_alt_outlined, color: AppColors.moradoTech),
+            ],
+          );
+        }),
+        const SizedBox(height: 14),
+        LayoutBuilder(builder: (context, constraints) {
+          final twoCols = constraints.maxWidth > 700;
+          final cards = <Widget>[
+            BarChartCard(
+              title: 'Escenas por Estado',
+              icon: Icons.bar_chart_outlined,
+              entries: [
+                BarChartEntry(label: 'Finalizada', value: porEstado['Finalizada'] ?? 0, color: AppColors.success.withOpacity(0.75)),
+                BarChartEntry(label: 'En proceso', value: porEstado['En proceso'] ?? 0, color: AppColors.warning.withOpacity(0.75)),
+                BarChartEntry(label: 'Pendiente', value: porEstado['Pendiente'] ?? 0, color: AppColors.azulProfundo.withOpacity(0.6)),
+                BarChartEntry(label: 'Eliminada', value: porEstado['Eliminada'] ?? 0, color: AppColors.grisMedio.withOpacity(0.6)),
+              ],
+            ),
+            BarChartCard(
+              title: 'Escenas por Momento',
+              icon: Icons.nightlight_outlined,
+              // Antes llevaba el emoji de `iconoMomento` delante del
+              // texto — Flutter Web no tiene ese glifo en ninguna fuente
+              // empaquetada y tira la advertencia "Could not find a set
+              // of Noto fonts..." en consola. La tarjeta ya trae su
+              // propio ícono (nightlight_outlined) arriba, así que se
+              // quita sin perder información.
+              entries: kMomentosDia
+                  .map((m) => BarChartEntry(
+                        label: labelMomento(m),
+                        value: porMomento[m] ?? 0,
+                        color: AppColors.moradoTech.withOpacity(0.6),
+                      ))
+                  .toList(),
+            ),
+            BarChartCard(
+              title: 'Escenas por Espacio',
+              icon: Icons.home_work_outlined,
+              entries: porEspacio.entries.map((e) => BarChartEntry(label: e.key, value: e.value, color: AppColors.azulProfundo.withOpacity(0.6))).toList(),
+            ),
+            BarChartCard(
+              title: 'Horario de Grabación',
+              icon: Icons.event_note_outlined,
+              emptyMessage: 'Asigna fecha y momento a las escenas para ver este dato.',
+              entries: [
+                BarChartEntry(label: '☀️ Día', value: diasRodaje.dia, color: AppColors.warning.withOpacity(0.7)),
+                BarChartEntry(label: '🌙 Noche', value: diasRodaje.noche, color: AppColors.azulProfundo.withOpacity(0.7)),
+              ],
+            ),
+            if (porCiudad.isNotEmpty)
+              BarChartCard(
+                title: 'Escenas por Ciudad',
+                icon: Icons.location_city_outlined,
+                entries: porCiudad.entries.take(6).map((e) => BarChartEntry(label: e.key, value: e.value, color: AppColors.coral.withOpacity(0.6))).toList(),
+              ),
+          ];
+
+          if (!twoCols) {
+            return Column(children: [for (final c in cards) Padding(padding: const EdgeInsets.only(bottom: 14), child: c)]);
+          }
+
+          // Dos columnas: reparte las tarjetas en pares (izquierda/derecha).
+          // Si queda una tarjeta impar sola al final (ej. "Escenas por
+          // Ciudad" cuando las demás ya se emparejaron), ocupa todo el
+          // ancho de la fila en vez de dejar un hueco vacío al lado —
+          // pedido explícito del usuario.
+          final rows = <Widget>[];
+          for (var i = 0; i < cards.length; i += 2) {
+            final esImparAlFinal = i + 1 >= cards.length;
+            rows.add(Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: esImparAlFinal
+                  ? cards[i]
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: cards[i]),
+                        const SizedBox(width: 14),
+                        Expanded(child: cards[i + 1]),
+                      ],
+                    ),
+            ));
+          }
+          return Column(children: rows);
+        }),
+      ],
     );
   }
 
-  Widget _stat(String label, int? value) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text('${value ?? '—'}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22)),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(color: AppColors.grisMedio, fontSize: 12), textAlign: TextAlign.center),
-        ],
-      ),
-    );
+  Map<String, int> _contarPorEstado(List<Scene> scenes) {
+    final counts = <String, int>{};
+    for (final s in scenes) {
+      counts[s.estado] = (counts[s.estado] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  Map<String, int> _contarPorMomento(List<Scene> scenes) {
+    final counts = <String, int>{};
+    for (final s in scenes) {
+      if (s.momentoDia == null) continue;
+      counts[s.momentoDia!] = (counts[s.momentoDia!] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  Map<String, int> _contarPorEspacio(List<Scene> scenes) {
+    final counts = <String, int>{};
+    for (final s in scenes) {
+      final label = (s.modoVista == null || s.modoVista!.isEmpty) ? 'Sin definir' : s.modoVista!.toUpperCase();
+      counts[label] = (counts[label] ?? 0) + 1;
+    }
+    // Orden estable y legible: INT, EXT, combinaciones y por último "Sin definir".
+    final orden = ['INT', 'EXT', 'INT/EXT', 'EXT/INT', 'Sin definir'];
+    final ordenado = <String, int>{};
+    for (final k in orden) {
+      if (counts.containsKey(k)) ordenado[k] = counts[k]!;
+    }
+    for (final k in counts.keys) {
+      if (!ordenado.containsKey(k)) ordenado[k] = counts[k]!;
+    }
+    return ordenado;
+  }
+
+  Map<String, int> _contarPorCiudad(List<Scene> scenes) {
+    final counts = <String, int>{};
+    for (final s in scenes) {
+      final ciudad = s.ciudad?.trim();
+      if (ciudad == null || ciudad.isEmpty) continue;
+      counts[ciudad] = (counts[ciudad] ?? 0) + 1;
+    }
+    final entries = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return {for (final e in entries) e.key: e.value};
+  }
+
+  /// Cuenta los días de rodaje distintos (por fecha_de_grabacion) y, de
+  /// esos, cuántos son mayormente de noche vs de día — pedido explícito
+  /// del usuario. Un día se clasifica como "Noche" solo si más escenas
+  /// de ese día son 'noche' que del resto de momentos combinados;
+  /// amanecer/atardecer/anochecer (transiciones) cuentan hacia "Día"
+  /// para esta métrica binaria en particular (el detalle completo por
+  /// momento ya se ve en "Escenas por Momento").
+  ({int total, int dia, int noche}) _diasDeRodaje(List<Scene> scenes) {
+    final porFecha = <DateTime, List<Scene>>{};
+    for (final s in scenes) {
+      final f = s.fechaDeGrabacion;
+      if (f == null) continue;
+      final key = DateTime(f.year, f.month, f.day);
+      porFecha.putIfAbsent(key, () => []).add(s);
+    }
+
+    var dia = 0, noche = 0;
+    for (final escenasDelDia in porFecha.values) {
+      final noches = escenasDelDia.where((s) => s.momentoDia == 'noche').length;
+      final resto = escenasDelDia.length - noches;
+      if (noches > resto) {
+        noche++;
+      } else {
+        dia++;
+      }
+    }
+
+    return (total: porFecha.length, dia: dia, noche: noche);
   }
 }

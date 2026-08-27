@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
@@ -9,14 +10,17 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/session.dart';
+import '../../models/character.dart';
 import '../../models/gallery_photo.dart';
 import '../../models/scene.dart';
+import '../../services/character_service.dart';
 import '../../services/gallery_service.dart';
 import '../../services/scene_service.dart';
 import '../../services/script_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
+import '../../widgets/character_autocomplete_field.dart';
 import '../../widgets/state_views.dart';
 import 'scenes_screen.dart' show colorForEstadoEscena;
 
@@ -46,6 +50,15 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
   Future<List<Map<String, dynamic>>>? _cast;
   Future<List<GalleryPhoto>>? _photos;
 
+  // Catálogo completo de personajes del proyecto, para el autocompletado
+  // (añadir al cast de la escena, y el campo "Personaje" al subir
+  // fotos). No depende de la escena, se carga una sola vez.
+  List<CharacterModel> _personajes = [];
+  // Cambia cada vez que se agrega un personaje al cast, para forzar que
+  // CharacterAutocompleteField reinicie su campo de texto interno
+  // (Autocomplete no expone un controller externo para limpiarlo).
+  int _addPersonajeTick = 0;
+
   // Vista dividida: mismo patrón que Desglose/Escenas — muestra el PDF
   // del guion de esta escena al lado de su información.
   bool _vistaDividida = false;
@@ -63,6 +76,50 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
     if (widget.scene.idGuion != null) {
       final session = context.read<AuthSession>();
       _pdfBytes = ScriptService(session.api).archivoBytes(widget.scene.idGuion!);
+    }
+    final session = context.read<AuthSession>();
+    CharacterService(session.api).all(session.projectId ?? '').then((list) {
+      if (mounted) setState(() => _personajes = list);
+    }).catchError((_) {
+      // Si falla, el autocompletado simplemente queda sin sugerencias —
+      // no es motivo para tumbar el resto de la pantalla.
+    });
+  }
+
+  void _reloadCast() {
+    final idEscena = widget.scene.idEscena;
+    if (idEscena == null) return;
+    final session = context.read<AuthSession>();
+    setState(() => _cast = SceneService(session.api).cast(idEscena));
+  }
+
+  Future<void> _addCharacterToCast(CharacterModel personaje) async {
+    final idEscena = widget.scene.idEscena;
+    final idPersonaje = personaje.idPersonaje;
+    if (idEscena == null || idPersonaje == null) return;
+
+    final session = context.read<AuthSession>();
+    try {
+      await SceneService(session.api).addToCast(idEscena, idPersonaje);
+      _changed = true;
+      setState(() => _addPersonajeTick++);
+      _reloadCast();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  Future<void> _removeCharacterFromCast(String idPersonaje) async {
+    final idEscena = widget.scene.idEscena;
+    if (idEscena == null) return;
+
+    final session = context.read<AuthSession>();
+    try {
+      await SceneService(session.api).removeFromCast(idEscena, idPersonaje);
+      _changed = true;
+      _reloadCast();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -237,8 +294,10 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppTextField(label: 'Escena', controller: _numero, enabled: canEdit),
-          const SizedBox(height: 14),
+          // El campo "Escena" (número) queda oculto a pedido del
+          // usuario: el controller sigue vivo con el valor original y
+          // se sigue guardando igual en _saveInfo(), solo no se
+          // muestra en el formulario.
           AppTextField(label: 'Encabezado', controller: _encabezado, enabled: canEdit),
           const SizedBox(height: 14),
           AppTextField(
@@ -282,9 +341,42 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
                 return const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2));
               }
               final cast = snap.data ?? [];
-              if (cast.isEmpty) return const Text('— Sin personajes asignados —', style: TextStyle(color: AppColors.grisMedio));
-              final label = cast.map((c) => '${c['codigo_personaje'] ?? ''} - ${c['nombre'] ?? ''}').join(', ');
-              return Text(label);
+              final idsEnCast = cast.map((c) => c['id_personaje']?.toString()).whereType<String>().toSet();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (cast.isEmpty)
+                    const Text('— Sin personajes asignados —', style: TextStyle(color: AppColors.grisMedio))
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: cast.map((c) {
+                        final idPersonaje = c['id_personaje']?.toString();
+                        final label = '${c['codigo_personaje'] ?? ''} - ${c['nombre'] ?? ''}';
+                        return Chip(
+                          label: Text(label),
+                          onDeleted: canEdit && idPersonaje != null ? () => _removeCharacterFromCast(idPersonaje) : null,
+                        );
+                      }).toList(),
+                    ),
+                  // Permite añadir más personajes a la escena en caso de
+                  // que se necesiten — no solo los que ya venían del
+                  // guion segmentado.
+                  if (canEdit) ...[
+                    const SizedBox(height: 12),
+                    CharacterAutocompleteField(
+                      key: ValueKey(_addPersonajeTick),
+                      label: 'Añadir personaje',
+                      hint: 'Ej: Ma → María, Martha...',
+                      personajes: _personajes
+                          .where((p) => p.idPersonaje != null && !idsEnCast.contains(p.idPersonaje))
+                          .toList(),
+                      onSelected: _addCharacterToCast,
+                    ),
+                  ],
+                ],
+              );
             },
           ),
           if (canEdit) ...[
@@ -308,7 +400,7 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (canUpload) _UploadPhotoCard(scene: widget.scene, onUploaded: _reloadPhotos),
+        if (canUpload) _UploadPhotoCard(scene: widget.scene, onUploaded: _reloadPhotos, personajes: _personajes),
         const SizedBox(height: 20),
         FutureBuilder<List<GalleryPhoto>>(
           future: _photos,
@@ -334,8 +426,10 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: photos.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
+              // Columnas calculadas por ancho disponible (móvil vs.
+              // tablet/desktop) en vez de un `crossAxisCount` fijo.
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 140,
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
               ),
@@ -395,7 +489,8 @@ enum _PhotoSource { camera, files }
 class _UploadPhotoCard extends StatefulWidget {
   final Scene scene;
   final VoidCallback onUploaded;
-  const _UploadPhotoCard({required this.scene, required this.onUploaded});
+  final List<CharacterModel> personajes;
+  const _UploadPhotoCard({required this.scene, required this.onUploaded, this.personajes = const []});
 
   @override
   State<_UploadPhotoCard> createState() => _UploadPhotoCardState();
@@ -403,6 +498,7 @@ class _UploadPhotoCard extends StatefulWidget {
 
 class _UploadPhotoCardState extends State<_UploadPhotoCard> {
   String _tipoFoto = kTiposFoto.first;
+  String _modoSubida = kModosSubidaFoto.first;
   final _personaje = TextEditingController();
   final _descripcion = TextEditingController();
   final _notas = TextEditingController();
@@ -431,6 +527,21 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
           const Text('Subir Nueva Foto', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
           const SizedBox(height: 16),
           AppDropdown<String>(
+            label: 'Foto o Collage',
+            value: _modoSubida,
+            items: kModosSubidaFoto,
+            labelBuilder: (e) => e,
+            onChanged: (v) => setState(() => _modoSubida = v ?? _modoSubida),
+          ),
+          if (collageCountFor(_modoSubida) != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Elegirás ${collageCountFor(_modoSubida)} fotos de tu galería/carpeta y se combinarán en una sola imagen.',
+              style: const TextStyle(color: AppColors.grisMedio, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 14),
+          AppDropdown<String>(
             label: 'Tipo de Foto',
             value: _tipoFoto,
             items: kTiposFoto,
@@ -438,7 +549,16 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
             onChanged: (v) => setState(() => _tipoFoto = v ?? _tipoFoto),
           ),
           const SizedBox(height: 14),
-          AppTextField(label: 'Personaje (Código)', hint: 'Ej: P001', controller: _personaje),
+          CharacterAutocompleteField(
+            label: 'Personaje',
+            hint: 'Ej: Ma → María, Martha...',
+            personajes: widget.personajes,
+            onSelected: (p) => setState(() => _personaje.text = p.codigoPersonaje),
+          ),
+          if (_personaje.text.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('Código seleccionado: ${_personaje.text}', style: const TextStyle(color: AppColors.grisMedio, fontSize: 12)),
+          ],
           const SizedBox(height: 14),
           AppTextField(label: 'Descripción', hint: 'Descripción de la foto', controller: _descripcion),
           const SizedBox(height: 14),
@@ -456,7 +576,9 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
               icon: _loading
                   ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.file_upload_outlined, size: 18),
-              label: Text(_loading ? 'Subiendo...' : 'Subir Foto(s)'),
+              label: Text(_loading
+                  ? 'Subiendo...'
+                  : (collageCountFor(_modoSubida) != null ? 'Elegir fotos y crear collage' : 'Subir Foto(s)')),
             ),
           ),
         ],
@@ -464,12 +586,20 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
     );
   }
 
-  /// Punto de entrada del botón "Subir Foto(s)": primero pregunta el
-  /// origen (cámara o galería/archivos) con un diálogo simple, y según
-  /// la respuesta delega a [_captureFromCamera] o [_pickFromFiles].
+  /// Punto de entrada del botón "Subir Foto(s)": en modo "Foto" primero
+  /// pregunta el origen (cámara o galería/archivos) y delega a
+  /// [_captureFromCamera] o [_pickFromFiles]; en modo "Collage N" va
+  /// directo a [_pickAndUploadCollage] (solo galería/archivos, ver ahí
+  /// por qué no se ofrece cámara para collage).
   Future<void> _pickAndUpload() async {
     final idEscena = widget.scene.idEscena;
     if (idEscena == null) return;
+
+    final n = collageCountFor(_modoSubida);
+    if (n != null) {
+      await _pickAndUploadCollage(idEscena, n);
+      return;
+    }
 
     final source = await _askPhotoSource();
     if (source == null) return; // se canceló el diálogo
@@ -478,6 +608,125 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
       await _captureFromCamera(idEscena);
     } else {
       await _pickFromFiles(idEscena);
+    }
+  }
+
+  /// Pide exactamente [n] imágenes de la galería/carpeta (no ofrece
+  /// cámara: tomar N fotos en secuencia con la cámara es un flujo
+  /// bastante más largo y no era necesario para el caso de uso), las
+  /// combina en una sola imagen con [_buildCollage] y sube ÚNICAMENTE
+  /// el resultado combinado — las N fotos originales no quedan
+  /// guardadas por separado.
+  Future<void> _pickAndUploadCollage(String idEscena, int n) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: true,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final archivos = result.files.where((f) => f.bytes != null).toList();
+    if (archivos.length != n) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Elige exactamente $n fotos para el collage (seleccionaste ${archivos.length}).')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final collageBytes = await _buildCollage(archivos.map((f) => f.bytes!).toList());
+      await _uploadBytes(idEscena, [(bytes: collageBytes, name: 'collage_$n.png')]);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo generar el collage. Intenta con otras fotos.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// Decodifica cada imagen y las dibuja sobre un lienzo cuadrado fijo
+  /// (1200x1200) según el layout de [_collageRects], recortando cada
+  /// una en modo "cover" (llena su celda sin deformarse) y devuelve el
+  /// PNG resultante — desde ahí se sube igual que cualquier otra foto.
+  Future<Uint8List> _buildCollage(List<Uint8List> imagenesBytes) async {
+    final imagenes = <ui.Image>[];
+    for (final bytes in imagenesBytes) {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      imagenes.add(frame.image);
+    }
+
+    const lado = 1200.0;
+    const espacio = 6.0;
+    final celdas = _collageRects(imagenes.length, lado, espacio);
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, lado, lado));
+    canvas.drawRect(const Rect.fromLTWH(0, 0, lado, lado), Paint()..color = const Color(0xFFFFFFFF));
+
+    for (var i = 0; i < imagenes.length; i++) {
+      final img = imagenes[i];
+      final celda = celdas[i];
+      final srcAspect = img.width / img.height;
+      final dstAspect = celda.width / celda.height;
+      late Rect src;
+      if (srcAspect > dstAspect) {
+        final srcW = img.height * dstAspect;
+        src = Rect.fromLTWH((img.width - srcW) / 2, 0, srcW, img.height.toDouble());
+      } else {
+        final srcH = img.width / dstAspect;
+        src = Rect.fromLTWH(0, (img.height - srcH) / 2, img.width.toDouble(), srcH);
+      }
+      canvas.save();
+      canvas.clipRect(celda);
+      canvas.drawImageRect(img, src, celda, Paint());
+      canvas.restore();
+    }
+
+    final picture = recorder.endRecording();
+    final resultado = await picture.toImage(lado.toInt(), lado.toInt());
+    final byteData = await resultado.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  /// Distribución de celdas del collage según cuántas fotos entran:
+  /// 2 = lado a lado, 3 = una arriba (ancho completo) + dos abajo, 4 =
+  /// grilla 2x2. Sin celdas vacías, todo el lienzo queda cubierto.
+  List<Rect> _collageRects(int n, double lado, double espacio) {
+    switch (n) {
+      case 2:
+        final w = (lado - espacio) / 2;
+        return [
+          Rect.fromLTWH(0, 0, w, lado),
+          Rect.fromLTWH(w + espacio, 0, w, lado),
+        ];
+      case 3:
+        final altoArriba = (lado - espacio) * 0.55;
+        final altoAbajo = lado - espacio - altoArriba;
+        final wAbajo = (lado - espacio) / 2;
+        return [
+          Rect.fromLTWH(0, 0, lado, altoArriba),
+          Rect.fromLTWH(0, altoArriba + espacio, wAbajo, altoAbajo),
+          Rect.fromLTWH(wAbajo + espacio, altoArriba + espacio, wAbajo, altoAbajo),
+        ];
+      case 4:
+        final w = (lado - espacio) / 2;
+        final h = (lado - espacio) / 2;
+        return [
+          Rect.fromLTWH(0, 0, w, h),
+          Rect.fromLTWH(w + espacio, 0, w, h),
+          Rect.fromLTWH(0, h + espacio, w, h),
+          Rect.fromLTWH(w + espacio, h + espacio, w, h),
+        ];
+      default:
+        final w = (lado - espacio * (n - 1)) / n;
+        return List.generate(n, (i) => Rect.fromLTWH(i * (w + espacio), 0, w, lado));
     }
   }
 

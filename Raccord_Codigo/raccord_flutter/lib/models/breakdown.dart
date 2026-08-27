@@ -75,6 +75,8 @@ class BreakdownSheet {
   final String? location;
   final String requerimientos;
   final bool activo;
+  // Obligatorio para crear (ver breakdown_sheet_schema.py en el backend).
+  final String? idProject;
 
   BreakdownSheet({
     this.idDesglose,
@@ -86,6 +88,7 @@ class BreakdownSheet {
     this.location,
     required this.requerimientos,
     this.activo = true,
+    this.idProject,
   });
 
   factory BreakdownSheet.fromJson(Map<String, dynamic> json) {
@@ -99,6 +102,7 @@ class BreakdownSheet {
       location: asString(pick(json, ['location'])),
       requerimientos: asString(pick(json, ['requerimientos'])) ?? '',
       activo: asBool(pick(json, ['activo'])) ?? true,
+      idProject: asString(pick(json, ['id_project'])),
     );
   }
 
@@ -111,5 +115,6 @@ class BreakdownSheet {
         if (location != null && location!.isNotEmpty) 'location': location,
         'requerimientos': requerimientos,
         'activo': activo,
+        if (idProject != null) 'id_project': idProject,
       };
 }

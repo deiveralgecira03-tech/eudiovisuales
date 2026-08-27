@@ -25,14 +25,17 @@ class BreakdownService {
     await api.delete('/breakdown/items/$id');
   }
 
-  Future<List<Map<String, dynamic>>> pendientesMiDepartamento() async {
-    final data = await api.get('/breakdown/pendientes');
+  // Antes /breakdown/pendientes no recibía proyecto — ahora lo exige
+  // (Department es un catálogo global, ver breakdown_controller.py).
+  Future<List<Map<String, dynamic>>> pendientesMiDepartamento(String idProject) async {
+    final data = await api.get('/breakdown/pendientes/project/$idProject');
     return asListOfMap(data);
   }
 
-  // Contenedor "desgloses" (breakdown-sheets)
-  Future<List<BreakdownSheet>> sheets() async {
-    final data = await api.get('/breakdown-sheets');
+  // Contenedor "desgloses" (breakdown-sheets) — antes /breakdown-sheets
+  // sin filtro devolvía los de TODOS los proyectos.
+  Future<List<BreakdownSheet>> sheets(String idProject) async {
+    final data = await api.get('/breakdown-sheets/project/$idProject');
     return asListOfMap(data).map(BreakdownSheet.fromJson).toList();
   }
 

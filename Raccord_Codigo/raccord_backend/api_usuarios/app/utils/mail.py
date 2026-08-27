@@ -163,6 +163,64 @@ def send_invitation_email(destinatario: str, nombre_proyecto: str, contrasena: s
         print("Error enviando invitación:", e)
         return False
 
+# correo de bienvenida cuando alguien se auto-registra en la plataforma
+# (crea su empresa + su cuenta de Administrador). Distinto de
+# send_invitation_email: ese es para cuando un Administrador/Director ya
+# dentro de un proyecto invita a alguien más de su equipo; este es el
+# primer correo que recibe quien acaba de crear la cuenta desde cero.
+# Incluye a propósito una línea para reportar el registro si la persona
+# no lo reconoce (protección contra que alguien registre una empresa
+# usando el correo de otra persona sin su consentimiento).
+def send_welcome_email(destinatario: str, nombre: str, razon_social: str):
+    try:
+        mensaje = MIMEMultipart("related")
+        mensaje["From"] = MAIL_USER
+        mensaje["To"] = destinatario
+        mensaje["Subject"] = "¡Bienvenido a Raccord!"
+
+        contacto = CONTACT_EMAIL or MAIL_USER
+
+        cuerpo = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+            <h2>¡Bienvenido a Raccord, {nombre}!</h2>
+            <p>Tu cuenta y la empresa <strong>{razon_social}</strong> quedaron registradas con éxito en nuestra plataforma de gestión de producción audiovisual.</p>
+            <p>Ya puedes iniciar sesión con tu correo (<strong>{destinatario}</strong>) y la contraseña que elegiste para empezar a crear tus proyectos.</p>
+            <br>
+            <p style="background: #f5f5f5; border-radius: 8px; padding: 14px 18px; color: #555; font-size: 14px;">
+                ¿No reconoces este registro? Es posible que alguien haya usado tu correo por error.
+                Escríbenos a <a href="mailto:{contacto}" style="color: #2563eb;">{contacto}</a> y lo revisamos contigo de inmediato.
+            </p>
+            <br>
+            <p>Equipo Raccord</p>
+            <br>
+            <img src="cid:logo" alt="Raccord Logo" style="width: 150px; height: auto;">
+        </body>
+        </html>
+        """
+
+        msg_html = MIMEText(cuerpo, "html")
+        mensaje.attach(msg_html)
+
+        logo_path = os.path.join(os.path.dirname(__file__), "..", "assets", "logo.png")
+
+        with open(logo_path, "rb") as img:
+            logo = MIMEImage(img.read())
+            logo.add_header("Content-ID", "<logo>")
+            logo.add_header("Content-Disposition", "inline", filename="logo.png")
+            mensaje.attach(logo)
+
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(MAIL_USER, MAIL_PASSWORD)
+        server.sendmail(MAIL_USER, destinatario, mensaje.as_string())
+        server.quit()
+
+        return True
+    except Exception as e:
+        print("Error enviando correo de bienvenida:", e)
+        return False
+
 # mensaje del landing
 
 

@@ -5,10 +5,20 @@ from app.utils.response import api_response
 from app.models.user_model import User
 from app.models.user_project_model import UserProject
 
-# GET ALL PROJECTS
+# GET ALL PROJECTS (del usuario que hace la petición)
 
-def get_projects(db: Session):
-    projects = db.query(Project).all()
+# Antes devolvía TODOS los proyectos de TODOS los clientes sin
+# filtrar — cualquier usuario autenticado veía el catálogo completo de
+# proyectos de otras empresas. Ahora se limita a los proyectos donde el
+# usuario tiene una fila en user_projects (a los que fue invitado o que
+# creó), sin importar su rol.
+def get_projects(id_user: str, db: Session):
+    projects = (
+        db.query(Project)
+        .join(UserProject, UserProject.id_project == Project.id_project)
+        .filter(UserProject.id_user == id_user)
+        .all()
+    )
     projects_list = [
         {
             "id_project": p.id_project,
@@ -42,36 +52,12 @@ def get_project(id: str, db: Session):
         "id_client": project.id_client
     })
 
-# CREATE PROJECT
-
-def create_project(project: ProjectSchema, db: Session):
-    existing = db.query(Project).filter(Project.id_project == project.id_project).first()
-
-    if existing:
-        return api_response(False, "ID de proyecto ya existe", error="DUPLICATE_PROJECT")
-
-    new_project = Project(
-        id_project=project.id_project,
-        project_name=project.project_name,
-        formato_de_produccion=project.formato_de_produccion,
-        genero=project.genero,
-        sinopsis=project.sinopsis,
-        director=project.director,
-        id_client=project.id_client
-    )
-
-    db.add(new_project)
-    db.commit()
-    db.refresh(new_project)
-
-    return api_response(True, "Proyecto creado", {
-        "id_project": new_project.id_project,
-        "project_name": new_project.project_name
-    })
-
-
 # UPDATE PROJECT (PUT)
 
+# NOTA: project.id_client (aunque el schema lo trae) a propósito NO se
+# copia acá — permitir cambiarlo movería el proyecto entero a OTRA
+# empresa/tenant, evadiendo el aislamiento igual que si se dejara mover
+# id_project en los otros módulos.
 def update_project_full(id: str, project: ProjectSchema, db: Session):
     project_db = db.query(Project).filter(Project.id_project == id).first()
 
@@ -83,7 +69,6 @@ def update_project_full(id: str, project: ProjectSchema, db: Session):
     project_db.genero = project.genero
     project_db.sinopsis = project.sinopsis
     project_db.director = project.director
-    project_db.id_client = project.id_client
 
     db.commit()
     db.refresh(project_db)
@@ -96,6 +81,9 @@ def update_project_full(id: str, project: ProjectSchema, db: Session):
 
 # UPDATE PROJECT (PATCH)
 
+# Mismo motivo que en update_project_full: id_client se descarta si
+# viene en el body parcial, para que no se pueda mover el proyecto a
+# otra empresa/tenant vía PATCH.
 def update_project(id: str, project, db: Session):
     project_db = db.query(Project).filter(Project.id_project == id).first()
 
@@ -103,6 +91,7 @@ def update_project(id: str, project, db: Session):
         return api_response(False, "Proyecto no encontrado")
 
     update_data = project.model_dump(exclude_unset=True)
+    update_data.pop("id_client", None)
 
     for key, value in update_data.items():
         setattr(project_db, key, value)
@@ -150,7 +139,12 @@ def get_projects_by_client(id_client: str, db: Session):
 
 # CREATE PROJECT
 
-def create_project(project: ProjectSchema, db: Session):
+# id_client SIEMPRE se toma del usuario que hace la petición (nunca del
+# body, aunque el schema lo traiga) — antes se aceptaba tal cual venía
+# en el request, así que un usuario podía crear un proyecto colgado de
+# OTRA empresa (con solo adivinar/conocer su UUID). Ver
+# app.utils.project_scope.get_user_client.
+def create_project(project: ProjectSchema, db: Session, id_client_actor: str):
     # id_project es UUID: si el cliente (ej. app offline) ya generó su
     # propio UUID, se respeta (evita colisiones al sincronizar). Si no
     # viene, se deja que la columna lo autogenere (default=uuid.uuid4 /
@@ -169,7 +163,7 @@ def create_project(project: ProjectSchema, db: Session):
         genero=project.genero,
         sinopsis=project.sinopsis,
         director=project.director,
-        id_client=project.id_client
+        id_client=id_client_actor
     )
     if project_id:
         new_project.id_project = project_id
@@ -187,36 +181,14 @@ def create_project(project: ProjectSchema, db: Session):
 
 # CREATE PROJECT AND LINK USER
 
-def create_project_and_link(project: ProjectSchema, id_user: str, db: Session):
-    # Crear el proyecto
-    result = create_project(project, db)
+# Vincula en user_projects con rol Administrador (1001): quien crea el
+# proyecto queda como su primer administrador.
+def create_project_and_link(project: ProjectSchema, id_user: str, db: Session, id_client_actor: str):
+    result = create_project(project, db, id_client_actor)
 
     if not result["success"]:
         return result
 
-    # Vincular el proyecto al usuario
-    user = db.query(User).filter(User.id_user == id_user).first()
-
-    if user:
-        user.id_project = result["data"]["id_project"]
-        db.commit()
-
-    return api_response(True, "Proyecto creado y vinculado al usuario", {
-        "id_project": result["data"]["id_project"],
-        "project_name": result["data"]["project_name"],
-        "id_client": result["data"]["id_client"],
-        "id_user": id_user
-    })
-
-# CREATE PROJECT AND LINK USER
-
-def create_project_and_link(project: ProjectSchema, id_user: str, db: Session):
-    result = create_project(project, db)
-
-    if not result["success"]:
-        return result
-
-    # Vincular en user_projects con rol administrador
     user_project = UserProject(
         id_user=id_user,
         id_project=result["data"]["id_project"],
@@ -231,4 +203,4 @@ def create_project_and_link(project: ProjectSchema, id_user: str, db: Session):
         "id_client": result["data"]["id_client"],
         "id_user": id_user
     })
-    
+

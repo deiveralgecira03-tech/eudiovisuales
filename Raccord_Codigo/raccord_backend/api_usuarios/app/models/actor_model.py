@@ -64,3 +64,16 @@ class Actor(Base):
         ForeignKey("personajes.id_personaje", ondelete="CASCADE"),
         nullable=True
     )
+
+    # Aislamiento por proyecto (ver sql/015_project_scoping.sql). No basta
+    # con resolverlo vía `id_personaje` porque ese campo es opcional (un
+    # actor puede existir sin personaje asignado todavía) — sin su propio
+    # id_project, un actor "suelto" no tendría forma de saber a qué
+    # proyecto pertenece. Nullable=True solo para la migración de filas
+    # existentes; toda fila nueva lo exige (ActorSchema).
+    id_project = Column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id_project", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )

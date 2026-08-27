@@ -38,14 +38,21 @@ def _serialize(a: Actor):
         "nacionalidad": a.nacionalidad,
         "doble_riesgo": a.doble_riesgo,
         "id_personaje": a.id_personaje,
+        "id_project": a.id_project,
     }
 
 
 # ==========================================
-# GET ALL ACTORS
+# GET ALL ACTORS (de UN proyecto)
 # ==========================================
-def get_actors(db: Session):
-    actors = db.query(Actor).order_by(Actor.id_actor).all()
+# Antes traía TODOS los actores de TODOS los proyectos sin filtro.
+def get_actors(id_project: str, db: Session):
+    actors = (
+        db.query(Actor)
+        .filter(Actor.id_project == id_project)
+        .order_by(Actor.id_actor)
+        .all()
+    )
     return api_response(True, "Lista de actores", [_serialize(a) for a in actors])
 
 
@@ -65,6 +72,11 @@ def get_actor(id: str, db: Session):
 # GET ACTORS BY CHARACTER (PERSONAJE)
 # ==========================================
 def get_actors_by_character(id_personaje: str, db: Session):
+    # No hace falta filtrar por id_project acá: la ruta ya exige (vía
+    # require_record_project_permission sobre Character) que el usuario
+    # pertenezca al proyecto de ESTE personaje antes de llegar aquí, y
+    # actors.id_personaje solo puede apuntar a un personaje que ya
+    # quedó resuelto en ese mismo proyecto al crearse.
     actors = db.query(Actor).filter(Actor.id_personaje == id_personaje).order_by(Actor.id_actor).all()
     return api_response(True, "Actores asignados a este personaje", [_serialize(a) for a in actors])
 
@@ -99,7 +111,8 @@ def create_actor(actor: ActorSchema, db: Session):
         comentarios_adicionales=actor.comentarios_adicionales,
         nacionalidad=actor.nacionalidad,
         doble_riesgo=actor.doble_riesgo,
-        id_personaje=actor.id_personaje
+        id_personaje=actor.id_personaje,
+        id_project=actor.id_project,
     )
 
     db.add(new_actor)
@@ -112,6 +125,8 @@ def create_actor(actor: ActorSchema, db: Session):
 # ==========================================
 # UPDATE ACTOR (PUT - completo)
 # ==========================================
+# NOTA: ActorSchema trae id_project (mismo schema que create), pero a
+# propósito NO se copia acá — ver la misma nota en character_controller.py.
 def update_actor_full(id: str, actor: ActorSchema, db: Session):
     actor_db = db.query(Actor).filter(Actor.id_actor == id).first()
 

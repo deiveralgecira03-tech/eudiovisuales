@@ -13,19 +13,28 @@ código para Android, iOS, Web y Desktop, en reemplazo del frontend React
 - Dashboard del proyecto con menú de los 8 módulos del mockup.
 - Roles del equipo + invitar personas (`/users/project/{id}`, `/users/invite`).
 - Guiones, Escenas, Personajes, ficha técnica de Actor, Crew List, Plan de
-  Rodaje y Desglose de producción — todos conectados a los endpoints reales
-  del backend (`/scripts`, `/scenes`, `/characters`, `/actors`,
-  `/shooting-days`, `/breakdown/*`).
+  Rodaje, Desglose de producción y Galería de fotos de continuidad — todos
+  conectados a los endpoints reales del backend (`/scripts`, `/scenes`,
+  `/characters`, `/actors`, `/shooting-days`, `/breakdown/*`,
+  `/gallery-photos`).
 - Perfil de usuario (ver/editar).
 - Paleta de marca tomada de `LandingScreen.css` y logos/tipografía tomados de
   `Marketing/Logos` y `Marketing/Fuentes`.
 
-### Lo que NO está conectado (a propósito)
+### Aislamiento de datos por proyecto y permisos
 
-**Galería / fotos de continuidad** (mockups 9, 9.1-9.3, 12, 15): el backend
-`api_usuarios` todavía no tiene endpoints para subir o listar fotos. La
-pantalla queda como placeholder explícito ("próximamente") en vez de simular
-datos falsos. Apenas exista la ruta, se conecta igual que los demás módulos.
+Todos los módulos de contenido (escenas, guiones, personajes, actores,
+desglose, plan de rodaje, galería) están *scoped* al proyecto activo: cada
+petición al backend viaja con `id_project` y el backend valida que el
+usuario pertenezca a ese proyecto antes de responder — nadie ve datos de un
+proyecto ajeno solo por adivinar un ID.
+
+Además, `AuthSession.can()` (`lib/core/session.dart`) resuelve permisos
+usando el **rol efectivo del usuario en el proyecto activo**
+(`user_projects.id_rol`), no su rol global de la cuenta. Esto permite que la
+misma persona sea, por ejemplo, Administrador en su propio proyecto y Onset
+en un proyecto ajeno al que fue invitada, con los permisos correctos en cada
+uno.
 
 ## Cómo correrlo
 
@@ -74,7 +83,6 @@ lib/
 
 ## Pendiente / próximos pasos sugeridos
 
-- Conectar Galería en cuanto el backend tenga endpoints de fotos.
 - Reemplazar el wordmark "Raccord" (dibujado con texto + gradiente) por el
   archivo de fuente real del logotipo cuando esté disponible en
   `Marketing/Fuentes`.

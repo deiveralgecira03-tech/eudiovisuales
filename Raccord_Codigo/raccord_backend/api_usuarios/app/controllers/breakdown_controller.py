@@ -2,6 +2,8 @@ from sqlalchemy.orm import Session
 
 from app.models.breakdown_model import DesgloseItem, DesgloseItemDetalle
 from app.models.user_model import User
+from app.models.scene_model import Scene
+from app.models.script_model import Script
 
 from app.schemas.breakdown_schema import DesgloseItemSchema, DesgloseDetalleSchema
 from app.utils.permissions import ADMINISTRADOR, DIRECTOR
@@ -98,11 +100,26 @@ def create_item(item: DesgloseItemSchema, db: Session, current_user: dict):
     return api_response(True, "Item de desglose creado", _serialize_item(new_item))
 
 
+def _resolve_project_of_escena(id_escena, db: Session):
+    if not id_escena:
+        return None
+    scene = db.query(Scene).filter(Scene.id_escena == id_escena).first()
+    if not scene or not scene.id_guion:
+        return None
+    return db.query(Script.id_project).filter(Script.id_guion == scene.id_guion).scalar()
+
+
 def update_item_full(id: str, item: DesgloseItemSchema, db: Session):
     item_db = db.query(DesgloseItem).filter(DesgloseItem.id_desglose_item == id).first()
 
     if not item_db:
         return api_response(False, "Item de desglose no encontrado")
+
+    # No se puede mover el item a una escena de OTRO proyecto (mismo
+    # guard que en scene_controller.py con id_guion).
+    if item.id_escena and str(item.id_escena) != str(item_db.id_escena):
+        if _resolve_project_of_escena(item.id_escena, db) != _resolve_project_of_escena(item_db.id_escena, db):
+            return api_response(False, "No se puede mover el item a una escena de otro proyecto", error="CROSS_PROJECT_MOVE")
 
     item_db.id_escena = item.id_escena
     item_db.id_departamento = item.id_departamento
@@ -124,6 +141,10 @@ def update_item(id: str, item, db: Session):
         return api_response(False, "Item de desglose no encontrado")
 
     update_data = item.model_dump(exclude_unset=True)
+
+    if update_data.get("id_escena") and str(update_data["id_escena"]) != str(item_db.id_escena):
+        if _resolve_project_of_escena(update_data["id_escena"], db) != _resolve_project_of_escena(item_db.id_escena, db):
+            return api_response(False, "No se puede mover el item a una escena de otro proyecto", error="CROSS_PROJECT_MOVE")
 
     for key, value in update_data.items():
         setattr(item_db, key, value)
@@ -284,8 +305,12 @@ def delete_detalle(id_detalle: str, db: Session, current_user: dict):
 # Lista de tareas (filas de detalle) que el área todavía debe resolver,
 # ordenadas por prioridad (alta primero) para que el Jefe/equipo sepa
 # qué atender primero. Siempre se limita al departamento del usuario
-# que hace la petición (nunca recibe id_departamento por parámetro).
-def get_pendientes_mi_departamento(db: Session, current_user: dict):
+# que hace la petición (nunca recibe id_departamento por parámetro) Y
+# ahora también al proyecto indicado — Department es un catálogo
+# GLOBAL (no tiene id_project, ver department_model.py), así que sin
+# este filtro el mismo departamento traería pendientes de desglose de
+# TODOS los proyectos donde ese departamento se usa.
+def get_pendientes_mi_departamento(id_project: str, db: Session, current_user: dict):
     id_departamento = _get_user_departamento(current_user, db)
 
     if not id_departamento:
@@ -295,9 +320,14 @@ def get_pendientes_mi_departamento(db: Session, current_user: dict):
 
     pendientes = db.query(DesgloseItemDetalle).join(
         DesgloseItem, DesgloseItemDetalle.id_desglose_item == DesgloseItem.id_desglose_item
+    ).join(
+        Scene, DesgloseItem.id_escena == Scene.id_escena
+    ).join(
+        Script, Scene.id_guion == Script.id_guion
     ).filter(
         DesgloseItem.id_departamento == id_departamento,
-        DesgloseItemDetalle.estado != "completado"
+        DesgloseItemDetalle.estado != "completado",
+        Script.id_project == id_project,
     ).all()
 
     pendientes.sort(key=lambda d: orden_prioridad.get(d.prioridad, 3))

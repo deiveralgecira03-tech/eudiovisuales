@@ -188,25 +188,53 @@ class _RolesScreenState extends State<RolesScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _TableHeader(),
-                const SizedBox(height: 4),
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: ListView.separated(
-                      itemCount: users.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, i) => _UserRow(
-                        user: users[i],
-                        departamentoNombre: _departamentoNombre(users[i].idDepartamento),
-                        canManageEstado: _puedeGestionarEstado(session, users[i]),
-                        onToggleEstado: () => _toggleEstado(users[i]),
-                      ),
-                    ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // La tabla de 4 columnas (Expanded con flex) no se
+                      // desborda en angosto gracias al `Expanded`, pero
+                      // queda ilegible (columnas comprimidas a unos pocos
+                      // px). Por debajo de 640px de ancho se reemplaza por
+                      // una lista de tarjetas apiladas, una por persona.
+                      final wide = constraints.maxWidth > 640;
+                      if (wide) {
+                        return Column(
+                          children: [
+                            _TableHeader(),
+                            const SizedBox(height: 4),
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: ListView.separated(
+                                  itemCount: users.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 1),
+                                  itemBuilder: (context, i) => _UserRow(
+                                    user: users[i],
+                                    departamentoNombre: _departamentoNombre(users[i].idDepartamento),
+                                    canManageEstado: _puedeGestionarEstado(session, users[i]),
+                                    onToggleEstado: () => _toggleEstado(users[i]),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return ListView.separated(
+                        itemCount: users.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, i) => _UserCard(
+                          user: users[i],
+                          departamentoNombre: _departamentoNombre(users[i].idDepartamento),
+                          canManageEstado: _puedeGestionarEstado(session, users[i]),
+                          onToggleEstado: () => _toggleEstado(users[i]),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -457,6 +485,106 @@ class _UserRow extends StatelessWidget {
   }
 }
 
+/// Versión en tarjeta de `_UserRow`, para pantallas angostas (móvil):
+/// en vez de 4 columnas comprimidas, apila nombre+correo arriba y
+/// departamento/rol/estado como una fila que envuelve (`Wrap`) debajo.
+class _UserCard extends StatelessWidget {
+  final AppUser user;
+  final String? departamentoNombre;
+  final bool canManageEstado;
+  final VoidCallback? onToggleEstado;
+  const _UserCard({
+    required this.user,
+    required this.departamentoNombre,
+    this.canManageEstado = false,
+    this.onToggleEstado,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final estado = (user.estado ?? '').toLowerCase();
+    final pendiente = estado == 'pendiente';
+    final suspendido = estado == 'suspendido';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: AppColors.surfaceVariant,
+                child: Text(user.nombre.isNotEmpty ? user.nombre[0].toUpperCase() : '?'),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+                    Text(user.mail, style: const TextStyle(color: AppColors.grisMedio, fontSize: 12), overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              if (canManageEstado)
+                IconButton(
+                  icon: Icon(suspendido ? Icons.play_circle_outline : Icons.block_outlined, size: 20, color: suspendido ? AppColors.success : AppColors.error),
+                  tooltip: suspendido ? 'Reactivar' : 'Suspender',
+                  onPressed: onToggleEstado,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _InfoChip(icon: Icons.apartment_outlined, label: departamentoNombre ?? '—'),
+              _InfoChip(icon: Icons.badge_outlined, label: Roles.label(user.idRol)),
+              StatusPill(
+                label: suspendido ? 'Suspendido' : (pendiente ? 'Pendiente' : 'Activo'),
+                color: suspendido ? AppColors.error : (pendiente ? AppColors.warning : AppColors.success),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _InfoChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.grisMedio),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
+  }
+}
+
 class _InviteDialog extends StatefulWidget {
   final String projectId;
   final String idClient;
@@ -492,100 +620,154 @@ class _InviteDialogState extends State<_InviteDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      // Antes usaba el inset default de Flutter (40h/24v), que en móvil
+      // angosto deja aún menos ancho disponible. Se alinea con el inset
+      // que ya usa `showCenteredFormSheet` en el resto de la app.
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.moradoTech, AppColors.azulProfundo]),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('NUEVA INVITACIÓN', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6)),
-                        SizedBox(height: 4),
-                        Text('Invitar al equipo', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                      ],
+        // Sin este scroll, el contenido (header + 2 filas de campos +
+        // botones) se desbordaba en pantallas de poca altura o con el
+        // teclado abierto en móvil, ya que un Dialog no da scroll
+        // automático a su contenido — ver auditoría de responsive.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: [AppColors.moradoTech, AppColors.azulProfundo]),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('NUEVA INVITACIÓN', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6)),
+                          SizedBox(height: 4),
+                          Text('Invitar al equipo', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(false),
-                  ),
-                ],
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(false),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: AppTextField(label: 'Nombre completo', hint: 'Nombre y apellidos', controller: _nombreCompleto)),
-                      const SizedBox(width: 16),
-                      Expanded(child: AppTextField(label: 'Correo electrónico', hint: 'correo@dominio.com', controller: _correo, keyboardType: TextInputType.emailAddress)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: AppDropdown<String>(
-                          label: 'Área / Departamento',
-                          value: _idDepartamento,
-                          hint: 'Selecciona área',
-                          items: widget.departamentos.map((d) => d.idDepartamento).toList(),
-                          labelBuilder: (id) => widget.departamentos.firstWhere((d) => d.idDepartamento == id).nombre,
-                          onChanged: (v) => setState(() => _idDepartamento = v),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // En pantallas angostas (móvil) los pares de campos en
+                    // Row+Expanded quedaban demasiado comprimidos (hints
+                    // como "correo@dominio.com" no caben). Por debajo de
+                    // 420px de ancho disponible se apilan verticalmente.
+                    final wide = constraints.maxWidth > 420;
+                    final camposContacto = wide
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: AppTextField(label: 'Nombre completo', hint: 'Nombre y apellidos', controller: _nombreCompleto)),
+                              const SizedBox(width: 16),
+                              Expanded(child: AppTextField(label: 'Correo electrónico', hint: 'correo@dominio.com', controller: _correo, keyboardType: TextInputType.emailAddress)),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              AppTextField(label: 'Nombre completo', hint: 'Nombre y apellidos', controller: _nombreCompleto),
+                              const SizedBox(height: 16),
+                              AppTextField(label: 'Correo electrónico', hint: 'correo@dominio.com', controller: _correo, keyboardType: TextInputType.emailAddress),
+                            ],
+                          );
+                    final camposRol = wide
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: AppDropdown<String>(
+                                  label: 'Área / Departamento',
+                                  value: _idDepartamento,
+                                  hint: 'Selecciona área',
+                                  items: widget.departamentos.map((d) => d.idDepartamento).toList(),
+                                  labelBuilder: (id) => widget.departamentos.firstWhere((d) => d.idDepartamento == id).nombre,
+                                  onChanged: (v) => setState(() => _idDepartamento = v),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: AppDropdown<int>(
+                                  label: 'Rol',
+                                  value: _idRol,
+                                  hint: 'Selecciona rol',
+                                  items: widget.roles.map((r) => r.idRol).toList(),
+                                  labelBuilder: (id) => widget.roles.firstWhere((r) => r.idRol == id).nombre,
+                                  onChanged: (v) => setState(() => _idRol = v),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              AppDropdown<String>(
+                                label: 'Área / Departamento',
+                                value: _idDepartamento,
+                                hint: 'Selecciona área',
+                                items: widget.departamentos.map((d) => d.idDepartamento).toList(),
+                                labelBuilder: (id) => widget.departamentos.firstWhere((d) => d.idDepartamento == id).nombre,
+                                onChanged: (v) => setState(() => _idDepartamento = v),
+                              ),
+                              const SizedBox(height: 16),
+                              AppDropdown<int>(
+                                label: 'Rol',
+                                value: _idRol,
+                                hint: 'Selecciona rol',
+                                items: widget.roles.map((r) => r.idRol).toList(),
+                                labelBuilder: (id) => widget.roles.firstWhere((r) => r.idRol == id).nombre,
+                                onChanged: (v) => setState(() => _idRol = v),
+                              ),
+                            ],
+                          );
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        camposContacto,
+                        const SizedBox(height: 16),
+                        camposRol,
+                        const SizedBox(height: 20),
+                        Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 12,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton(
+                              onPressed: _loading ? null : () => Navigator.of(context).pop(false),
+                              child: const Text('Cancelar'),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: _loading ? null : _submit,
+                              icon: _loading
+                                  ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.send_outlined, size: 16),
+                              label: const Text('Enviar invitación'),
+                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.moradoTech),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: AppDropdown<int>(
-                          label: 'Rol',
-                          value: _idRol,
-                          hint: 'Selecciona rol',
-                          items: widget.roles.map((r) => r.idRol).toList(),
-                          labelBuilder: (id) => widget.roles.firstWhere((r) => r.idRol == id).nombre,
-                          onChanged: (v) => setState(() => _idRol = v),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton(
-                        onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-                        child: const Text('Cancelar'),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: _loading ? null : _submit,
-                        icon: _loading
-                            ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.send_outlined, size: 16),
-                        label: const Text('Enviar invitación'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.moradoTech),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

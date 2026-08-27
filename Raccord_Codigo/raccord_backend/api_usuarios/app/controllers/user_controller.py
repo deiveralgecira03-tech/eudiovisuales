@@ -21,10 +21,14 @@ MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 # ==========================================
-# GET ALL USERS
+# GET ALL USERS (de la MISMA empresa/cliente que quien pregunta)
 # ==========================================
-def get_users(db: Session):
-    users = db.query(User).all()
+# Antes devolvía TODOS los usuarios de TODOS los clientes de la
+# plataforma (nombre, correo, teléfono, identificación de gente de
+# OTRAS empresas). Se acota a users.id_client del que hace la
+# petición.
+def get_users(id_client: str, db: Session):
+    users = db.query(User).filter(User.id_client == id_client).all()
     users_list = [
         {
             "id_user": u.id_user,

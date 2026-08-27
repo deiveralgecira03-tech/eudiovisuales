@@ -42,6 +42,10 @@ const _sortLabels = {
 class _ScenesScreenState extends State<ScenesScreen> {
   late Future<List<Scene>> _future;
   String? _filtroEstado;
+  // Mismo filtro de "bloque de grabación" que Plan de Rodaje — pedido
+  // explícito del usuario para poder ver solo las escenas de un bloque
+  // también desde Escenas.
+  int? _filtroBloque;
   _SortField _sortField = _SortField.numero;
   bool _sortAsc = true;
   int _page = 0;
@@ -62,7 +66,7 @@ class _ScenesScreenState extends State<ScenesScreen> {
 
   Future<List<Scene>> _load() {
     final session = context.read<AuthSession>();
-    return SceneService(session.api).all();
+    return SceneService(session.api).all(session.projectId ?? '');
   }
 
   void _reload() => setState(() {
@@ -91,6 +95,9 @@ class _ScenesScreenState extends State<ScenesScreen> {
 
   List<Scene> _filterSort(List<Scene> scenes) {
     var list = _filtroEstado == null ? scenes : scenes.where((s) => s.estado == _filtroEstado).toList();
+    if (_filtroBloque != null) {
+      list = list.where((s) => s.bloqueGrabacion == _filtroBloque).toList();
+    }
     list = [...list];
     list.sort((a, b) {
       int cmp;
@@ -167,21 +174,51 @@ class _ScenesScreenState extends State<ScenesScreen> {
           final page = _page.clamp(0, totalPages - 1);
           final start = page * _pageSize;
           final pageItems = filtered.skip(start).take(_pageSize).toList();
+          final bloquesDisponibles = all.map((s) => s.bloqueGrabacion).whereType<int>().toSet().toList()..sort();
 
-          final listaEscenas = _buildListaEscenas(context, canEdit, filtered, pageItems, totalPages, page);
+          final listaEscenas = _buildListaEscenas(context, canEdit, filtered, pageItems, totalPages, page, bloquesDisponibles);
 
           return Padding(
             padding: const EdgeInsets.all(20),
             child: _vistaDividida && _selectedScene != null
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(flex: 5, child: _buildScriptPane(context)),
-                      const SizedBox(width: 16),
-                      const VerticalDivider(width: 1),
-                      const SizedBox(width: 16),
-                      Expanded(flex: 6, child: listaEscenas),
-                    ],
+                ? LayoutBuilder(
+                    builder: (context, constraints) {
+                      // En pantallas angostas (móvil/tablet chico) los dos
+                      // paneles lado a lado quedan inutilizables (guion y
+                      // lista comprimidos con `flex`). A partir de 760px se
+                      // ven lado a lado como antes; por debajo, se apilan
+                      // verticalmente (guion arriba con alto fijo + lista
+                      // debajo), igual que en `scene_edit_screen.dart`.
+                      final wide = constraints.maxWidth > 760;
+                      if (wide) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(flex: 5, child: _buildScriptPane(context)),
+                            const SizedBox(width: 16),
+                            const VerticalDivider(width: 1),
+                            const SizedBox(width: 16),
+                            Expanded(flex: 6, child: listaEscenas),
+                          ],
+                        );
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(height: 420, child: _buildScriptPane(context)),
+                          const SizedBox(height: 16),
+                          const Divider(height: 1),
+                          const SizedBox(height: 16),
+                          // `listaEscenas` trae internamente un ListView
+                          // dentro de un Expanded (pensado para vivir dentro
+                          // de la Row ancha con stretch); envuelto acá en un
+                          // Expanded propio para que reciba una altura
+                          // acotada del Column apilado y no truene por alto
+                          // sin límite.
+                          Expanded(child: listaEscenas),
+                        ],
+                      );
+                    },
                   )
                 : listaEscenas,
           );
@@ -235,6 +272,7 @@ class _ScenesScreenState extends State<ScenesScreen> {
     List<Scene> pageItems,
     int totalPages,
     int page,
+    List<int> bloquesDisponibles,
   ) {
     return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,6 +303,27 @@ class _ScenesScreenState extends State<ScenesScreen> {
                         ),
                       ],
                     ),
+                    if (bloquesDisponibles.isNotEmpty)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Bloque de grabación: ', style: TextStyle(color: AppColors.grisMedio)),
+                          DropdownButton<int?>(
+                            value: _filtroBloque,
+                            underline: const SizedBox.shrink(),
+                            dropdownColor: AppColors.surfaceVariant,
+                            hint: const Text('Todos'),
+                            items: [
+                              const DropdownMenuItem<int?>(value: null, child: Text('Todos')),
+                              ...bloquesDisponibles.map((b) => DropdownMenuItem<int?>(value: b, child: Text('Bloque $b'))),
+                            ],
+                            onChanged: (v) => setState(() {
+                              _filtroBloque = v;
+                              _page = 0;
+                            }),
+                          ),
+                        ],
+                      ),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -429,6 +488,8 @@ Color colorForEstadoEscena(String estado) {
       return AppColors.success;
     case 'En proceso':
       return AppColors.warning;
+    case 'Eliminada':
+      return AppColors.grisMedio;
     default:
       return AppColors.error;
   }
@@ -462,57 +523,155 @@ class _SceneRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Container(
-      padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? AppColors.azulProfundo : AppColors.border, width: selected ? 2 : 1),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Las 3 columnas de ancho fijo (`_Field` con su etiqueta
+              // apilada arriba) quedan ilegibles en móvil/tablet vertical
+              // (se comprimen y el texto se envuelve varias veces). Por
+              // debajo de 560px se usa una tarjeta compacta: encabezado en
+              // negrita arriba + chips pequeños (día dramático, estado)
+              // abajo, sin repetir etiquetas ("Encabezado", "Estado", etc.)
+              // que ya se explican solas por su ícono/estilo.
+              final wide = constraints.maxWidth > 560;
+              if (wide) {
+                return Row(
+                  children: [
+                    // El número de escena (antes visible como "Escena #N")
+                    // se mantiene en el modelo/BD y se sigue usando para
+                    // ordenar y en el resto de la app (Desglose, Plan de
+                    // Rodaje) — pedido explícito del usuario: solo se
+                    // oculta de esta lista.
+                    Expanded(flex: 6, child: _Field('Encabezado', scene.encabezado)),
+                    Expanded(
+                      flex: 3,
+                      child: _Field('Día Dramático', scene.diaDramatico != null ? '${scene.diaDramatico}' : '—'),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Estado', style: TextStyle(color: AppColors.grisMedio, fontSize: 12)),
+                          const SizedBox(height: 6),
+                          StatusPill(label: scene.estado, color: colorForEstadoEscena(scene.estado)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.visibility_outlined, size: 20),
+                      tooltip: 'Ver fotos de continuidad',
+                      onPressed: onView,
+                    ),
+                    if (canEdit)
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                        tooltip: 'Editar escena',
+                        onPressed: onEdit,
+                      ),
+                    if (canEdit)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                        tooltip: 'Eliminar escena',
+                        onPressed: onDelete,
+                      ),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          scene.encabezado,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                      ),
+                      // Íconos más chicos (18px) y sin el padding grande
+                      // por defecto de IconButton, para que no dominen la
+                      // tarjeta en una pantalla angosta.
+                      _CompactIconButton(icon: Icons.visibility_outlined, tooltip: 'Ver fotos de continuidad', onPressed: onView),
+                      if (canEdit) _CompactIconButton(icon: Icons.edit_outlined, tooltip: 'Editar escena', onPressed: onEdit),
+                      if (canEdit) _CompactIconButton(icon: Icons.delete_outline, tooltip: 'Eliminar escena', onPressed: onDelete, color: AppColors.error),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (scene.diaDramatico != null)
+                        _InfoChip(icon: Icons.auto_stories_outlined, label: 'Día ${scene.diaDramatico}'),
+                      StatusPill(label: scene.estado, color: colorForEstadoEscena(scene.estado)),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ícono compacto (18px, sin el padding/tamaño mínimo por defecto de
+/// [IconButton], que en pantallas angostas hacía que 2-3 botones ya
+/// ocuparan un tercio de la tarjeta) — usado solo en la tarjeta de
+/// móvil de [_SceneRow].
+class _CompactIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final Color? color;
+  const _CompactIconButton({required this.icon, required this.tooltip, required this.onPressed, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(icon, size: 18, color: color),
+      tooltip: tooltip,
+      onPressed: onPressed,
+      padding: const EdgeInsets.all(6),
+      constraints: const BoxConstraints(),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+/// Chip pequeño con ícono + texto, para mostrar datos secundarios (día
+/// dramático, etc.) sin repetir una etiqueta encima del valor — mismo
+/// patrón usado en la tarjeta de Roles del Equipo.
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _InfoChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: selected ? AppColors.azulProfundo : AppColors.border, width: selected ? 2 : 1),
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            flex: 2,
-            child: _Field('Escena', '#${scene.numeroDeEscena}', bold: true),
-          ),
-          Expanded(
-            flex: 4,
-            child: _Field('Encabezado', scene.encabezado),
-          ),
-          Expanded(
-            flex: 3,
-            child: _Field('Día Dramático', scene.diaDramatico != null ? 'Día ${scene.diaDramatico}' : '—'),
-          ),
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Estado', style: TextStyle(color: AppColors.grisMedio, fontSize: 12)),
-                const SizedBox(height: 6),
-                StatusPill(label: scene.estado, color: colorForEstadoEscena(scene.estado)),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.visibility_outlined, size: 20),
-            tooltip: 'Ver fotos de continuidad',
-            onPressed: onView,
-          ),
-          if (canEdit)
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 20),
-              tooltip: 'Editar escena',
-              onPressed: onEdit,
-            ),
-          if (canEdit)
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
-              tooltip: 'Eliminar escena',
-              onPressed: onDelete,
-            ),
+          Icon(icon, size: 14, color: AppColors.grisMedio),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(fontSize: 12)),
         ],
-      ),
-        ),
       ),
     );
   }
@@ -588,9 +747,9 @@ class _SceneFormSheetState extends State<_SceneFormSheet> {
               children: [
                 Expanded(
                   child: AppDropdown<String>(
-                    label: 'Vista',
+                    label: 'Espacio',
                     value: _modoVista,
-                    hint: 'Seleccione vista',
+                    hint: 'Seleccione espacio',
                     items: kModosVista,
                     labelBuilder: (e) => e.toUpperCase(),
                     onChanged: (v) => setState(() => _modoVista = v),

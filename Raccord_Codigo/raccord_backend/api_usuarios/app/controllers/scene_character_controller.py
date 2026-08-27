@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.scene_character_model import SceneCharacter
 from app.models.character_model import Character
 from app.models.scene_model import Scene
+from app.models.script_model import Script
 
 from app.schemas.scene_character_schema import SceneCharacterSchema
 
@@ -50,6 +51,17 @@ def add_character_to_scene(id_escena: str, data: SceneCharacterSchema, db: Sessi
 
     if not character:
         return api_response(False, "Personaje no encontrado")
+
+    # No se puede meter al cast un personaje de OTRO proyecto, aunque
+    # el usuario tenga permiso en el proyecto de la escena (ver la
+    # misma preocupación resuelta con require_record_project_permission
+    # en el resto del módulo).
+    id_project_escena = (
+        db.query(Script.id_project).filter(Script.id_guion == scene.id_guion).scalar()
+        if scene.id_guion else None
+    )
+    if character.id_project != id_project_escena:
+        return api_response(False, "Este personaje pertenece a otro proyecto", error="CROSS_PROJECT_CHARACTER")
 
     existing = db.query(SceneCharacter).filter(
         SceneCharacter.id_escena == id_escena,

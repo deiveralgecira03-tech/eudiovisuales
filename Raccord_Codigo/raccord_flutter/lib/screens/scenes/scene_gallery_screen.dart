@@ -62,8 +62,11 @@ class _SceneGalleryScreenState extends State<SceneGalleryScreen> {
           return GridView.builder(
             padding: const EdgeInsets.all(20),
             itemCount: photos.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
+            // `MaxCrossAxisExtent` calcula columnas según el ancho real en
+            // vez de un `crossAxisCount` fijo — menos columnas en móvil,
+            // más en tablet/desktop.
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 160,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),

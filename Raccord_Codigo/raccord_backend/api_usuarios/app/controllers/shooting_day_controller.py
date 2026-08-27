@@ -22,6 +22,7 @@ def _serialize(r: ShootingDay):
         "location": r.location,
         "notas": r.notas,
         "activo": r.activo,
+        "id_project": r.id_project,
     }
 
 
@@ -42,10 +43,13 @@ def _serialize_scene(s: Scene):
 # ==========================================
 # GET ALL SHOOTING DAYS
 # ==========================================
-def get_shooting_days(db: Session):
-    days = db.query(ShootingDay).order_by(
-        ShootingDay.semana_grabacion, ShootingDay.dia_rodaje
-    ).all()
+def get_shooting_days(id_project: str, db: Session):
+    days = (
+        db.query(ShootingDay)
+        .filter(ShootingDay.id_project == id_project)
+        .order_by(ShootingDay.semana_grabacion, ShootingDay.dia_rodaje)
+        .all()
+    )
 
     return api_response(True, "Lista del plan de rodaje", [_serialize(r) for r in days])
 
@@ -84,7 +88,8 @@ def create_shooting_day(day: ShootingDaySchema, db: Session):
         hora_fin=day.hora_fin,
         location=day.location,
         notas=day.notas,
-        activo=day.activo if day.activo is not None else True
+        activo=day.activo if day.activo is not None else True,
+        id_project=day.id_project,
     )
 
     db.add(new_day)
@@ -97,6 +102,9 @@ def create_shooting_day(day: ShootingDaySchema, db: Session):
 # ==========================================
 # UPDATE SHOOTING DAY (PUT - completo)
 # ==========================================
+# NOTA: ShootingDaySchema trae id_project (mismo schema que create),
+# pero a propósito NO se copia acá — ver la misma nota en
+# character_controller.py.
 def update_shooting_day_full(id: str, day: ShootingDaySchema, db: Session):
     day_db = db.query(ShootingDay).filter(ShootingDay.id_rodaje == id).first()
 

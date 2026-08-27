@@ -18,6 +18,7 @@ def _serialize(c: Character):
         "nombre": c.nombre,
         "edad": c.edad,
         "codigo_personaje": c.codigo_personaje,
+        "id_project": c.id_project,
     }
 
 
@@ -31,10 +32,19 @@ def _serialize_actor(a: Actor):
 
 
 # ==========================================
-# GET ALL CHARACTERS
+# GET ALL CHARACTERS (de UN proyecto)
 # ==========================================
-def get_characters(db: Session):
-    characters = db.query(Character).order_by(Character.id_personaje).all()
+# Antes traía TODOS los personajes de TODOS los proyectos, de
+# cualquier cliente — sin ningún filtro. Ahora exige id_project y solo
+# devuelve los de ese proyecto (el permiso/pertenencia ya se validó en
+# la ruta, ver require_project_member en character_routes.py).
+def get_characters(id_project: str, db: Session):
+    characters = (
+        db.query(Character)
+        .filter(Character.id_project == id_project)
+        .order_by(Character.id_personaje)
+        .all()
+    )
     return api_response(True, "Lista de personajes", [_serialize(c) for c in characters])
 
 
@@ -61,11 +71,14 @@ def get_character(id: str, db: Session):
 # CREATE CHARACTER
 # ==========================================
 # No se manda id_personaje: lo genera el trigger de la BD (cast1, cast2, ...).
+# La pertenencia al proyecto (character.id_project) y el permiso ya se
+# validaron en la ruta antes de llegar acá (ver character_routes.py).
 def create_character(character: CharacterSchema, db: Session):
     new_character = Character(
         nombre=character.nombre,
         edad=character.edad,
-        codigo_personaje=character.codigo_personaje
+        codigo_personaje=character.codigo_personaje,
+        id_project=character.id_project,
     )
 
     db.add(new_character)
@@ -78,6 +91,10 @@ def create_character(character: CharacterSchema, db: Session):
 # ==========================================
 # UPDATE CHARACTER (PUT - completo)
 # ==========================================
+# NOTA: CharacterSchema (mismo schema que create) trae id_project, pero
+# a propósito NO se copia acá — mover un personaje de proyecto por un
+# PUT normal sería una forma fácil de saltarse el aislamiento por
+# proyecto. El proyecto de un personaje queda fijo desde su creación.
 def update_character_full(id: str, character: CharacterSchema, db: Session):
     character_db = db.query(Character).filter(Character.id_personaje == id).first()
 

@@ -17,6 +17,10 @@ class BreakdownSheetSchema(BaseModel):
     location: Optional[str] = None
     requerimientos: str
     activo: Optional[bool] = True
+    # Obligatorio (ver sql/015_project_scoping.sql): un contenedor de
+    # desglose siempre pertenece a UN proyecto, incluso antes de
+    # asignarle escenas. No se puede cambiar después.
+    id_project: str
 
 
 class BreakdownSheetUpdateSchema(BaseModel):

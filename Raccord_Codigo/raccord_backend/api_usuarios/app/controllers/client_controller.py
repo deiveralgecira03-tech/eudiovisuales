@@ -6,8 +6,13 @@ from app.utils.response import api_response
 
 # GET ALL CLIENTS
 
-def get_clients(db: Session):
-    clients = db.query(Client).all()
+# Antes devolvía TODAS las empresas registradas en la plataforma —
+# cualquier usuario autenticado podía ver el registro fiscal/contacto
+# de OTRAS empresas. Un usuario solo pertenece a UNA empresa
+# (users.id_client), así que esto ahora siempre devuelve como mucho
+# una fila: la propia.
+def get_clients(id_client: str, db: Session):
+    clients = db.query(Client).filter(Client.id_cliente == id_client).all()
     clients_list = [
         {
             "id_cliente": c.id_cliente,

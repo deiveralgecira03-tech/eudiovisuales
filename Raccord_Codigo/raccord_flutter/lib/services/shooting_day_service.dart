@@ -6,8 +6,10 @@ class ShootingDayService {
   final ApiClient api;
   ShootingDayService(this.api);
 
-  Future<List<ShootingDay>> all() async {
-    final data = await api.get('/shooting-days');
+  // Antes /shooting-days sin filtro devolvía el plan de rodaje de
+  // TODOS los proyectos — ahora requiere el proyecto activo.
+  Future<List<ShootingDay>> all(String idProject) async {
+    final data = await api.get('/shooting-days/project/$idProject');
     return asListOfMap(data).map(ShootingDay.fromJson).toList();
   }
 

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models.gallery_photo_model import GalleryPhoto
 from app.models.scene_model import Scene
+from app.models.script_model import Script
 
 from app.utils.response import api_response
 from app.utils.minio_client import BUCKET_IMAGENES, upload_file, delete_file, download_file
@@ -16,8 +17,8 @@ ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024  # 15 MB
 
 
-def _serialize(p: GalleryPhoto):
-    return {
+def _serialize(p: GalleryPhoto, scene: Scene | None = None):
+    data = {
         "id_foto": p.id_foto,
         "id_escena": p.id_escena,
         "tipo_foto": p.tipo_foto,
@@ -28,6 +29,14 @@ def _serialize(p: GalleryPhoto):
         "archivo_tamano": p.archivo_tamano,
         "fecha_subida": p.fecha_subida.isoformat() if p.fecha_subida else None,
     }
+    # Datos de la escena embebidos solo cuando se pide el listado
+    # global (ver get_all_photos) — la Galería del proyecto necesita
+    # mostrar a qué escena pertenece cada foto sin tener que pedir
+    # las escenas aparte foto por foto.
+    if scene is not None:
+        data["numero_de_escena"] = scene.numero_de_escena
+        data["encabezado"] = scene.encabezado
+    return data
 
 
 # ==========================================
@@ -47,6 +56,25 @@ def get_photos_by_scene(id_escena: str, db: Session):
     )
 
     return api_response(True, "Fotos de continuidad de la escena", [_serialize(p) for p in photos])
+
+
+# ==========================================
+# GET TODAS LAS FOTOS (Galería global de UN proyecto)
+# ==========================================
+# Antes traía las fotos de TODOS los proyectos sin filtro. GalleryPhoto
+# no tiene columna id_project propia: se resuelve subiendo por
+# fotos_continuidad.id_escena -> escenas.id_guion -> guiones.id_project.
+def get_all_photos(id_project: str, db: Session):
+    photos = (
+        db.query(GalleryPhoto, Scene)
+        .join(Scene, GalleryPhoto.id_escena == Scene.id_escena)
+        .join(Script, Scene.id_guion == Script.id_guion)
+        .filter(Script.id_project == id_project)
+        .order_by(GalleryPhoto.fecha_subida.desc())
+        .all()
+    )
+
+    return api_response(True, "Fotos de continuidad del proyecto", [_serialize(p, scene) for p, scene in photos])
 
 
 # ==========================================

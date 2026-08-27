@@ -21,8 +21,12 @@ from app.controllers.user_controller import (
     set_user_estado
 )
 
-# 🔐 IMPORTANTE: autenticación / permisos
+# 🔐 IMPORTANTE: autenticación / permisos. Users se acota por DOS
+# límites distintos: id_client (empresa/tenant — ver
+# require_same_client_user) para operaciones sobre "un usuario", y
+# proyecto (user_projects) para "usuarios de un proyecto".
 from app.middleware.auth import get_current_user, require_permission
+from app.utils.project_scope import require_same_client_user, require_project_member, get_user_client
 
 # ==========================================
 # ROUTER (CRUD de usuarios, todo protegido)
@@ -33,13 +37,14 @@ router = APIRouter(
 )
 
 
-# GET ALL USERS (PROTEGIDO)
+# GET ALL USERS (PROTEGIDO) — antes devolvía los usuarios de TODAS las
+# empresas de la plataforma; ahora solo los de la propia.
 @router.get("")
 def users(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    return get_users(db)
+    return get_users(get_user_client(db, current_user.get("id_user")), db)
 
 
 # CREATE USER (PROTEGIDO - alta administrativa, distinta de /register)
@@ -53,22 +58,28 @@ def store_user(
     return create_user(user, db)
 
 
-# GET USERS BY PROJECT (PROTEGIDO)
+# GET USERS BY PROJECT (PROTEGIDO) — antes cualquier usuario
+# autenticado podía pedir el equipo de un proyecto al que no
+# pertenecía; ahora exige ser miembro de ESE proyecto.
 @router.get("/project/{id_project}")
 def users_by_project(
     id_project: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_project_member())
 ):
     return get_users_by_project(id_project, db)
 
 
-# GET PROJECTS BY USER (PROTEGIDO)
+# GET PROJECTS BY USER (PROTEGIDO) — antes cualquier usuario
+# autenticado podía pedir los proyectos de OTRO usuario de otra
+# empresa; ahora exige ser el mismo usuario o pertenecer a su misma
+# empresa.
 @router.get("/{id_user}/projects")
 def user_projects(
     id_user: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    _scope: dict = Depends(require_same_client_user(pk_path_param="id_user")),
 ):
     return get_user_projects(id_user, db)
 
@@ -113,47 +124,53 @@ async def store_own_photo(
     return await upload_own_photo(current_user["id_user"], file, db)
 
 
-# VER LA FOTO DE PERFIL DE CUALQUIER USUARIO (PROTEGIDO - cualquier
-# usuario autenticado; se usa también en listas como Roles del Equipo).
+# VER LA FOTO DE PERFIL DE CUALQUIER USUARIO (PROTEGIDO) — acotado a la
+# misma empresa/cliente (antes cualquier usuario autenticado de
+# CUALQUIER empresa podía ver la foto de perfil de cualquiera).
 @router.get("/{id}/foto")
 def photo(
     id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    _scope: dict = Depends(require_same_client_user()),
 ):
     return get_user_photo(id, db)
 
 
-# GET USER BY ID (PROTEGIDO)
+# GET USER BY ID (PROTEGIDO) — acotado a la misma empresa/cliente.
 @router.get("/{id}")
 def user(
     id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_same_client_user())
 ):
     return get_user(id, db)
 
 
 # UPDATE USER - PUT (PROTEGIDO)
-# Solo Administrador (1001) y Director (1002).
+# Solo Administrador (1001) y Director (1002), y solo sobre usuarios de
+# su MISMA empresa/cliente.
 @router.put("/{id}")
 def edit_user(
     id: str,
     user: UserSchema,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_permission("full_management"))
+    current_user: dict = Depends(require_permission("full_management")),
+    _scope: dict = Depends(require_same_client_user()),
 ):
     return update_user_full(id, user, db)
 
 
 # UPDATE USER - PATCH (PROTEGIDO)
-# Solo Administrador (1001) y Director (1002).
+# Solo Administrador (1001) y Director (1002), y solo sobre usuarios de
+# su MISMA empresa/cliente.
 @router.patch("/{id}")
 def patch_user(
     id: str,
     user: UserUpdateSchema,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_permission("full_management"))
+    current_user: dict = Depends(require_permission("full_management")),
+    _scope: dict = Depends(require_same_client_user()),
 ):
     return update_user(id, user, db)
 
@@ -162,12 +179,14 @@ def patch_user(
 # Administrador (1001) y Director (1002) pueden eliminar usuarios, pero
 # Director NO puede eliminar usuarios con rol Administrador (1001) —
 # esa regla puntual se valida dentro del controller, porque depende del
-# rol del usuario objetivo, no solo del que hace la petición.
+# rol del usuario objetivo, no solo del que hace la petición. Además,
+# solo sobre usuarios de su MISMA empresa/cliente.
 @router.delete("/{id}")
 def destroy_user(
     id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_permission("full_management"))
+    current_user: dict = Depends(require_permission("full_management")),
+    _scope: dict = Depends(require_same_client_user()),
 ):
     return delete_user(id, db, current_user)
 
@@ -176,12 +195,14 @@ def destroy_user(
 # Administrador (1001) y Director (1002): todo el proyecto. Jefe de
 # Departamento (1003): solo su propio departamento — esa parte del
 # scoping se valida dentro del controller porque depende de comparar
-# el departamento del que llama contra el del usuario objetivo.
+# el departamento del que llama contra el del usuario objetivo. Además,
+# solo sobre usuarios de su MISMA empresa/cliente.
 @router.patch("/{id}/estado")
 def patch_user_estado(
     id: str,
     data: UserEstadoSchema,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_permission("manage_team_status"))
+    current_user: dict = Depends(require_permission("manage_team_status")),
+    _scope: dict = Depends(require_same_client_user()),
 ):
     return set_user_estado(id, data.estado, current_user, db)
