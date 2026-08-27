@@ -8,7 +8,7 @@
 | Título | Inicio de Sesión con Autenticación de Dos Factores |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado  |
 | RNF asociados | RNF-001, RNF-002, RNF-003, RNF-004, RNF-005, RNF-017, RNF-019 |
 
 ---
