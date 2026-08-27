@@ -8,7 +8,7 @@
 | Título | Recuperación de Contraseña |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Alta |
-| Estado | Completado |
+| Estado | Pendiente |
 | RNF asociados | RNF-003, RNF-005, RNF-017 |
 
 ---

@@ -8,7 +8,7 @@
 | Título | Búsqueda Avanzada por Filtros |
 | Módulo | Gestión de Fotografías de Continuidad |
 | Prioridad | Crítica |
-| Estado | Completado |
+| Estado | Pendiente |
 | RNF asociados | RNF-008, RNF-020 |
 
 ---

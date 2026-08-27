@@ -8,7 +8,7 @@
 | Título | Creación de Proyectos |
 | Módulo | Gestión de Calendario y Planeación |
 | Prioridad | Crítica |
-| Estado | Completado |
+| Estado | Pendiente |
 | RNF asociados | — |
 
 ---

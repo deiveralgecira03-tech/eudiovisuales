@@ -8,7 +8,7 @@
 | Título | Carga de Fotografías |
 | Módulo | Gestión de Fotografías de Continuidad |
 | Prioridad | Crítica |
-| Estado | Completado |
+| Estado | Pendiente |
 | RNF asociados | RNF-006, RNF-007, RNF-009, RNF-015, RNF-017, RNF-018, RNF-020, RNF-027 |
 
 ---

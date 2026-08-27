@@ -7,7 +7,7 @@
 | ID | HU-007 |
 | Título | Recuperación de Contraseña |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completada |
 | RF asociado | RF-007 |
 
 ---

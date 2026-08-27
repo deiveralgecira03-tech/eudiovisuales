@@ -7,7 +7,7 @@
 | ID | HU-017 |
 | Título | Creación de Proyectos |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completada |
 | RF asociado | RF-017 |
 
 ---

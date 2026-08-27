@@ -7,7 +7,7 @@
 | ID | HU-010 |
 | Título | Carga de Fotografías |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completada |
 | RF asociado | RF-010 |
 
 ---

@@ -8,7 +8,7 @@
 | Título | Checklist de Escenas Grabadas vs Pendientes |
 | Módulo | Reportes y Analítica |
 | Prioridad | Media |
-| Estado | Completado |
+| Estado | Pendiente |
 | RNF asociados | — |
 
 ---

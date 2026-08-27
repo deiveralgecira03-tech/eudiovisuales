@@ -7,7 +7,7 @@
 | ID | HU-036 |
 | Título | Checklist de Escenas Grabadas vs Pendientes |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | Completada  |
 | RF asociado | RF-036 |
 
 ---

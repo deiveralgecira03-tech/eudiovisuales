@@ -7,7 +7,7 @@
 | ID | HU-004 |
 | Título | Sistema de Notificaciones por Email |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completada |
 | RF asociado | RF-004 |
 
 ---

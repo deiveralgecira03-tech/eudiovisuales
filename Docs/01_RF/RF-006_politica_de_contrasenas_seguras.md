@@ -8,7 +8,7 @@
 | Título | Política de Contraseñas Seguras |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Alta |
-| Estado | Completado |
+| Estado | Pendiente |
 | RNF asociados | RNF-005, RNF-017 |
 
 ---
