@@ -81,14 +81,16 @@ def download_photo_file(
     return get_photo_archivo(id_foto, db)
 
 
-# Eliminar foto: mismo permiso que subirla, resuelto contra el proyecto
-# de la escena dueña de la foto.
+# Eliminar foto: permiso propio "delete_photos" (separado de
+# "upload_photos" a pedido explícito: Onset puede subir fotos de
+# continuidad pero no eliminarlas), resuelto contra el proyecto de la
+# escena dueña de la foto.
 @router.delete("/fotos/{id_foto}")
 def destroy_photo(
     id_foto: str,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_record_project_permission(
-        "upload_photos", model=GalleryPhoto, pk_column="id_foto", pk_path_param="id_foto",
+        "delete_photos", model=GalleryPhoto, pk_column="id_foto", pk_path_param="id_foto",
         resolve_project=resolve_project_via_scene_fk("id_escena"), not_found_message="Foto no encontrada",
     )),
 ):

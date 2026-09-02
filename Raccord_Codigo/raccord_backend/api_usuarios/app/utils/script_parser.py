@@ -66,6 +66,9 @@ _MOMENTO_DIA_MAP = {
     "ATARDECER": "atardecer",
     "ANOCHECER": "atardecer",
     "TARDE": "dia",
+    "MAÑANA": "dia",
+    "MEDIODIA": "dia",
+    "MEDIODÍA": "dia",
     "MADRUGADA": "noche",
     "DIA/NOCHE": "dia/noche",
     "DÍA/NOCHE": "dia/noche",
@@ -76,7 +79,43 @@ _MOMENTO_DIA_MAP = {
 # Ordenadas de más larga a más corta para que "DIA/NOCHE" no se corte
 # en "DIA" cuando ambas son candidatas (alternancia regex prueba en orden).
 _MOMENTO_PALABRAS = sorted(_MOMENTO_DIA_MAP.keys(), key=len, reverse=True)
-_MOMENTO_ALTERNATIVAS = "|".join(re.escape(w) for w in _MOMENTO_PALABRAS)
+
+# BUG REAL encontrado con guiones reales (ej. "LAS TIERRAS INVISIBLES"):
+# algunos PDFs con fuentes/kerning particulares hacen que pypdf inserte
+# un espacio espurio justo DESPUÉS de una vocal acentuada o la "ñ" al
+# extraer el texto — "MAÑANA" sale como "MAÑ ANA", "DÍA" como "DÍ A".
+# En vez de intentar arreglar la extracción (no depende de nosotros),
+# el patrón de cada palabra de momento tolera un espacio opcional justo
+# después de cada letra acentuada, así "MAÑANA" y "MAÑ ANA" matchean
+# igual sin arriesgar falsos positivos (dos letras separadas por un
+# espacio real en mitad de otra palabra es un caso rarísimo).
+_LETRAS_ACENTUADAS = "áéíóúñÁÉÍÓÚÑ"
+
+
+def _patron_tolerante(palabra: str) -> str:
+    partes = []
+    for letra in palabra:
+        partes.append(re.escape(letra))
+        if letra in _LETRAS_ACENTUADAS:
+            partes.append(r"\s*")
+    return "".join(partes)
+
+
+_MOMENTO_ALTERNATIVAS = "|".join(_patron_tolerante(w) for w in _MOMENTO_PALABRAS)
+
+_MODO_VISTA_RE_PARTE = r"(INT\b\.?\s*/\s*EXT\b\.?|EXT\b\.?\s*/\s*INT\b\.?|INT\b\.?|EXT\b\.?)"
+
+# Separadores vistos en guiones reales entre el lugar y el momento del
+# día: guion normal, pero también guion largo/en-dash y raya/em-dash —
+# muy comunes en PDFs exportados desde Word/Google Docs, que
+# "autocorrigen" el guion simple a estos caracteres. El patrón anterior
+# solo aceptaba "-" (ASCII) y por eso encabezados como "LAGUNA – DÍA"
+# (con en-dash "–", U+2013) no se detectaban como escena: la búsqueda
+# seguía expandiéndose hasta encontrar el PRIMER "-" ASCII varias
+# escenas más adelante, tragándose todo el texto intermedio (escenas
+# "perdidas" y encabezados gigantes con el texto de varias escenas
+# pegado).
+_GUION_RE_PARTE = r"[-‐‑‒–—]"
 
 #
 # BUG REAL encontrado en producción (guiones con portada/acotaciones
@@ -93,19 +132,71 @@ _MOMENTO_ALTERNATIVAS = "|".join(re.escape(w) for w in _MOMENTO_PALABRAS)
 # (la "e" que sigue es letra, no hay corte de palabra ahí) pero
 # "EXT." o "EXT " sí lo son.
 _SCENE_RE = re.compile(
-    r"\b(?:(?:ESC|ESCENA)\.?\s*\d+\.?\s*)?"
-    r"\b(INT\b\.?\s*/\s*EXT\b\.?|EXT\b\.?\s*/\s*INT\b\.?|INT\b\.?|EXT\b\.?)\s*\.?\s*"
-    r"(.+?)\s*-\s*(" + _MOMENTO_ALTERNATIVAS + r")\b",
+    # El prefijo "ESC"/"ESCENA" se exige en MAYÚSCULAS a propósito
+    # (case-sensitive vía (?-i:...), aunque el resto del patrón use
+    # IGNORECASE): en prosa normal es frecuentísimo terminar una
+    # oración con la palabra "escena" en minúscula justo antes de un
+    # encabezado real (ej. "...aumentando el misterio de la escena. 13.
+    # INT. CUARTO...") — con el prefijo insensible a mayúsculas, ese
+    # "escena." + número se leía como si fuera el marcador técnico de
+    # número de escena y se tragaba el ". 13." de la oración anterior
+    # dentro del encabezado detectado. Los guiones reales siempre
+    # escriben este marcador en mayúsculas ("ESC 4.", "ESCENA 13."),
+    # así que exigirlas elimina el falso positivo sin perder casos reales.
+    r"\b(?:(?-i:ESC|ESCENA)\.?\s*\d+\.?\s*)?"
+    r"\b" + _MODO_VISTA_RE_PARTE + r"\s*\.?\s*"
+    # El lugar se acota a un máximo de 100 caracteres (en vez de un
+    # "(.+?)" sin límite): un lugar de escena real nunca es tan largo, y
+    # sin este tope, si el guion NO usa este formato en absoluto (ej. usa
+    # el formato alterno de _SCENE_RE_ALT en todo el documento) y en
+    # algún punto lejano del texto aparece por coincidencia un guion
+    # seguido de una palabra de momento (ej. una acotación de transición
+    # "TARDE-NOCHE"), el grupo no-codicioso se traga TODO el texto
+    # intermedio -incluyendo escenas reales- en un solo "encabezado"
+    # gigante (bug real visto con un guion de 100+ páginas).
+    r"(.{1,100}?)\s*" + _GUION_RE_PARTE + r"\s*(" + _MOMENTO_ALTERNATIVAS + r")\b",
+    re.IGNORECASE,
+)
+
+# Formato alterno visto en algunos guiones reales (ej. "LAS TIERRAS
+# INVISIBLES"): el MOMENTO va justo después de INT/EXT, ANTES del
+# lugar, sin ningún guion separador — "INT. NOCHE. CENTRO DE LA TIERRA"
+# en vez de "INT. CENTRO DE LA TIERRA - NOCHE". Es una convención real
+# y no un error de formato, así que necesita su propio patrón (no un
+# simple cambio de orden en _SCENE_RE, porque ahí el lugar SÍ tiene un
+# límite claro a la derecha: el guion antes del momento).
+#
+# Sin ese límite, ¿dónde termina el lugar en este formato? Los PDFs
+# donde se vio esta convención (exportados de programas tipo
+# Highland/Fade In) imprimen el número de escena duplicado justo ahí:
+# pegado al final del lugar y otra vez separado por un espacio (ej.
+# "...TIERRA1 1", "...FUNERAL. 2 2", y para escenas "insertadas" con
+# sufijo de letra: "...EDIFICIO DE CIENCIAS 13A 13A") — se usa ese
+# número (con su sufijo de letra opcional) repetido como límite natural
+# del lugar, vía backreference (\d+[A-Za-z]?)\s+(?P=n).
+_SCENE_RE_ALT = re.compile(
+    r"\b" + _MODO_VISTA_RE_PARTE + r"\s*\.?\s*"
+    r"(" + _MOMENTO_ALTERNATIVAS + r")\b\s*\.?\s*"
+    # Mismo tope de 100 caracteres que en _SCENE_RE y por la misma razón
+    # (evitar que, si el número duplicado que marca el final del lugar
+    # no aparece cerca por algún motivo, el grupo se trague el resto del
+    # documento buscándolo).
+    r"(.{1,100}?)(?P<n>\d+[A-Za-z]?)\s+(?P=n)\b",
     re.IGNORECASE,
 )
 
 # Líneas/frases en mayúsculas que NO son nombres de personaje
-# (encabezados de transición/técnicos comunes en guiones). Se
-# descartan como candidatos.
+# (encabezados de transición/técnicos comunes en guiones, o marcadores
+# genéricos de sonido/voz-en-off que no identifican a un personaje real
+# — "VOZ (OFF)" y variantes de "PENSAMIENTO" como acotación repetida se
+# vieron en guiones reales generando falsos positivos). Se descartan
+# como candidatos.
 _NOT_A_CHARACTER = {
     "CORTE A", "FUNDIDO A NEGRO", "FADE IN", "FADE OUT", "TITULO", "TÍTULO",
     "CONTINUA", "CONTINÚA", "V.O.", "O.S.", "CONT'D", "FIN", "ESCENA",
-    "TITULOS", "TÍTULOS", "CREDITOS", "CRÉDITOS",
+    "TITULOS", "TÍTULOS", "CREDITOS", "CRÉDITOS", "VOZ", "VOZ EN OFF",
+    "VOZ OFF", "PENSAMIENTO", "TERMINA SECUENCIA", "FIN DE SECUENCIA",
+    "CONTINUARÁ", "CONTINUARA",
 }
 
 # Nombre de personaje (1 a 3 palabras en mayúsculas, con edad opcional
@@ -129,8 +220,12 @@ def _normalize_modo_vista(raw: str) -> str | None:
 
 
 def _normalize_momento_dia(raw: str) -> str | None:
-    key = raw.strip().upper()
-    key = re.sub(r"\s*/\s*", "/", key)
+    # El texto capturado puede traer un espacio espurio tolerado por
+    # _patron_tolerante (ej. "MAÑ ANA" en vez de "MAÑANA") — se quita
+    # TODO espacio interno antes de buscar en el catálogo, ya que
+    # ninguna palabra de momento del día tiene espacios de verdad
+    # (las combinadas como "DIA/NOCHE" ya se guardan sin espacios).
+    key = re.sub(r"\s+", "", raw.strip().upper())
     return _MOMENTO_DIA_MAP.get(key)
 
 
@@ -147,9 +242,72 @@ def _clean_character_name(nombre: str) -> str | None:
     nombre = nombre.strip()
     if nombre in _NOT_A_CHARACTER or len(nombre) < 2:
         return None
-    if len(nombre.split()) > 3:
+    palabras = nombre.split()
+    if len(palabras) > 3:
+        return None
+    # Marcadores/acotaciones repetidas palabra-por-palabra (vistas en
+    # guiones reales, ej. "PENSAMIENTO PENSAMIENTO" como convención de
+    # formato para una voz interior) nunca son un nombre de personaje
+    # real — un personaje no se llama a sí mismo dos veces seguidas.
+    if len(palabras) > 1 and len(set(palabras)) == 1:
         return None
     return nombre
+
+
+def _find_scene_matches(texto_completo: str) -> list[dict]:
+    """
+    Corre los dos formatos de encabezado soportados (_SCENE_RE:
+    "LUGAR - MOMENTO", y _SCENE_RE_ALT: "MOMENTO. LUGAR") sobre el
+    mismo texto y combina los resultados en una sola lista ordenada por
+    posición, cada uno normalizado a
+    {"start", "end", "modo_raw", "momento_raw", "encabezado"}.
+
+    Si ambos patrones matchean el mismo tramo de texto (no debería pasar
+    en un guion con un solo formato, pero por seguridad ante guiones con
+    formato mixto o falsos positivos cruzados), se descarta el que
+    empieza después, quedándose con el primero encontrado en esa
+    posición.
+    """
+    encontrados: list[dict] = []
+
+    for m in _SCENE_RE.finditer(texto_completo):
+        encontrados.append({
+            "start": m.start(),
+            "end": m.end(),
+            "modo_raw": m.group(1),
+            "momento_raw": m.group(3),
+            "encabezado": _normalize_whitespace(m.group(0)),
+        })
+
+    for m in _SCENE_RE_ALT.finditer(texto_completo):
+        # El encabezado se reconstruye a partir del texto crudo
+        # matcheado, quitando el número de escena duplicado del final
+        # (ej. "...TIERRA1 1" -> "...TIERRA") y cualquier punto/espacio
+        # colgante que quede tras cortarlo.
+        crudo = m.group(0)
+        crudo_sin_numero = re.sub(r"\d+[A-Za-z]?\s+\d+[A-Za-z]?\s*$", "", crudo)
+        encontrados.append({
+            "start": m.start(),
+            "end": m.end(),
+            "modo_raw": m.group(1),
+            "momento_raw": m.group(2),
+            "encabezado": _normalize_whitespace(crudo_sin_numero).rstrip(" ."),
+        })
+
+    # Al empatar en la posición de inicio (los dos patrones detectan el
+    # mismo encabezado), se prioriza el match MÁS CORTO: si uno de los
+    # dos se extendió de más buscando su terminador (guion+momento o
+    # número duplicado) y no lo encontró cerca, es casi seguro el que
+    # está mal, así que se descarta en vez de tragarse texto de más.
+    encontrados.sort(key=lambda e: (e["start"], e["end"]))
+
+    combinados: list[dict] = []
+    for entrada in encontrados:
+        if combinados and entrada["start"] < combinados[-1]["end"]:
+            continue  # se solapa con uno ya aceptado, se descarta
+        combinados.append(entrada)
+
+    return combinados
 
 
 def parse_script(pdf_bytes: bytes) -> dict:
@@ -193,7 +351,7 @@ def parse_script(pdf_bytes: bytes) -> dict:
                 break
         return pagina
 
-    matches = list(_SCENE_RE.finditer(texto_completo))
+    matches = _find_scene_matches(texto_completo)
 
     # Primera pasada: contar apariciones de cada personaje candidato en
     # TODO el guion, para descartar palabras en mayúsculas que
@@ -212,15 +370,15 @@ def parse_script(pdf_bytes: bytes) -> dict:
 
     for idx, m in enumerate(matches):
         numero = idx + 1
-        modo_vista = _normalize_modo_vista(m.group(1))
-        momento_dia = _normalize_momento_dia(m.group(3))
-        encabezado_limpio = _normalize_whitespace(m.group(0))
+        modo_vista = _normalize_modo_vista(m["modo_raw"])
+        momento_dia = _normalize_momento_dia(m["momento_raw"])
+        encabezado_limpio = m["encabezado"]
 
         # Personajes de esta escena: los que aparecen entre el final de
         # este encabezado y el inicio del siguiente (o el final del
         # documento, si es la última escena).
-        inicio_fragmento = m.end()
-        fin_fragmento = matches[idx + 1].start() if idx + 1 < len(matches) else len(texto_completo)
+        inicio_fragmento = m["end"]
+        fin_fragmento = matches[idx + 1]["start"] if idx + 1 < len(matches) else len(texto_completo)
         fragmento = texto_completo[inicio_fragmento:fin_fragmento]
 
         personajes_escena: "OrderedDict[str, None]" = OrderedDict()
@@ -235,7 +393,7 @@ def parse_script(pdf_bytes: bytes) -> dict:
             "encabezado": encabezado_limpio,
             "modo_vista": modo_vista,
             "momento_dia": momento_dia,
-            "pagina": _pagina_de(m.start()),
+            "pagina": _pagina_de(m["start"]),
             "personajes_detectados": list(personajes_escena.keys()),
         })
 

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/pdf_export.dart';
+import '../../core/responsive.dart';
 import '../../core/session.dart';
 import '../../models/breakdown.dart';
 import '../../models/scene.dart';
@@ -162,7 +163,10 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
     });
 
     final session = context.read<AuthSession>();
-    if (scene.idGuion != null) {
+    // En móvil la vista dividida no está disponible (ver build()), así
+    // que no tiene sentido descargar el PDF del guion completo solo para
+    // nunca mostrarlo.
+    if (scene.idGuion != null && !isMobileScreen(context)) {
       setState(() => _pdfBytes = ScriptService(session.api).archivoBytes(scene.idGuion!));
     }
     try {
@@ -187,6 +191,12 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
     final session = context.watch<AuthSession>();
     final canManage = session.can('manage_general_breakdown');
     final canDownload = session.can('download_files');
+    // La vista dividida (guion en PDF al lado del desglose) no se ofrece
+    // en móvil, ni siquiera apilada: además de quedar inutilizable en una
+    // pantalla angosta, carga el visor de PDF (pdfrx/PDFium — su propio
+    // worker WASM) sin necesidad, solo para generar ruido en consola.
+    final mobile = isMobileScreen(context);
+    final mostrarVistaDividida = _vistaDividida && !mobile;
 
     return AppScaffold(
       title: 'Desglose de Producción',
@@ -198,7 +208,7 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
             tooltip: 'Descargar desglose de esta escena (PDF)',
             onPressed: (_items == null || _items!.isEmpty) ? null : () => _download(),
           ),
-        if (_selectedScene != null)
+        if (_selectedScene != null && !mobile)
           IconButton(
             icon: Icon(_vistaDividida ? Icons.vertical_split : Icons.vertical_split_outlined),
             tooltip: _vistaDividida ? 'Cerrar vista dividida' : 'Vista dividida con el guion',
@@ -246,7 +256,7 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
               )
             else
               Expanded(
-                child: _vistaDividida
+                child: mostrarVistaDividida
                     ? LayoutBuilder(
                         builder: (context, constraints) {
                           // Igual que en Escenas: en pantallas angostas

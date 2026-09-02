@@ -60,7 +60,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
   @override
   Widget build(BuildContext context) {
     final session = context.watch<AuthSession>();
-    final canDelete = session.can('upload_photos');
+    // Separado de upload_photos a pedido explícito: Onset puede subir
+    // fotos de continuidad, pero no eliminarlas.
+    final canDelete = session.can('delete_photos');
 
     return AppScaffold(
       title: 'Galería',

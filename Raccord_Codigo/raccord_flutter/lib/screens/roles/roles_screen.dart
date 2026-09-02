@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
+import '../../core/invite_helpers.dart';
 import '../../core/permissions.dart';
 import '../../core/session.dart';
 import '../../models/catalog.dart';
@@ -11,8 +12,8 @@ import '../../services/role_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
-import '../../widgets/app_text_field.dart';
 import '../../widgets/bulk_upload_button.dart';
+import '../../widgets/invite_person_dialog.dart';
 import '../../widgets/state_views.dart';
 import '../../core/bulk_import.dart';
 
@@ -257,7 +258,7 @@ class _RolesScreenState extends State<RolesScreen> {
     final session = context.read<AuthSession>();
     final invited = await showDialog<bool>(
       context: context,
-      builder: (_) => _InviteDialog(
+      builder: (_) => InvitePersonDialog(
         projectId: session.projectId ?? '',
         idClient: session.user?.idClient ?? '',
         departamentos: _departamentos,
@@ -267,109 +268,20 @@ class _RolesScreenState extends State<RolesScreen> {
     if (invited == true) _reload();
   }
 
-  // ==========================================
-  // CARGA MASIVA
-  // ==========================================
-  // Mismas columnas que el formulario "Invitar persona": nombre
-  // completo, correo electrónico, área/departamento (por nombre) y rol
-  // (por nombre). Se resuelven nombres -> id acá mismo antes de llamar
-  // al backend (que ya espera id_departamento/id_rol).
-  Future<List<BulkRowResult>> _bulkInvite(List<Map<String, String>> rows) async {
+  // Carga masiva: misma lógica compartida con Crew List (ver
+  // core/invite_helpers.dart) — ambas pantallas invitan exactamente
+  // igual, solo cambia desde dónde se dispara.
+  Future<List<BulkRowResult>> _bulkInvite(List<Map<String, String>> rows) {
     final session = context.read<AuthSession>();
-    final results = <BulkRowResult>[];
-    final pendientes = <_PendingInvite>[];
-
-    var fila = 1;
-    for (final row in rows) {
-      fila++;
-      final nombreCompleto = _pick(row, ['nombre completo', 'nombre_completo', 'nombre']);
-      final correo = _pick(row, ['correo electrónico', 'correo electronico', 'correo', 'email', 'mail']);
-      final areaTexto = _pick(row, ['área/departamento', 'area/departamento', 'área', 'area', 'departamento']);
-      final rolTexto = _pick(row, ['rol']);
-
-      if (nombreCompleto == null || nombreCompleto.isEmpty || correo == null || correo.isEmpty || areaTexto == null || areaTexto.isEmpty || rolTexto == null || rolTexto.isEmpty) {
-        results.add(BulkRowResult(fila: fila, ok: false, detalle: 'Faltan columnas requeridas (nombre completo, correo, área, rol)'));
-        continue;
-      }
-
-      final depto = _findDepartamento(areaTexto);
-      if (depto == null) {
-        results.add(BulkRowResult(fila: fila, ok: false, detalle: 'El área/departamento "$areaTexto" no existe'));
-        continue;
-      }
-
-      final rol = _findRol(rolTexto);
-      if (rol == null) {
-        results.add(BulkRowResult(fila: fila, ok: false, detalle: 'El rol "$rolTexto" no existe'));
-        continue;
-      }
-
-      pendientes.add(_PendingInvite(
-        fila: fila,
-        correo: correo.trim().toLowerCase(),
-        item: InviteItem(nombreCompleto: nombreCompleto, mail: correo, idDepartamento: depto.idDepartamento, idRol: rol.idRol),
-      ));
-    }
-
-    if (pendientes.isEmpty) return results;
-
-    try {
-      final resp = await RoleService(session.api).invite(
-        invitados: pendientes.map((p) => p.item).toList(),
-        idProject: session.projectId ?? '',
-        idClient: session.user?.idClient ?? '',
-      );
-
-      final creados = (resp['usuarios_creados'] as List? ?? []).map((e) => (e as Map)['mail'].toString().toLowerCase()).toSet();
-      final errores = <String, String>{
-        for (final e in (resp['errores'] as List? ?? []))
-          (e as Map)['mail'].toString().toLowerCase(): e['error'].toString(),
-      };
-
-      for (final p in pendientes) {
-        if (creados.contains(p.correo)) {
-          results.add(BulkRowResult(fila: p.fila, ok: true, detalle: 'Invitado correctamente'));
-        } else {
-          results.add(BulkRowResult(fila: p.fila, ok: false, detalle: errores[p.correo] ?? 'No se pudo invitar'));
-        }
-      }
-    } on ApiException catch (e) {
-      for (final p in pendientes) {
-        results.add(BulkRowResult(fila: p.fila, ok: false, detalle: e.message));
-      }
-    }
-
-    return results;
+    return bulkInvitePeople(
+      api: session.api,
+      idProject: session.projectId ?? '',
+      idClient: session.user?.idClient ?? '',
+      departamentos: _departamentos,
+      roles: _roles,
+      rows: rows,
+    );
   }
-
-  String? _pick(Map<String, String> row, List<String> posiblesLlaves) {
-    for (final key in posiblesLlaves) {
-      final value = row[key];
-      if (value != null && value.trim().isNotEmpty) return value.trim();
-    }
-    return null;
-  }
-
-  Department? _findDepartamento(String texto) {
-    for (final d in _departamentos) {
-      if (d.nombre.toLowerCase() == texto.toLowerCase() || d.idDepartamento == texto) return d;
-    }
-    return null;
-  }
-
-  RoleModel? _findRol(String texto) {
-    for (final r in _roles) {
-      if (r.nombre.toLowerCase() == texto.toLowerCase() || r.idRol.toString() == texto) return r;
-    }
-    return null;
-  }
-}
-
-class _PendingInvite {
-  final int fila;
-  final String correo;
-  final InviteItem item;
-  _PendingInvite({required this.fila, required this.correo, required this.item});
 }
 
 class _CounterPill extends StatelessWidget {
@@ -585,218 +497,3 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _InviteDialog extends StatefulWidget {
-  final String projectId;
-  final String idClient;
-  final List<Department> departamentos;
-  final List<RoleModel> roles;
-
-  const _InviteDialog({
-    required this.projectId,
-    required this.idClient,
-    required this.departamentos,
-    required this.roles,
-  });
-
-  @override
-  State<_InviteDialog> createState() => _InviteDialogState();
-}
-
-class _InviteDialogState extends State<_InviteDialog> {
-  final _nombreCompleto = TextEditingController();
-  final _correo = TextEditingController();
-  String? _idDepartamento;
-  int? _idRol;
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _nombreCompleto.dispose();
-    _correo.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      // Antes usaba el inset default de Flutter (40h/24v), que en móvil
-      // angosto deja aún menos ancho disponible. Se alinea con el inset
-      // que ya usa `showCenteredFormSheet` en el resto de la app.
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        // Sin este scroll, el contenido (header + 2 filas de campos +
-        // botones) se desbordaba en pantallas de poca altura o con el
-        // teclado abierto en móvil, ya que un Dialog no da scroll
-        // automático a su contenido — ver auditoría de responsive.
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [AppColors.moradoTech, AppColors.azulProfundo]),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('NUEVA INVITACIÓN', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6)),
-                          SizedBox(height: 4),
-                          Text('Invitar al equipo', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    // En pantallas angostas (móvil) los pares de campos en
-                    // Row+Expanded quedaban demasiado comprimidos (hints
-                    // como "correo@dominio.com" no caben). Por debajo de
-                    // 420px de ancho disponible se apilan verticalmente.
-                    final wide = constraints.maxWidth > 420;
-                    final camposContacto = wide
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: AppTextField(label: 'Nombre completo', hint: 'Nombre y apellidos', controller: _nombreCompleto)),
-                              const SizedBox(width: 16),
-                              Expanded(child: AppTextField(label: 'Correo electrónico', hint: 'correo@dominio.com', controller: _correo, keyboardType: TextInputType.emailAddress)),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              AppTextField(label: 'Nombre completo', hint: 'Nombre y apellidos', controller: _nombreCompleto),
-                              const SizedBox(height: 16),
-                              AppTextField(label: 'Correo electrónico', hint: 'correo@dominio.com', controller: _correo, keyboardType: TextInputType.emailAddress),
-                            ],
-                          );
-                    final camposRol = wide
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: AppDropdown<String>(
-                                  label: 'Área / Departamento',
-                                  value: _idDepartamento,
-                                  hint: 'Selecciona área',
-                                  items: widget.departamentos.map((d) => d.idDepartamento).toList(),
-                                  labelBuilder: (id) => widget.departamentos.firstWhere((d) => d.idDepartamento == id).nombre,
-                                  onChanged: (v) => setState(() => _idDepartamento = v),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: AppDropdown<int>(
-                                  label: 'Rol',
-                                  value: _idRol,
-                                  hint: 'Selecciona rol',
-                                  items: widget.roles.map((r) => r.idRol).toList(),
-                                  labelBuilder: (id) => widget.roles.firstWhere((r) => r.idRol == id).nombre,
-                                  onChanged: (v) => setState(() => _idRol = v),
-                                ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              AppDropdown<String>(
-                                label: 'Área / Departamento',
-                                value: _idDepartamento,
-                                hint: 'Selecciona área',
-                                items: widget.departamentos.map((d) => d.idDepartamento).toList(),
-                                labelBuilder: (id) => widget.departamentos.firstWhere((d) => d.idDepartamento == id).nombre,
-                                onChanged: (v) => setState(() => _idDepartamento = v),
-                              ),
-                              const SizedBox(height: 16),
-                              AppDropdown<int>(
-                                label: 'Rol',
-                                value: _idRol,
-                                hint: 'Selecciona rol',
-                                items: widget.roles.map((r) => r.idRol).toList(),
-                                labelBuilder: (id) => widget.roles.firstWhere((r) => r.idRol == id).nombre,
-                                onChanged: (v) => setState(() => _idRol = v),
-                              ),
-                            ],
-                          );
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        camposContacto,
-                        const SizedBox(height: 16),
-                        camposRol,
-                        const SizedBox(height: 20),
-                        Wrap(
-                          alignment: WrapAlignment.end,
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [
-                            OutlinedButton(
-                              onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-                              child: const Text('Cancelar'),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: _loading ? null : _submit,
-                              icon: _loading
-                                  ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : const Icon(Icons.send_outlined, size: 16),
-                              label: const Text('Enviar invitación'),
-                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.moradoTech),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _submit() async {
-    final nombreCompleto = _nombreCompleto.text.trim();
-    final correo = _correo.text.trim();
-
-    if (nombreCompleto.isEmpty || correo.isEmpty || _idDepartamento == null || _idRol == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Completa nombre, correo, área y rol')));
-      return;
-    }
-
-    setState(() => _loading = true);
-    final session = context.read<AuthSession>();
-
-    try {
-      await RoleService(session.api).invite(
-        invitados: [InviteItem(nombreCompleto: nombreCompleto, mail: correo, idDepartamento: _idDepartamento!, idRol: _idRol!)],
-        idProject: widget.projectId,
-        idClient: widget.idClient,
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } on ApiException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-}

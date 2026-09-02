@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/bulk_import.dart';
+import '../../core/responsive.dart';
 import '../../core/session.dart';
 import '../../models/scene.dart';
 import '../../services/scene_service.dart';
@@ -77,7 +78,10 @@ class _ScenesScreenState extends State<ScenesScreen> {
   void _selectScene(Scene scene) {
     setState(() {
       _selectedScene = scene;
-      _pdfBytes = scene.idGuion != null
+      // En móvil la vista dividida no está disponible (ver build()), así
+      // que no tiene sentido descargar el PDF del guion completo solo
+      // para nunca mostrarlo.
+      _pdfBytes = (scene.idGuion != null && !isMobileScreen(context))
           ? ScriptService(context.read<AuthSession>().api).archivoBytes(scene.idGuion!)
           : null;
     });
@@ -134,12 +138,17 @@ class _ScenesScreenState extends State<ScenesScreen> {
   Widget build(BuildContext context) {
     final session = context.watch<AuthSession>();
     final canEdit = session.can('create_scenes');
+    // La vista dividida (guion en PDF al lado de la lista) no se ofrece
+    // en móvil: además de quedar inutilizable en una pantalla angosta,
+    // carga el visor de PDF (pdfrx/PDFium) sin necesidad.
+    final mobile = isMobileScreen(context);
+    final mostrarVistaDividida = _vistaDividida && !mobile;
 
     return AppScaffold(
       title: 'Escenas',
       showBack: true,
       actions: [
-        if (_selectedScene != null)
+        if (_selectedScene != null && !mobile)
           IconButton(
             icon: Icon(_vistaDividida ? Icons.vertical_split : Icons.vertical_split_outlined),
             tooltip: _vistaDividida ? 'Cerrar vista dividida' : 'Vista dividida con el guion',
@@ -180,7 +189,7 @@ class _ScenesScreenState extends State<ScenesScreen> {
 
           return Padding(
             padding: const EdgeInsets.all(20),
-            child: _vistaDividida && _selectedScene != null
+            child: mostrarVistaDividida && _selectedScene != null
                 ? LayoutBuilder(
                     builder: (context, constraints) {
                       // En pantallas angostas (móvil/tablet chico) los dos

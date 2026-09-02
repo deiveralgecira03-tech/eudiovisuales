@@ -40,6 +40,12 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
     final session = context.watch<AuthSession>();
 
     return AppScaffold(
+      // El Dashboard ES la pantalla del proyecto, así que su título
+      // sigue siendo el nombre del proyecto (a diferencia del resto de
+      // pantallas, que pasan su propio nombre — "Guiones", "Escenas",
+      // etc. — y a ESE se le antepone el proyecto). Ver _titleWithProject
+      // en app_scaffold.dart: detecta que title == projectName acá y no
+      // lo duplica ("Nubes - Nubes"), lo deja tal cual.
       title: session.projectName ?? 'Proyecto',
       // Ya estamos en el Dashboard: no tiene sentido mostrar el ícono de
       // casa que lleva ahí mismo.

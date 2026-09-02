@@ -16,6 +16,16 @@ from app.utils.response import api_response
 from app.utils.mail import send_2fa_email
 
 # ==========================================
+# 2FA - INTERRUPTOR GLOBAL (TEMPORAL)
+# ==========================================
+# Suspendido a pedido explícito (2026-08-27): mientras esté en True,
+# check_2fa_required() siempre responde requires_2fa=False (tras validar
+# igual mail+contraseña), así que el frontend nunca navega a la pantalla
+# de código. No se tocó send_2fa_code/verify_2fa_code ni el modelo: para
+# reactivar, basta con volver esto a False.
+TWO_FACTOR_GLOBALLY_DISABLED = True
+
+# ==========================================
 # 2FA - DISPOSITIVOS VERIFICADOS / CODIGOS
 # ==========================================
 # Cuánto tiempo se confía en un dispositivo ya verificado antes de
@@ -186,6 +196,11 @@ def check_2fa_required(mail: str, device_id: str, contrasena: str, db: Session):
 
     if error:
         return error
+
+    if TWO_FACTOR_GLOBALLY_DISABLED:
+        return api_response(True, "2FA suspendido temporalmente", {
+            "requires_2fa": False
+        })
 
     if _device_is_verified(mail, device_id):
         return api_response(True, "Dispositivo confiable, no se requiere verificación", {

@@ -84,7 +84,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _apellido.text = user.apellido;
     _msisdn.text = user.msisdn ?? '';
     _direccion.text = user.direccion ?? '';
-    _idIdentificacion.text = user.idIdentificacion ?? '';
+    // Un usuario recién invitado queda en BD con id_identificacion =
+    // "TEMP-<correo>" (placeholder único requerido por la columna
+    // unique+not-null — ver register_controller.invite_users). Nunca se
+    // debe mostrar ese placeholder: el campo se ve vacío hasta que la
+    // persona ingresa su documento real, sin importar su rol.
+    final idIdentificacionReal = (user.idIdentificacion != null && !user.idIdentificacion!.startsWith('TEMP-'))
+        ? user.idIdentificacion!
+        : '';
+    _idIdentificacion.text = idIdentificacionReal;
     if (user.identificacion != null && kTiposDocumento.contains(user.identificacion)) {
       _tipoIdentificacion = user.identificacion!;
     }
@@ -134,7 +142,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // el rol global de la cuenta (users.id_rol/user.idRol) — ver
           // comentario junto al StatusPill más abajo.
           final effectiveRol = session.hasProject ? session.projectRole : user.idRol;
-          final canEditDepartamentoAqui = effectiveRol == 1001 || effectiveRol == 1002;
+          // Bloqueado solo para el Administrador (1001): un admin no
+          // pertenece a un departamento operativo propio. El resto de
+          // roles (Director, Jefe de Departamento, Onset, Usuario) sí
+          // puede editar su propio departamento desde Mi Perfil.
+          final canEditDepartamentoAqui = effectiveRol != 1001;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -426,7 +438,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Mismo criterio que en el build: rol EFECTIVO en el proyecto activo,
     // no el rol global de la cuenta.
     final effectiveRol = session.hasProject ? session.projectRole : session.user?.idRol;
-    final canEditDepartamento = effectiveRol == 1001 || effectiveRol == 1002;
+    final canEditDepartamento = effectiveRol != 1001;
 
     try {
       await UserService(session.api).updateOwnProfile({

@@ -329,7 +329,26 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
           if (snap.hasError) return ErrorView(message: 'No se pudo cargar el plan de rodaje.', onRetry: _reload);
 
           final data = snap.data!;
-          _lastData = data;
+          // El botón "Descargar" del AppBar (actions, arriba) lee
+          // _lastData para decidir si está habilitado — pero esa lista
+          // de actions se construye en el build() de MÁS ARRIBA, antes
+          // de llegar aquí, así que el IconButton ya quedó armado con
+          // onPressed=null (deshabilitado) la primera vez que este
+          // FutureBuilder entra en este builder. Mutar _lastData solo
+          // no repinta ese IconButton: FutureBuilder únicamente
+          // reconstruye SU PROPIO subárbol al resolver, no el build()
+          // completo del State. Por eso el ícono se veía deshabilitado
+          // "apenas ingreso" pese a que la tabla ya tenía datos. Se
+          // programa un setState() para el siguiente frame SOLO la
+          // primera vez que llega esta data (evita loop: en rebuilds
+          // posteriores la referencia ya es la misma), forzando un
+          // repintado completo que arma el botón ya habilitado.
+          if (!identical(_lastData, data)) {
+            _lastData = data;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) setState(() {});
+            });
+          }
           final days = [...data.days]..sort((a, b) {
               final da = a.diaRodaje ?? 999999;
               final db_ = b.diaRodaje ?? 999999;

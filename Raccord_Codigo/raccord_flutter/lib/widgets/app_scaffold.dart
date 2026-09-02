@@ -9,13 +9,16 @@ import 'app_logo.dart';
 /// Los 8 módulos del proyecto (mockups 7, 7.1). Se usan tanto en las
 /// tarjetas del dashboard como en el menú lateral de todas las pantallas
 /// "dentro" de un proyecto.
+// Orden pedido explícitamente por el usuario (2026-09-01): Guión,
+// Escenas, Desglose, Plan de Rodaje, Personajes, Cast List, Galería,
+// Crew List, Roles.
 const appSideMenuItems = [
   ('Guión', Icons.description_outlined, '/guiones'),
   ('Escenas', Icons.movie_filter_outlined, '/escenas'),
+  ('Desglose', Icons.checklist_outlined, '/desglose'),
+  ('Plan de Rodaje', Icons.event_note_outlined, '/plan-rodaje'),
   ('Personajes', Icons.people_outline, '/personajes'),
   ('Cast List', Icons.theater_comedy_outlined, '/actores'),
-  ('Plan de Rodaje', Icons.event_note_outlined, '/plan-rodaje'),
-  ('Desglose', Icons.checklist_outlined, '/desglose'),
   ('Galería', Icons.photo_library_outlined, '/galeria'),
   // Crew List va casi al final del menú porque es el listado de TODAS
   // las personas del proyecto (no solo elenco) — pedido explícito del
@@ -93,6 +96,25 @@ class AppSideMenu extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Antepone el nombre del proyecto activo al título de la pantalla
+/// ("Nubes - Guiones" en vez de solo "Guiones") — pedido explícito del
+/// usuario (2026-09-01), aplicado en TODAS las pantallas porque todas
+/// pasan por este mismo AppScaffold. Si todavía no hay proyecto activo
+/// (ej. la pantalla de "Escoger/Crear Proyecto") se deja el título tal
+/// cual, sin anteponer nada.
+///
+/// Excepción explícita (mismo pedido, 2026-09-01): el Dashboard pasa el
+/// nombre del proyecto COMO título (porque ahí no hay un nombre de
+/// pantalla distinto que mostrar) — si se antepusiera igual, saldría
+/// duplicado ("Nubes - Nubes"). Cuando `title` ya es exactamente el
+/// nombre del proyecto, se deja tal cual en vez de repetirlo.
+String _titleWithProject(AuthSession session, String title) {
+  final nombre = session.projectName;
+  if (!session.hasProject || nombre == null || nombre.isEmpty) return title;
+  if (title == nombre) return title;
+  return '$nombre - $title';
 }
 
 /// Scaffold estándar de las pantallas "dentro" de un proyecto: barra
@@ -202,7 +224,7 @@ class AppScaffold extends StatelessWidget {
               Container(width: 1, height: 18, color: AppColors.border),
               const SizedBox(width: 12),
               Flexible(
-                child: Text(title, style: TextStyle(fontSize: isNarrow ? 14 : 16, overflow: TextOverflow.ellipsis)),
+                child: Text(_titleWithProject(session, title), style: TextStyle(fontSize: isNarrow ? 14 : 16, overflow: TextOverflow.ellipsis)),
               ),
             ],
           ],

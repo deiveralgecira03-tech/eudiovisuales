@@ -9,6 +9,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
+import '../../core/responsive.dart';
 import '../../core/session.dart';
 import '../../models/character.dart';
 import '../../models/gallery_photo.dart';
@@ -73,7 +74,10 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
       _cast = SceneService(session.api).cast(idEscena);
       _photos = GalleryService(session.api).byScene(idEscena);
     }
-    if (widget.scene.idGuion != null) {
+    // En móvil la vista dividida no está disponible (ver build()), así
+    // que no tiene sentido descargar el PDF del guion completo solo para
+    // nunca mostrarlo.
+    if (widget.scene.idGuion != null && !isMobileScreen(context)) {
       final session = context.read<AuthSession>();
       _pdfBytes = ScriptService(session.api).archivoBytes(widget.scene.idGuion!);
     }
@@ -145,6 +149,14 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
     final session = context.watch<AuthSession>();
     final canEditInfo = session.can('create_scenes');
     final canUpload = session.can('upload_photos');
+    // Separado de canUpload a pedido explícito: Onset puede subir fotos
+    // de continuidad, pero no eliminarlas.
+    final canDeletePhotos = session.can('delete_photos');
+    // La vista dividida (guion en PDF al lado de la info) no se ofrece
+    // en móvil: además de quedar inutilizable en una pantalla angosta,
+    // carga el visor de PDF (pdfrx/PDFium) sin necesidad.
+    final mobile = isMobileScreen(context);
+    final mostrarVistaDividida = _vistaDividida && !mobile;
 
     return PopScope(
       canPop: false,
@@ -157,7 +169,7 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
         showBack: true,
         onBack: () => Navigator.of(context).pop(_changed),
         actions: [
-          if (widget.scene.idGuion != null)
+          if (widget.scene.idGuion != null && !mobile)
             IconButton(
               icon: Icon(_vistaDividida ? Icons.vertical_split : Icons.vertical_split_outlined),
               tooltip: _vistaDividida ? 'Cerrar vista dividida' : 'Vista dividida con el guion',
@@ -169,7 +181,7 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
           builder: (context, constraints) {
             final wide = constraints.maxWidth > 760;
             final infoPanel = _infoPanel(canEditInfo);
-            final continuityPanel = _continuityPanel(canUpload);
+            final continuityPanel = _continuityPanel(canUpload, canDeletePhotos);
 
             final Widget contenido = wide
                 ? Row(
@@ -188,7 +200,7 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
                     ],
                   );
 
-            if (_vistaDividida) {
+            if (mostrarVistaDividida) {
               if (wide) {
                 return Padding(
                   padding: const EdgeInsets.all(20),
@@ -396,7 +408,7 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
     );
   }
 
-  Widget _continuityPanel(bool canUpload) {
+  Widget _continuityPanel(bool canUpload, bool canDeletePhotos) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -435,7 +447,7 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
               ),
               itemBuilder: (context, i) => _PhotoThumb(
                 photo: photos[i],
-                canDelete: canUpload,
+                canDelete: canDeletePhotos,
                 onDeleted: _reloadPhotos,
               ),
             );
