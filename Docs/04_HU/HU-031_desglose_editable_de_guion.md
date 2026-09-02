@@ -7,7 +7,7 @@
 | ID | HU-031 |
 | Título | Desglose Editable de Guion |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociado | RF-031 |
 
 ---

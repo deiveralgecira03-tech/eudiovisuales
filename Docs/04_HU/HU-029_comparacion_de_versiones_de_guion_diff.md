@@ -1,6 +1,6 @@
 # HU-029 — Comparación de Versiones de Guion (Diff)
 
-## Identificación
+## Identificación *
 
 | Campo | Valor |
 |---|---|

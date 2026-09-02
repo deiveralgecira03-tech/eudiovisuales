@@ -7,7 +7,7 @@
 | ID | HU-025 |
 | Título | Directorio de Equipo (Crew List) |
 | Prioridad | Baja |
-| Estado | Pendiente |
+| Estado | Poceso  |
 | RF asociado | RF-025 |
 
 ---

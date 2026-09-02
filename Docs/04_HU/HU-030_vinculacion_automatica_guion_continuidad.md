@@ -1,6 +1,6 @@
 # HU-030 — Vinculación Automática Guion-Continuidad
 
-## Identificación
+## Identificación *
 
 | Campo | Valor |
 |---|---|

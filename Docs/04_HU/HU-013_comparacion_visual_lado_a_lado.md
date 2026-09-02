@@ -1,13 +1,13 @@
 # HU-013 — Comparación Visual Lado a Lado
 
-## Identificación
+## Identificación *
 
 | Campo | Valor |
 |---|---|
 | ID | HU-013 |
 | Título | Comparación Visual Lado a Lado |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Pendiente  |
 | RF asociado | RF-013 |
 
 ---

@@ -7,7 +7,7 @@
 | ID | HU-008 |
 | Título | Gestión de Perfil de Usuario |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociado | RF-008 |
 
 ---

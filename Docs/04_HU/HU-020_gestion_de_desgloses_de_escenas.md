@@ -7,7 +7,7 @@
 | ID | HU-020 |
 | Título | Gestión de Desgloses de Escenas |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociado | RF-020 |
 
 ---

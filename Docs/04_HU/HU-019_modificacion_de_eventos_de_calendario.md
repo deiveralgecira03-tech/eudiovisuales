@@ -7,7 +7,7 @@
 | ID | HU-019 |
 | Título | Modificación de Eventos de Calendario |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociado | RF-019 |
 
 ---

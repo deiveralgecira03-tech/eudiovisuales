@@ -7,7 +7,7 @@
 | ID | HU-005 |
 | Título | Sistema de Roles y Permisos Granulares (RBAC) |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociado | RF-005 |
 
 ---
