@@ -113,6 +113,29 @@ services:
     depends_on:
       - backend
 
+  # Landing page de marketing (HTML/CSS/JS plano, no Flutter ni
+  # React/Vite — ver decisión en README). Independiente del resto:
+  # nginx sirviendo estático, sin depender de que el backend esté listo
+  # para construirse/arrancar (solo lo necesita en runtime, cuando
+  # alguien envía el formulario de contacto).
+  landing:
+    build:
+      context: ./Landing_pages
+      args:
+        # En "localhost" el CORS del backend ya acepta cualquier puerto
+        # (ver allow_origin_regex en app/main.py), así que esto solo
+        # hace falta cambiarlo al desplegar en un dominio real:
+        #   docker compose build landing --build-arg API_BASE_URL=https://api.tu-dominio.com
+        API_BASE_URL: http://127.0.0.1:8000
+        # A dónde lleva el botón "Ingresar" del navbar (-> /login). En
+        # local apunta al puerto donde publica el servicio "frontend"
+        # de abajo (8081); en producción, la URL real de la app.
+        APP_URL: http://localhost:8081
+    container_name: raccord-landing
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+
 volumes:
   postgres_data:
     external: true

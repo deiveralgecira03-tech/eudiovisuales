@@ -5,7 +5,8 @@ Herramienta de gestión de producción audiovisual (continuidad, guiones, escena
 ```
 Raccord_Codigo/
 ├── raccord_backend/api_usuarios/   # API FastAPI + PostgreSQL
-├── raccord_flutter/                # Frontend Flutter (web + móvil)
+├── raccord_flutter/                # Frontend Flutter (web + móvil) — la app real, con login
+├── Landing_pages/                  # Landing page de marketing (HTML/CSS/JS plano, sin build)
 └── docker-compose.yml              # Levanta todo el stack con un solo comando
 ```
 
@@ -168,7 +169,7 @@ docker compose up -d --build
 
 La primera vez tarda varios minutos (descarga las imágenes base de Python, Flutter y nginx). Las siguientes veces es mucho más rápido.
 
-Cuando termine, revisa que los 4 servicios estén corriendo:
+Cuando termine, revisa que los 6 servicios estén corriendo:
 ```bash
 docker compose ps
 ```
@@ -177,7 +178,8 @@ Y accede desde el navegador:
 
 | Servicio | URL | Descripción |
 |---|---|---|
-| Frontend (Flutter Web) | http://localhost:8081 | La app |
+| Landing (marketing) | http://localhost:8082 | Página pública de presentación, con botón "Ingresar" al login y formulario de contacto |
+| Frontend (Flutter Web) | http://localhost:8081 | La app real (login, proyectos, guiones, escenas, etc.) |
 | Backend (API) | http://localhost:8000 | FastAPI |
 | Adminer | http://localhost:8080 | Administrar la base de datos desde el navegador |
 | PostgreSQL | localhost:5432 | Base de datos (se conecta con un cliente de BD, no desde el navegador) |
@@ -206,6 +208,46 @@ Los PDFs de guiones, las fotos de continuidad y las fotos de perfil **no** se gu
 
 En Postgres solo queda guardada la ruta del archivo (`archivo_key` / `foto_perfil_key`) y los metadatos (nombre, tipo, tamaño) — nunca el binario. Al pedir un archivo (`GET /scripts/{id}/archivo`, `GET /fotos/{id_foto}/archivo` o `GET /users/{id}/foto`), el backend valida el permiso como siempre y **sirve el archivo él mismo** (descarga el binario de MinIO y lo devuelve en la respuesta) en vez de redirigir a una URL de MinIO — así el navegador nunca pide el archivo directo al puerto de MinIO, lo que evita problemas de CORS entre dominios distintos.
 
+### 4.3 Landing page (marketing)
+
+La carpeta `Landing_pages/` es la página pública que presenta el producto (home, nosotros, servicios, contacto) — **deliberadamente NO** está hecha en Flutter ni en React/Vite:
+
+- Es contenido de marketing, casi todo estático. Lo único dinámico es el formulario de contacto.
+- Necesita cargar rápido y ser indexable por buscadores (SEO) — algo en lo que Flutter Web es especialmente malo (renderiza todo sobre un `<canvas>`, sin HTML real que Google pueda leer).
+- Sin build ni `node_modules`: es HTML + CSS + JavaScript vanilla, servido tal cual por un nginx propio (`Landing_pages/Dockerfile` + `nginx.conf`). Menos dependencias que mantener/parchear.
+
+La app real (login, proyectos, todo lo demás) sigue siendo Flutter Web, servida por el contenedor `frontend` — la landing solo enlaza hacia allá con el botón "Ingresar" (`/login`).
+
+**Archivos:**
+
+```
+Landing_pages/
+├── Main.html      # Contenido (se sirve como index.html)
+├── Styles.css      # Estilos (ojo: nombre con S mayúscula, importa en Linux)
+├── assets/         # Logos + imagen de fondo del hero, empaquetados localmente
+├── Dockerfile
+└── nginx.conf
+```
+
+**Formulario de contacto:** el `<form>` de la sección Contacto hace un `fetch` real a `POST /contact` del backend (`raccord_backend/app/routes/contact_routes.py`), que envía un correo a `CONTACT_EMAIL` (ver sección 3, ya está en el `.env`) usando `send_contact_email` en `app/utils/mail.py`. Incluye un campo honeypot oculto (protección anti-spam silenciosa) y validación de formato de correo en el schema (`ContactSchema`).
+
+**Dos valores se inyectan al construir la imagen** (no hay bundler que lea variables de entorno en tiempo de ejecución, así que un `sed` en el `Dockerfile` reemplaza estos tokens en el HTML):
+
+| Build arg | Para qué | Valor por defecto (local) |
+|---|---|---|
+| `API_BASE_URL` | A dónde apunta el `fetch` del formulario de contacto | `http://127.0.0.1:8000` |
+| `APP_URL` | A dónde lleva el botón "Ingresar" (`/login`) | `http://localhost:8081` |
+
+Al desplegar en dominios reales, reconstruye pasando los valores correctos:
+```bash
+docker compose build landing \
+  --build-arg API_BASE_URL=https://api.tu-dominio.com \
+  --build-arg APP_URL=https://app.tu-dominio.com
+```
+(o edítalos directamente en `docker-compose.yml`, dentro de `services.landing.build.args`).
+
+> En `localhost`, el CORS del backend ya acepta cualquier puerto (`allow_origin_regex` en `app/main.py`), así que en desarrollo no hay que tocar nada de CORS. En producción, agrega el dominio real de la landing a `allow_origins` en ese mismo archivo.
+
 ---
 
 ## 5. Comandos del día a día (Docker)
@@ -214,7 +256,8 @@ En Postgres solo queda guardada la ruta del archivo (`archivo_key` / `foto_perfi
 |---|---|
 | Levantar todo | `docker compose up -d` |
 | Levantar reconstruyendo (tras cambios de código) | `docker compose up -d --build` |
-| Reconstruir solo un servicio | `docker compose up -d --build backend` (o `frontend`) |
+| Reconstruir solo un servicio | `docker compose up -d --build backend` (o `frontend`, `landing`) |
+| Reconstruir sin usar caché (por si algo quedó raro) | `docker compose build --no-cache <servicio>` |
 | Parar todo (sin borrar datos) | `docker compose down` |
 | Pausar sin eliminar contenedores | `docker compose stop` / `docker compose start` |
 | Ver logs en vivo | `docker compose logs -f` |
@@ -310,13 +353,17 @@ El resultado queda en `build/web/`.
 
 **Puerto ya en uso:** si algún puerto (8000, 8080, 8081, 5432) ya está ocupado por otro programa en la máquina, `docker compose up` fallará. Hay que cerrar ese programa o cambiar el mapeo de puertos en `docker-compose.yml` (por ejemplo `"8082:80"` en vez de `"8081:80"`).
 
-**Correo (2FA, recuperación de contraseña):** requiere que `MAIL_USER`/`MAIL_PASSWORD` en el `.env` sean válidos y que la máquina tenga salida a internet.
+**Correo (2FA, recuperación de contraseña, formulario de contacto de la landing):** requiere que `MAIL_USER`/`MAIL_PASSWORD`/`CONTACT_EMAIL` en el `.env` sean válidos y que la máquina tenga salida a internet.
 
 **Adminer:** para conectarte a la base desde http://localhost:8080, el campo "Servidor" debe ser `db` (el nombre del servicio en `docker-compose.yml`), no `localhost`.
 
 **`flutter doctor` marca errores de Android/iOS:** no es necesario resolverlos si solo vas a correr/compilar la versión web. Esos ítems solo son obligatorios para compilar `.apk` o la app de iOS.
 
 **Un PDF o foto no carga / da 404:** el backend sirve estos archivos él mismo (los descarga de MinIO y los devuelve en la respuesta, ver sección 4.2), así que el navegador nunca habla directo con MinIO para esto — revisa que el contenedor `raccord-minio` esté corriendo (`docker compose ps`) y que las variables `MINIO_ENDPOINT`/`MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` del backend sean correctas (`docker compose logs -f backend` suele mostrar el error real si no logra conectarse).
+
+**Falla `docker compose build` con un error de "no such host" / no resuelve `registry-1.docker.io`:** no es un problema del proyecto, es que la máquina no tenía internet en ese momento (Docker necesita bajar/verificar las imágenes base la primera vez). Recupera la conexión y reintenta el mismo comando. Una vez las imágenes están construidas, `docker compose up` con los contenedores ya armados **sí funciona sin internet** — excepto el mapa de Google Maps embebido en la sección de Contacto de la landing, que necesita conexión para cargar (si no hay internet, ese recuadro queda en blanco, pero no rompe nada más).
+
+**La landing se ve sin estilos o sin logos:** si editaste `Landing_pages/Main.html` o `Styles.css` a mano, revisa que las rutas respeten mayúsculas/minúsculas exactas (`Styles.css`, no `styles.css`) — en Windows no se nota porque el sistema de archivos no distingue mayúsculas, pero el nginx del contenedor corre en Linux y ahí sí importa. Los logos y la imagen de fondo del hero deben vivir dentro de `Landing_pages/assets/` para quedar empaquetados en la imagen; no uses URLs externas (a un repo de GitHub, por ejemplo) como `src` de una imagen — si ese recurso externo cambia de lugar o el repo es privado, la imagen se rompe sin que el proyecto tenga ningún error.
 
 ---
 
@@ -327,4 +374,6 @@ El resultado queda en `build/web/`.
 - **Aislamiento de datos por proyecto:** todo el contenido de producción (guiones, escenas, personajes, actores, desglose, plan de rodaje, galería, crew) queda asociado a un `id_project`, y cada endpoint valida que el usuario autenticado pertenezca a ese proyecto antes de responder — un usuario nunca puede ver ni modificar datos de un proyecto ajeno.
 - **Permisos por rol efectivo:** el rol que decide qué puede hacer un usuario es el que tiene **dentro de cada proyecto** (`user_projects.id_rol`), no un rol global fijo — la misma persona puede tener distinto rol en distintos proyectos.
 - **Archivos binarios:** PDFs de guiones y fotos (continuidad y perfil) se almacenan en MinIO (S3-compatible), no en la base de datos; el backend intermedia toda descarga para evitar exponer MinIO directamente al navegador.
-- **Correo:** SMTP directo contra Gmail (STARTTLS) para recuperación de contraseña, 2FA, invitaciones y bienvenida.
+- **Correo:** SMTP directo contra Gmail (STARTTLS) para recuperación de contraseña, 2FA, invitaciones, bienvenida y el formulario de contacto de la landing.
+- **Landing separada de la app:** `Landing_pages/` (marketing, público, sin login) y `raccord_flutter/` (la app, autenticada) son dos despliegues independientes que solo se tocan en dos puntos: el botón "Ingresar" de la landing enlaza a `/login` de la app, y el formulario de contacto de la landing llama a `POST /contact` del mismo backend que usa la app. Ningún dato de sesión ni de proyecto se comparte entre ambas.
+- **Endpoint de contacto sin autenticación:** `POST /contact` es el único endpoint público del backend (lo llama cualquier visitante de la landing, sin login). Por eso valida el formato del correo (`EmailStr`), limita la longitud de todos los campos, y descarta en silencio los envíos que llenan un campo honeypot oculto (spam automatizado) sin delatarle al bot que fue bloqueado.
