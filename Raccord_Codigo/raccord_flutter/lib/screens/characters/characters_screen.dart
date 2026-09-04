@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,7 +12,9 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/bulk_upload_button.dart';
+import '../../widgets/pagination_bar.dart';
 import '../../widgets/state_views.dart';
+import 'actor_form_screen.dart';
 
 /// Mockup 14: Crear Personaje. Actor (ficha técnica completa) se
 /// gestiona aparte por lo extenso del formulario (ActorSchema).
@@ -22,7 +26,13 @@ class CharactersScreen extends StatefulWidget {
 }
 
 class _CharactersScreenState extends State<CharactersScreen> {
-  late Future<List<CharacterModel>> _future;
+  late Future<_CharactersData> _future;
+  // Búsqueda por nombre del personaje + paginación — pedido explícito
+  // del usuario (2026-09-02), mismo patrón/widget que Escenas y Plan de
+  // Rodaje (ver PaginationBar).
+  String _query = '';
+  int _page = 0;
+  int _pageSize = 10;
 
   @override
   void initState() {
@@ -30,9 +40,30 @@ class _CharactersScreenState extends State<CharactersScreen> {
     _future = _load();
   }
 
-  Future<List<CharacterModel>> _load() {
+  // Trae personajes + actores del proyecto en paralelo (una sola vez, no
+  // por fila) y agrupa los actores por id_personaje — así cada fila
+  // puede mostrar la(s) foto(s) del actor asociado sin una llamada N+1
+  // por personaje. Pedido explícito del usuario (2026-09-03): ver la
+  // foto del actor (o una por actor, si hay varios relacionados) junto
+  // a cada personaje en la lista.
+  Future<_CharactersData> _load() async {
     final session = context.read<AuthSession>();
-    return CharacterService(session.api).all(session.projectId ?? '');
+    final idProject = session.projectId ?? '';
+    final results = await Future.wait([
+      CharacterService(session.api).all(idProject),
+      ActorService(session.api).all(idProject),
+    ]);
+    final personajes = results[0] as List<CharacterModel>;
+    final actores = results[1] as List<ActorModel>;
+
+    final porPersonaje = <String, List<ActorModel>>{};
+    for (final actor in actores) {
+      final id = actor.idPersonaje;
+      if (id != null && id.isNotEmpty) {
+        porPersonaje.putIfAbsent(id, () => []).add(actor);
+      }
+    }
+    return _CharactersData(personajes, porPersonaje);
   }
 
   void _reload() => setState(() => _future = _load());
@@ -59,22 +90,56 @@ class _CharactersScreenState extends State<CharactersScreen> {
               label: const Text('Crear Personaje'),
             )
           : null,
-      body: FutureBuilder<List<CharacterModel>>(
+      body: FutureBuilder<_CharactersData>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) return const LoadingView();
           if (snap.hasError) return ErrorView(message: 'No se pudieron cargar los personajes.', onRetry: _reload);
-          final characters = snap.data ?? [];
-          if (characters.isEmpty) {
+          final all = snap.data?.personajes ?? [];
+          final actoresPorPersonaje = snap.data?.actoresPorPersonaje ?? const {};
+          if (all.isEmpty) {
             return const EmptyView(message: 'Todavía no hay personajes creados.', icon: Icons.theater_comedy_outlined);
           }
-          return ListView.separated(
+
+          final filtered = _query.isEmpty
+              ? all
+              : all.where((c) => c.nombre.toLowerCase().contains(_query.toLowerCase())).toList();
+          final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
+          final page = _page.clamp(0, totalPages - 1);
+          final start = page * _pageSize;
+          final pageItems = filtered.skip(start).take(_pageSize).toList();
+
+          return Padding(
             padding: const EdgeInsets.all(20),
-            itemCount: characters.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) {
-              final c = characters[i];
-              return Material(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Buscar por nombre del personaje...',
+                  ),
+                  onChanged: (v) => setState(() {
+                    _query = v;
+                    _page = 0;
+                  }),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? EmptyView(
+                          message: all.isEmpty ? 'Todavía no hay personajes creados.' : 'Sin resultados.',
+                          icon: all.isEmpty ? Icons.theater_comedy_outlined : Icons.search_off,
+                        )
+                      : ListView.separated(
+                          itemCount: pageItems.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 12),
+                          itemBuilder: (context, i) {
+                            final c = pageItems[i];
+                            final actoresDelPersonaje = c.idPersonaje != null
+                                ? (actoresPorPersonaje[c.idPersonaje] ?? const <ActorModel>[])
+                                : const <ActorModel>[];
+                            return Material(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
@@ -99,6 +164,16 @@ class _CharactersScreenState extends State<CharactersScreen> {
                             ],
                           ),
                         ),
+                        // Foto(s) del/los actor(es) relacionados con este
+                        // personaje — 1 avatar por actor si hay varios
+                        // (doble, suplente, etapas de edad...), a la
+                        // derecha de la fila y con click a la ficha
+                        // técnica del actor. Pedido explícito del usuario
+                        // (2026-09-03/04).
+                        if (actoresDelPersonaje.isNotEmpty) ...[
+                          _ActorAvatarStack(actores: actoresDelPersonaje),
+                          const SizedBox(width: 8),
+                        ],
                         if (c.idPersonaje != null)
                           IconButton(
                             icon: const Icon(Icons.person_add_alt_outlined),
@@ -117,6 +192,25 @@ class _CharactersScreenState extends State<CharactersScreen> {
                 ),
               );
             },
+          ),
+                ),
+                if (filtered.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  PaginationBar(
+                    page: page,
+                    totalPages: totalPages,
+                    totalItems: filtered.length,
+                    pageSize: _pageSize,
+                    itemLabel: 'personaje(s)',
+                    onPageChanged: (p) => setState(() => _page = p),
+                    onPageSizeChanged: (size) => setState(() {
+                      _pageSize = size;
+                      _page = 0;
+                    }),
+                  ),
+                ],
+              ],
+            ),
           );
         },
       ),
@@ -284,4 +378,133 @@ class _CharacterFormSheetState extends State<_CharacterFormSheet> {
       if (mounted) setState(() => _loading = false);
     }
   }
+}
+
+// ==========================================
+// FOTOS DE ACTOR EN LA LISTA DE PERSONAJES
+// ==========================================
+// Agrupa personajes + actores cargados en _load() — ver comentario ahí.
+class _CharactersData {
+  final List<CharacterModel> personajes;
+  final Map<String, List<ActorModel>> actoresPorPersonaje;
+  _CharactersData(this.personajes, this.actoresPorPersonaje);
+}
+
+/// Fotos pequeñas (una por actor) apiladas con ligero solape, tipo
+/// "avatar stack" — pedido explícito del usuario (2026-09-03): si un
+/// personaje tiene varios actores relacionados (doble, suplente, etapas
+/// de edad distintas...), mostrar 1 foto de cada uno, no solo la
+/// primera. Si son más de 3, el resto se resume en un "+N".
+class _ActorAvatarStack extends StatelessWidget {
+  final List<ActorModel> actores;
+  const _ActorAvatarStack({required this.actores});
+
+  // Un poco más grande — pedido explícito del usuario (2026-09-04).
+  static const double _size = 44;
+  static const double _overlap = 20;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibles = actores.take(3).toList();
+    final restantes = actores.length - visibles.length;
+    final slots = visibles.length + (restantes > 0 ? 1 : 0);
+    final width = _size + (slots - 1) * _overlap;
+
+    return SizedBox(
+      width: width,
+      height: _size,
+      child: Stack(
+        children: [
+          for (var i = 0; i < visibles.length; i++)
+            Positioned(
+              left: i * _overlap,
+              child: _SingleActorAvatar(actor: visibles[i], size: _size),
+            ),
+          if (restantes > 0)
+            Positioned(
+              left: visibles.length * _overlap,
+              child: Container(
+                width: _size,
+                height: _size,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.surfaceVariant,
+                  border: Border.all(color: AppColors.surface, width: 2),
+                ),
+                child: Text('+$restantes', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Una foto de actor: prueba primero la foto "en personaje"
+/// (caracterizado) y si el actor no tiene esa, cae a la foto "normal" —
+/// mismo criterio que el resto de la ficha; si tampoco tiene ninguna de
+/// las dos, un ícono de persona en vez de dejarlo en blanco.
+class _SingleActorAvatar extends StatelessWidget {
+  final ActorModel actor;
+  final double size;
+  const _SingleActorAvatar({required this.actor, required this.size});
+
+  Future<List<int>?> _loadBytes(ActorService service, String idActor) async {
+    try {
+      return await service.fotoPersonajeBytes(idActor);
+    } catch (_) {
+      try {
+        return await service.fotoNormalBytes(idActor);
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final idActor = actor.idActor;
+    final session = context.read<AuthSession>();
+
+    return Tooltip(
+      message: '${actor.nombre} ${actor.apellido}'.trim(),
+      child: InkWell(
+        // Click en la foto -> ficha técnica de ESE actor (no la de
+        // edición del personaje, que ya maneja la fila completa) —
+        // pedido explícito del usuario (2026-09-04).
+        customBorder: const CircleBorder(),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ActorFormScreen(existing: actor)),
+        ),
+        child: Container(
+          width: size,
+          height: size,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.surfaceVariant,
+            border: Border.all(color: AppColors.surface, width: 2),
+          ),
+          child: idActor == null
+              ? _placeholder()
+              : FutureBuilder<List<int>?>(
+                  future: _loadBytes(ActorService(session.api), idActor),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: SizedBox(height: 10, width: 10, child: CircularProgressIndicator(strokeWidth: 1.5)),
+                      );
+                    }
+                    final bytes = snap.data;
+                    if (bytes == null) return _placeholder();
+                    return Image.memory(Uint8List.fromList(bytes), fit: BoxFit.cover, width: size, height: size);
+                  },
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() => Center(child: Icon(Icons.person, size: size * 0.55, color: AppColors.grisMedio));
 }

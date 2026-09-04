@@ -99,7 +99,21 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                     );
                   }),
                   const SizedBox(height: 24),
-                  const _ProjectCharts(),
+                  // key con projectId (no const): al refrescar el
+                  // navegador estando YA en /dashboard, esta pantalla se
+                  // construye antes de que AuthSession.bootstrap() termine
+                  // de leer SharedPreferences (session.projectId todavía
+                  // null), así que _ProjectCharts._load() no encuentra
+                  // proyecto y se queda con el spinner pegado para
+                  // siempre. Este widget SÍ escucha a AuthSession
+                  // (context.watch arriba) y se reconstruye en cuanto
+                  // bootstrap() resuelve, pero al ser un StatefulWidget
+                  // con la MISMA key de antes, Flutter reutiliza el State
+                  // existente y jamás vuelve a llamar initState()/_load().
+                  // Cambiar la key según projectId fuerza a Flutter a
+                  // descartar ese State viejo y crear uno nuevo (con
+                  // initState nuevo) apenas hay proyecto disponible.
+                  _ProjectCharts(key: ValueKey(session.projectId)),
                 ],
               ),
             ),
@@ -124,7 +138,7 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
 /// planos y saturados que ya usa el resto de la app, también pedido
 /// explícito del usuario.
 class _ProjectCharts extends StatefulWidget {
-  const _ProjectCharts();
+  const _ProjectCharts({super.key});
 
   @override
   State<_ProjectCharts> createState() => _ProjectChartsState();
@@ -145,7 +159,14 @@ class _ProjectChartsState extends State<_ProjectCharts> {
   Future<void> _load() async {
     final session = context.read<AuthSession>();
     final projectId = session.projectId;
-    if (projectId == null) return;
+    if (projectId == null) {
+      // No se queda pegado en el spinner si por algún motivo todavía no
+      // hay proyecto activo (ver comentario en project_dashboard_screen
+      // sobre la key: normalmente este caso se resuelve solo apenas
+      // AuthSession.bootstrap() termina y este widget se recrea).
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
 
     try {
       final scripts = await ScriptService(session.api).byProject(projectId);

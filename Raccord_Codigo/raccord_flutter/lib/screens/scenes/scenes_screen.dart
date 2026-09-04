@@ -9,6 +9,7 @@ import '../../core/bulk_import.dart';
 import '../../core/responsive.dart';
 import '../../core/session.dart';
 import '../../models/scene.dart';
+import '../../models/script.dart';
 import '../../services/scene_service.dart';
 import '../../services/script_service.dart';
 import '../../theme/app_theme.dart';
@@ -718,7 +719,6 @@ class _SceneFormSheet extends StatefulWidget {
 
 class _SceneFormSheetState extends State<_SceneFormSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _numero = TextEditingController();
   final _encabezado = TextEditingController();
   final _descripcion = TextEditingController();
   final _ciudad = TextEditingController();
@@ -726,6 +726,25 @@ class _SceneFormSheetState extends State<_SceneFormSheet> {
   String? _momentoDia;
   String _estado = kEstadosEscena.first;
   bool _loading = false;
+
+  // Guion de origen de la escena — obligatorio para crearla (ver
+  // id_guion en el backend), pedido explícito del usuario (2026-09-02):
+  // antes no había forma de elegirlo desde este formulario y el
+  // backend rechazaba la creación con "id_guion es obligatorio". Solo
+  // se ofrecen guiones "Aprobado" o "En Rodaje" — los demás estados
+  // (Borrador, Revisión, Archivado) no están listos para desglosarse en
+  // escenas.
+  Future<List<Script>>? _guiones;
+  String? _idGuion;
+
+  @override
+  void initState() {
+    super.initState();
+    final session = context.read<AuthSession>();
+    _guiones = ScriptService(session.api).byProject(session.projectId ?? '').then(
+          (list) => list.where((s) => s.estado == 'Aprobado' || s.estado == 'En Rodaje').toList(),
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -739,16 +758,41 @@ class _SceneFormSheetState extends State<_SceneFormSheet> {
           children: [
             const Text('Nueva Escena', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: AppTextField(label: 'Escena (Número)', hint: 'Ej: 1, 2A, 3B', controller: _numero, validator: _req)),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: AppTextField(label: 'Encabezado', hint: 'Título de la escena', controller: _encabezado, validator: _req),
-                ),
-              ],
+            FutureBuilder<List<Script>>(
+              future: _guiones,
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  );
+                }
+                final guiones = snap.data ?? [];
+                if (guiones.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 4),
+                    child: Text(
+                      'No hay guiones en estado "Aprobado" o "En Rodaje" en este proyecto. '
+                      'Cambia el estado del guion desde el módulo Guión para poder crear escenas.',
+                      style: TextStyle(color: AppColors.grisMedio, fontSize: 12),
+                    ),
+                  );
+                }
+                return AppDropdown<String>(
+                  label: 'Guion',
+                  value: _idGuion,
+                  hint: 'Selecciona el guion de origen',
+                  items: guiones.map((g) => g.idGuion!).toList(),
+                  labelBuilder: (id) {
+                    final g = guiones.firstWhere((g) => g.idGuion == id);
+                    return '${g.nombre} · v${g.numeroDeVersion} · ${g.estado}';
+                  },
+                  onChanged: (v) => setState(() => _idGuion = v),
+                );
+              },
             ),
+            const SizedBox(height: 16),
+            AppTextField(label: 'Encabezado', hint: 'Título de la escena', controller: _encabezado, validator: _req),
             const SizedBox(height: 16),
             AppTextField(label: 'Descripción', hint: 'Descripción de la escena', controller: _descripcion, maxLines: 3),
             const SizedBox(height: 16),
@@ -811,14 +855,26 @@ class _SceneFormSheetState extends State<_SceneFormSheet> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_idGuion == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona el guion de origen de la escena')));
+      return;
+    }
+
     setState(() => _loading = true);
     final session = context.read<AuthSession>();
 
     try {
+      // El campo "Escena (Número)" ya no se pide en este formulario
+      // (pedido explícito del usuario) — se calcula solo, como el
+      // siguiente consecutivo dentro de ESTE guion (1, 2, 3...).
+      final existentes = await SceneService(session.api).byScript(_idGuion!);
+      final siguienteNumero = (existentes.length + 1).toString();
+
       await SceneService(session.api).create(Scene(
-        numeroDeEscena: _numero.text.trim(),
+        numeroDeEscena: siguienteNumero,
         encabezado: _encabezado.text.trim(),
         descripcion: _descripcion.text.trim(),
+        idGuion: _idGuion,
         modoVista: _modoVista,
         momentoDia: _momentoDia,
         ciudad: _ciudad.text.trim(),

@@ -31,4 +31,16 @@ class ThemeController extends ChangeNotifier {
     AppColors.isDark = nuevoModo == ThemeMode.dark;
     notifyListeners();
   }
+
+  // Al cerrar sesión, el login debe quedar siempre en oscuro (el modo
+  // por defecto de la app), sin importar qué modo tenía elegido el
+  // usuario mientras estaba dentro — pedido explícito del usuario
+  // (2026-09-04): si cerraba sesión en modo claro, el login se quedaba
+  // en claro en vez de volver al oscuro por defecto.
+  void resetToDark() {
+    if (_mode == ThemeMode.dark) return;
+    _mode = ThemeMode.dark;
+    AppColors.isDark = true;
+    notifyListeners();
+  }
 }

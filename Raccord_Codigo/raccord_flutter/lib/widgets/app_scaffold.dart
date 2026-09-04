@@ -301,6 +301,9 @@ class AppScaffold extends StatelessWidget {
                       }
                     } else if (value == 'salir') {
                       await session.logout();
+                      // El login siempre debe quedar en oscuro, sin
+                      // importar el modo que tenía elegido el usuario.
+                      if (context.mounted) context.read<ThemeController>().resetToDark();
                       if (context.mounted) {
                         Navigator.of(context).pushNamedAndRemoveUntil('/login', (r) => false);
                       }

@@ -266,9 +266,10 @@ class _GalleryPhotoThumb extends StatelessWidget {
   }
 
   void _openViewer(BuildContext context) {
-    final etiquetaEscena = (photo.numeroDeEscenaOrigen != null && photo.numeroDeEscenaOrigen!.isNotEmpty)
-        ? 'ESC ${photo.numeroDeEscenaOrigen} · ${photo.encabezadoEscenaOrigen ?? ''}'
-        : (photo.encabezadoEscenaOrigen ?? '');
+    // Solo el encabezado, sin el número de escena — pedido explícito
+    // del usuario (2026-09-04), mismo criterio ya aplicado en Escenas y
+    // Continuidad Visual (ver scenes_screen.dart / scene_edit_screen.dart).
+    final etiquetaEscena = photo.encabezadoEscenaOrigen ?? '';
 
     showDialog(
       context: context,

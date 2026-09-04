@@ -5,17 +5,19 @@ import '../core/json_utils.dart';
 /// gallery_photo_schema.py del backend.
 const kTiposFoto = ['Locación', 'Propuesta', 'Prueba', 'En Rodaje'];
 
-/// "Foto" sube cada archivo elegido como una foto de continuidad
-/// separada (comportamiento de siempre). "Collage N" pide exactamente N
-/// fotos y las combina en una sola imagen antes de subirla — para el
-/// backend sigue siendo una foto de continuidad más, no hay modelo ni
-/// endpoint nuevo (ver _buildCollage en scene_edit_screen.dart).
-const kModosSubidaFoto = ['Foto', 'Collage 2', 'Collage 3', 'Collage 4'];
+/// "Individual" sube cada archivo elegido como una foto de continuidad
+/// separada (comportamiento de siempre; antes decía "Foto" en el
+/// desplegable, renombrado a pedido explícito del usuario 2026-09-02).
+/// "Collage N" pide exactamente N fotos y las combina en una sola
+/// imagen antes de subirla — para el backend sigue siendo una foto de
+/// continuidad más, no hay modelo ni endpoint nuevo (ver _buildCollage
+/// en scene_edit_screen.dart).
+const kModosSubidaFoto = ['Individual', 'Collage 2', 'Collage 3', 'Collage 4'];
 
 /// Extrae la cantidad de fotos de un modo "Collage N" (null si el modo
-/// es "Foto", es decir subida normal sin combinar).
+/// es "Individual", es decir subida normal sin combinar).
 int? collageCountFor(String modoSubida) {
-  if (modoSubida == 'Foto') return null;
+  if (modoSubida == 'Individual') return null;
   return int.tryParse(modoSubida.replaceAll(RegExp(r'[^0-9]'), ''));
 }
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/permissions.dart';
 import '../../core/session.dart';
+import '../../core/theme_controller.dart';
 import '../../models/project.dart';
 import '../../services/project_service.dart';
 import '../../theme/app_theme.dart';
@@ -63,6 +64,9 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
               if (v == 'perfil') Navigator.of(context).pushNamed('/perfil');
               if (v == 'salir') {
                 await session.logout();
+                // El login siempre debe quedar en oscuro, sin importar
+                // el modo que tenía elegido el usuario.
+                if (context.mounted) context.read<ThemeController>().resetToDark();
                 if (context.mounted) Navigator.of(context).pushNamedAndRemoveUntil('/login', (r) => false);
               }
             },

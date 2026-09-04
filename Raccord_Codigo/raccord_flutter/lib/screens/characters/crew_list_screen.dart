@@ -13,6 +13,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/bulk_upload_button.dart';
 import '../../widgets/invite_person_dialog.dart';
+import '../../widgets/pagination_bar.dart';
 import '../../widgets/state_views.dart';
 
 /// Crew List: directorio de TODAS las personas que YA TIENEN CUENTA en
@@ -46,7 +47,14 @@ class _CrewListScreenState extends State<CrewListScreen> {
   late Future<List<AppUser>> _future;
   List<Department> _departamentos = [];
   List<RoleModel> _roles = [];
+  // Búsqueda por nombre de la persona + filtro por departamento (dos
+  // controles separados, no un único cuadro combinado) y paginación —
+  // pedido explícito del usuario (2026-09-02), mismo widget que Escenas
+  // y Personajes (ver PaginationBar).
   String _query = '';
+  String? _idDepartamentoFiltro;
+  int _page = 0;
+  int _pageSize = 10;
 
   @override
   void initState() {
@@ -119,24 +127,60 @@ class _CrewListScreenState extends State<CrewListScreen> {
           if (snap.hasError) return ErrorView(message: 'No se pudo cargar el crew list.', onRetry: _reload);
 
           final all = snap.data ?? [];
-          final filtered = _query.isEmpty
+          var filtered = _query.isEmpty
               ? all
-              : all.where((u) {
-                  final campos = '${u.nombre} ${u.apellido} ${_departamentoNombre(u.idDepartamento) ?? ''} ${u.msisdn ?? ''} ${u.mail}'.toLowerCase();
-                  return campos.contains(_query.toLowerCase());
-                }).toList();
+              : all.where((u) => '${u.nombre} ${u.apellido}'.toLowerCase().contains(_query.toLowerCase())).toList();
+          if (_idDepartamentoFiltro != null) {
+            filtered = filtered.where((u) => u.idDepartamento == _idDepartamentoFiltro).toList();
+          }
+          final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
+          final page = _page.clamp(0, totalPages - 1);
+          final start = page * _pageSize;
+          final pageItems = filtered.skip(start).take(_pageSize).toList();
 
           return Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Buscar por nombre, apellidos, departamento, celular o correo...',
-                  ),
-                  onChanged: (v) => setState(() => _query = v),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                      width: 320,
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search),
+                          hintText: 'Buscar por nombre de la persona...',
+                        ),
+                        onChanged: (v) => setState(() {
+                          _query = v;
+                          _page = 0;
+                        }),
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Departamento: ', style: TextStyle(color: AppColors.grisMedio)),
+                        DropdownButton<String?>(
+                          value: _idDepartamentoFiltro,
+                          underline: const SizedBox.shrink(),
+                          dropdownColor: AppColors.surfaceVariant,
+                          hint: const Text('Todos'),
+                          items: [
+                            const DropdownMenuItem<String?>(value: null, child: Text('Todos')),
+                            ..._departamentos.map((d) => DropdownMenuItem<String?>(value: d.idDepartamento, child: Text(d.nombre))),
+                          ],
+                          onChanged: (v) => setState(() {
+                            _idDepartamentoFiltro = v;
+                            _page = 0;
+                          }),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 Expanded(
@@ -164,11 +208,11 @@ class _CrewListScreenState extends State<CrewListScreen> {
                                         border: Border.all(color: AppColors.border),
                                       ),
                                       child: ListView.separated(
-                                        itemCount: filtered.length,
+                                        itemCount: pageItems.length,
                                         separatorBuilder: (_, __) => const Divider(height: 1),
                                         itemBuilder: (context, i) => _CrewUserRow(
-                                          user: filtered[i],
-                                          departamentoNombre: _departamentoNombre(filtered[i].idDepartamento),
+                                          user: pageItems[i],
+                                          departamentoNombre: _departamentoNombre(pageItems[i].idDepartamento),
                                         ),
                                       ),
                                     ),
@@ -177,16 +221,31 @@ class _CrewListScreenState extends State<CrewListScreen> {
                               );
                             }
                             return ListView.separated(
-                              itemCount: filtered.length,
+                              itemCount: pageItems.length,
                               separatorBuilder: (_, __) => const SizedBox(height: 10),
                               itemBuilder: (context, i) => _CrewUserCard(
-                                user: filtered[i],
-                                departamentoNombre: _departamentoNombre(filtered[i].idDepartamento),
+                                user: pageItems[i],
+                                departamentoNombre: _departamentoNombre(pageItems[i].idDepartamento),
                               ),
                             );
                           },
                         ),
                 ),
+                if (filtered.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  PaginationBar(
+                    page: page,
+                    totalPages: totalPages,
+                    totalItems: filtered.length,
+                    pageSize: _pageSize,
+                    itemLabel: 'persona(s)',
+                    onPageChanged: (p) => setState(() => _page = p),
+                    onPageSizeChanged: (size) => setState(() {
+                      _pageSize = size;
+                      _page = 0;
+                    }),
+                  ),
+                ],
               ],
             ),
           );

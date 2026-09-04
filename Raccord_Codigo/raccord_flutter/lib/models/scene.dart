@@ -80,6 +80,12 @@ class Scene {
   // grabación" — independiente del día de rodaje asignado. Visible y
   // editable tanto en Plan de Rodaje como filtrable en Escenas.
   final int? bloqueGrabacion;
+  // Comentarios libres de la escena, editables desde el panel
+  // "Información de la Escena" en Continuidad Visual — distinto de
+  // `descripcion` (sinopsis narrativa fijada al crear la escena) y de
+  // `notasRodaje` (específicas del día de rodaje). Pedido explícito del
+  // usuario (2026-09-02).
+  final String? comentarios;
 
   Scene({
     this.idEscena,
@@ -102,6 +108,7 @@ class Scene {
     this.notasRodaje,
     this.ordenRodaje,
     this.bloqueGrabacion,
+    this.comentarios,
   });
 
   String get modoYMomento {
@@ -134,6 +141,7 @@ class Scene {
       notasRodaje: asString(pick(json, ['notas_rodaje'])),
       ordenRodaje: asInt(pick(json, ['orden_rodaje'])),
       bloqueGrabacion: asInt(pick(json, ['bloque_grabacion'])),
+      comentarios: asString(pick(json, ['comentarios'])),
     );
   }
 
@@ -158,5 +166,6 @@ class Scene {
         if (notasRodaje != null && notasRodaje!.isNotEmpty) 'notas_rodaje': notasRodaje,
         if (ordenRodaje != null) 'orden_rodaje': ordenRodaje,
         if (bloqueGrabacion != null) 'bloque_grabacion': bloqueGrabacion,
+        if (comentarios != null && comentarios!.isNotEmpty) 'comentarios': comentarios,
       };
 }

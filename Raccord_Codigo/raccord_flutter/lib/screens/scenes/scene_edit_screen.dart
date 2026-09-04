@@ -44,6 +44,9 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
   late final _fecha = TextEditingController(
     text: widget.scene.fechaDeGrabacion != null ? widget.scene.fechaDeGrabacion!.toIso8601String().split('T').first : '',
   );
+  // Campo libre de comentarios de la escena — pedido explícito del
+  // usuario (2026-09-02), ver Scene.comentarios en models/scene.dart.
+  late final _comentarios = TextEditingController(text: widget.scene.comentarios ?? '');
   late String _estado = widget.scene.estado;
   bool _savingInfo = false;
   bool _changed = false;
@@ -134,6 +137,7 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
     _ciudad.dispose();
     _diaDramatico.dispose();
     _fecha.dispose();
+    _comentarios.dispose();
     super.dispose();
   }
 
@@ -391,6 +395,14 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
               );
             },
           ),
+          const SizedBox(height: 14),
+          AppTextField(
+            label: 'Comentarios',
+            hint: 'Notas u observaciones sobre esta escena',
+            controller: _comentarios,
+            enabled: canEdit,
+            maxLines: 3,
+          ),
           if (canEdit) ...[
             const SizedBox(height: 20),
             SizedBox(
@@ -485,6 +497,7 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
         'dia_dramatico': int.tryParse(_diaDramatico.text.trim()),
         'fecha_de_grabacion': _fecha.text.trim().isEmpty ? null : _fecha.text.trim(),
         'estado': _estado,
+        'comentarios': _comentarios.text.trim(),
       });
       _changed = true;
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Escena actualizada')));
@@ -598,7 +611,7 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
     );
   }
 
-  /// Punto de entrada del botón "Subir Foto(s)": en modo "Foto" primero
+  /// Punto de entrada del botón "Subir Foto(s)": en modo "Individual" primero
   /// pregunta el origen (cámara o galería/archivos) y delega a
   /// [_captureFromCamera] o [_pickFromFiles]; en modo "Collage N" va
   /// directo a [_pickAndUploadCollage] (solo galería/archivos, ver ahí
