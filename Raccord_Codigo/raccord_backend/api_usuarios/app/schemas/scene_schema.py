@@ -42,6 +42,9 @@ class SceneSchema(BaseModel):
     # usa para filtrar en Plan de Rodaje y en Escenas (ver
     # sql/013_bloque_grabacion.sql).
     bloque_grabacion: Optional[int] = None
+    # Comentarios libres de la escena, editables desde el panel
+    # "Información de la Escena" — ver scene_model.py.
+    comentarios: Optional[str] = None
 
 
 class SceneUpdateSchema(BaseModel):
@@ -68,3 +71,4 @@ class SceneUpdateSchema(BaseModel):
     # usa para filtrar en Plan de Rodaje y en Escenas (ver
     # sql/013_bloque_grabacion.sql).
     bloque_grabacion: Optional[int] = None
+    comentarios: Optional[str] = None

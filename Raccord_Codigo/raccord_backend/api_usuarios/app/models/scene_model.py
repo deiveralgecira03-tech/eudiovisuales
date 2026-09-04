@@ -122,3 +122,12 @@ class Scene(Base):
     bloque_grabacion = Column(  # agrupación manual (1, 2, 3...) para filtrar en Plan de Rodaje/Escenas — ver sql/013_bloque_grabacion.sql
         Integer
     )
+
+    # Campo libre de comentarios de la escena (distinto de "descripcion",
+    # que es la sinopsis narrativa fijada al crear la escena, y de
+    # "notas_rodaje", específicas del día de rodaje) — editable desde el
+    # panel "Información de la Escena" en Continuidad Visual. Pedido
+    # explícito del usuario (2026-09-02). Ver sql/016_scene_comentarios.sql.
+    comentarios = Column(
+        Text
+    )

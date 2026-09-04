@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 from app.config.database import get_db
 from app.controllers.actor_controller import (
@@ -8,7 +8,11 @@ from app.controllers.actor_controller import (
     create_actor,
     update_actor_full,
     update_actor,
-    delete_actor
+    delete_actor,
+    upload_actor_foto_personaje,
+    get_actor_foto_personaje,
+    upload_actor_foto_normal,
+    get_actor_foto_normal,
 )
 from app.schemas.actor_schema import ActorSchema, ActorUpdateSchema
 from app.models.actor_model import Actor
@@ -90,3 +94,51 @@ def destroy_actor(
     )),
 ):
     return delete_actor(id, db)
+
+
+# ==========================================
+# FOTOS DEL ACTOR (en personaje / normal)
+# ==========================================
+# Subir: mismo permiso que editar la ficha técnica (create_characters).
+# Ver: cualquier miembro del proyecto (None), igual que GET /actors/{id}.
+@router.post("/actors/{id}/foto-personaje")
+async def store_actor_foto_personaje(
+    id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_record_project_permission(
+        "create_characters", model=Actor, pk_column="id_actor", not_found_message="Actor no encontrado",
+    )),
+):
+    return await upload_actor_foto_personaje(id, file, db)
+
+@router.get("/actors/{id}/foto-personaje")
+def actor_foto_personaje(
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_record_project_permission(
+        None, model=Actor, pk_column="id_actor", not_found_message="Actor no encontrado",
+    )),
+):
+    return get_actor_foto_personaje(id, db)
+
+@router.post("/actors/{id}/foto-normal")
+async def store_actor_foto_normal(
+    id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_record_project_permission(
+        "create_characters", model=Actor, pk_column="id_actor", not_found_message="Actor no encontrado",
+    )),
+):
+    return await upload_actor_foto_normal(id, file, db)
+
+@router.get("/actors/{id}/foto-normal")
+def actor_foto_normal(
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_record_project_permission(
+        None, model=Actor, pk_column="id_actor", not_found_message="Actor no encontrado",
+    )),
+):
+    return get_actor_foto_normal(id, db)

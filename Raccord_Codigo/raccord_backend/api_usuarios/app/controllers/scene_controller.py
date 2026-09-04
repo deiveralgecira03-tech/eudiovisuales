@@ -32,7 +32,8 @@ def _serialize(s: Scene):
         "hora_inicio_rodaje": str(s.hora_inicio_rodaje) if s.hora_inicio_rodaje else None,
         "notas_rodaje": s.notas_rodaje,
         "orden_rodaje": s.orden_rodaje,
-        "bloque_grabacion": s.bloque_grabacion
+        "bloque_grabacion": s.bloque_grabacion,
+        "comentarios": s.comentarios
     }
 
 
@@ -120,7 +121,8 @@ def create_scene(scene: SceneSchema, db: Session):
         hora_inicio_rodaje=scene.hora_inicio_rodaje,
         notas_rodaje=scene.notas_rodaje,
         orden_rodaje=scene.orden_rodaje,
-        bloque_grabacion=scene.bloque_grabacion
+        bloque_grabacion=scene.bloque_grabacion,
+        comentarios=scene.comentarios
     )
 
     db.add(new_scene)
@@ -176,6 +178,7 @@ def update_scene_full(id: str, scene: SceneSchema, db: Session):
     scene_db.notas_rodaje = scene.notas_rodaje
     scene_db.orden_rodaje = scene.orden_rodaje
     scene_db.bloque_grabacion = scene.bloque_grabacion
+    scene_db.comentarios = scene.comentarios
 
     db.commit()
     db.refresh(scene_db)

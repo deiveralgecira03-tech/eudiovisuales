@@ -8,6 +8,11 @@ from datetime import date
 # escrito, Postgres lo rechaza porque no es un label válido del enum.
 Genero = Literal["masculino", "fenemino", "otro"]
 
+# Catálogos de seguimiento de casting (deben coincidir con
+# kStatusConfirmacionActor/kCategoriasCast en models/character.dart).
+StatusConfirmacion = Literal["Confirmado", "No confirmado"]
+CategoriaCast = Literal["Principal", "Secundario", "Personal de Apoyo"]
+
 
 # ==========================================
 # ACTORS
@@ -16,34 +21,43 @@ Genero = Literal["masculino", "fenemino", "otro"]
 # base de datos (act1, act2, ...). id_personaje es opcional: un actor
 # puede existir en el catálogo sin estar todavía asignado a un rol.
 class ActorSchema(BaseModel):
+    # Solo nombre/apellido son obligatorios de verdad — pedido explícito
+    # del usuario (2026-09-03): poder guardar el actor con lo mínimo y
+    # subir sus 2 fotos de inmediato (necesitan un id_actor real), y
+    # completar el resto de la ficha técnica después. Ver
+    # sql/020_actor_campos_opcionales.sql y actor_model.py.
     nombre: str
     apellido: str
-    genero: Genero
-    fecha_de_nacimiento: date
+    genero: Optional[Genero] = None
+    fecha_de_nacimiento: Optional[date] = None
 
-    talla_zapatos: str
-    ancho_espalda: str
-    pecho: str
-    cintura: str
-    cadera: str
-    largo_manga: str
-    largo_pierna: str
+    talla_zapatos: Optional[str] = None
+    ancho_espalda: Optional[str] = None
+    pecho: Optional[str] = None
+    cintura: Optional[str] = None
+    cadera: Optional[str] = None
+    largo_manga: Optional[str] = None
+    largo_pierna: Optional[str] = None
     talla_anillo: Optional[str] = None
     contorno_cabeza: Optional[str] = None
     contorno_cuello: Optional[str] = None
 
-    color_cabello: str
-    textura_cabello: str
-    tipo_piel: str
-    color_ojos: str
+    color_cabello: Optional[str] = None
+    textura_cabello: Optional[str] = None
+    tipo_piel: Optional[str] = None
+    color_ojos: Optional[str] = None
+    # Tono de piel: texto libre (no Literal) a propósito, igual que
+    # tipo_piel/color_ojos — así el catálogo del frontend puede crecer
+    # sin requerir migración de schema. Ver actor_model.py.
+    tono_piel: Optional[str] = None
 
     alergias: Optional[str] = None
     habilidades_especiales: Optional[str] = None
     restricciones: Optional[str] = None
     comentarios_adicionales: Optional[str] = None
 
-    nacionalidad: str
-    doble_riesgo: bool
+    nacionalidad: Optional[str] = None
+    doble_riesgo: Optional[bool] = None
 
     id_personaje: Optional[str] = None
     # Obligatorio (ver sql/015_project_scoping.sql y CharacterSchema):
@@ -51,6 +65,20 @@ class ActorSchema(BaseModel):
     # crea, tenga o no personaje asignado todavía. No se puede cambiar
     # después (no está en ActorUpdateSchema).
     id_project: str
+
+    # Contacto de producción + seguimiento de casting (ver actor_model.py
+    # y sql/018_actor_contacto_casting.sql) — todos opcionales, no
+    # forman parte de la ficha física del actor.
+    cedula: Optional[str] = None
+    direccion: Optional[str] = None
+    telefono: Optional[str] = None
+    correo: Optional[str] = None
+    status_confirmacion: Optional[StatusConfirmacion] = None
+    llamados: Optional[str] = None
+    fechas_tentativas: Optional[str] = None
+    guion_enviado: Optional[bool] = None
+    ensayos: Optional[str] = None
+    categoria_cast: Optional[CategoriaCast] = None
 
 
 class ActorUpdateSchema(BaseModel):
@@ -74,6 +102,7 @@ class ActorUpdateSchema(BaseModel):
     textura_cabello: Optional[str] = None
     tipo_piel: Optional[str] = None
     color_ojos: Optional[str] = None
+    tono_piel: Optional[str] = None
 
     alergias: Optional[str] = None
     habilidades_especiales: Optional[str] = None
@@ -84,3 +113,14 @@ class ActorUpdateSchema(BaseModel):
     doble_riesgo: Optional[bool] = None
 
     id_personaje: Optional[str] = None
+
+    cedula: Optional[str] = None
+    direccion: Optional[str] = None
+    telefono: Optional[str] = None
+    correo: Optional[str] = None
+    status_confirmacion: Optional[StatusConfirmacion] = None
+    llamados: Optional[str] = None
+    fechas_tentativas: Optional[str] = None
+    guion_enviado: Optional[bool] = None
+    ensayos: Optional[str] = None
+    categoria_cast: Optional[CategoriaCast] = None

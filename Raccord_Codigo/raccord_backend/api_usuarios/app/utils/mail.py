@@ -241,8 +241,8 @@ def send_contact_email(nombre: str, email: str, celular: str, empresa: str, tipo
                     <td style="padding: 10px; border: 1px solid #ddd;">{nombre}</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #f5f5f5;">Email</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">{celular}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #f5f5f5;">Celular / Teléfono</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">{celular if celular else 'No especificado'}</td>
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #f5f5f5;">Email</td>
