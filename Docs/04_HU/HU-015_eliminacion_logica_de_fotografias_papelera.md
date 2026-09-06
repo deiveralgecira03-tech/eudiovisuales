@@ -1,4 +1,4 @@
-# HU-016 — Eliminación Lógica de Fotografías (Papelera)
+# HU-015 — Eliminación Lógica de Fotografías (Papelera)
 
 ## Identificación
 
@@ -15,12 +15,12 @@
 ## Historia
 
 *Como* Script (continuista),
-*quiero* poder eliminar una fotografía sin perderla definitivamente de inmediato,
+*quiero* poder eliminar una fotografía sin perderla definitivamente,
 *para* poder recuperarla si me equivoco al borrarla.
 
 ## Criterios de Aceptación
 
-- Solo Script y Administrador Total pueden eliminar o restaurar fotografías.
-- Al eliminar, la fotografía se mueve a una papelera visible solo para Script y Administrador Total, sin borrarse del almacenamiento.
+- Solo director y jefe de departamento  pueden eliminar o restaurar fotografías.
+- Al eliminar, la fotografía se mueve a una papelera visible solo para director y jefe de departamento, sin borrarse del almacenamiento.
 - La fotografía puede restaurarse durante 30 días; pasado ese plazo se elimina de forma permanente y automática.
 - Toda eliminación y restauración queda registrada en el log de auditoría.

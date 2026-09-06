@@ -1,4 +1,4 @@
-# HU-032 — Reporte de Preparación para Rodaje
+# HU-028 — Reporte de Preparación para Rodaje
 
 ## Identificación
 

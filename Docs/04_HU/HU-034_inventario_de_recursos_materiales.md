@@ -1,4 +1,4 @@
-# HU-038 — Inventario de Recursos/Materiales
+# HU-034 — Inventario de Recursos/Materiales
 
 ## Identificación
 
