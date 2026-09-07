@@ -58,7 +58,6 @@ def register(data, db: Session):
             ultimo_acceso=datetime.now(),
             contrasena=hashed_password,
             id_departamento=None,
-            id_project=None,
             id_client=new_client.id_cliente,
             id_rol=1001
         )
@@ -172,7 +171,6 @@ def invite_users(invitados: list, id_project: str, id_client: str, db: Session):
                 ultimo_acceso=datetime.now(),
                 contrasena=hash_password(contrasena_temporal),
                 id_departamento=invitado.id_departamento,
-                id_project=id_project,
                 id_client=id_client,
                 id_rol=invitado.id_rol
             )

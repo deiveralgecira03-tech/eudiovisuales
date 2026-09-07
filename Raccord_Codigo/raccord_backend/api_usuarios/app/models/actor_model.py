@@ -72,10 +72,13 @@ class Actor(Base):
     nacionalidad = Column(String(50), nullable=True)
     doble_riesgo = Column(Boolean, nullable=True)
 
+    # index=True: GET /actors/character/{id_personaje} filtra por esta
+    # columna (ver sql/022_indices_faltantes.sql).
     id_personaje = Column(  # llave foránea -> personajes.id_personaje
         UUID(as_uuid=True),
         ForeignKey("personajes.id_personaje", ondelete="CASCADE"),
-        nullable=True
+        nullable=True,
+        index=True,
     )
 
     # Fotos del actor (bucket MinIO "imagenes", mismo patrón que

@@ -18,7 +18,6 @@ class UserSchema(BaseModel):
     estado: str
     contrasena: str
     id_departamento: str
-    id_project: str
     id_rol: int
 
 
@@ -34,22 +33,21 @@ class UserUpdateSchema(BaseModel):
     estado: Optional[str] = None
     contrasena: Optional[str] = None
     id_departamento: Optional[str] = None
-    id_project: Optional[str] = None
     id_rol: Optional[int] = None
 
 
 # ==========================================
 # AUTO-EDICIÓN DE PERFIL (PATCH /users/me)
 # ==========================================
-# A propósito NO incluye mail, id_rol, id_project ni estado ni
-# contrasena: cualquier usuario autenticado puede llamar este endpoint
-# sobre SU PROPIO registro (nunca el de otro), así que estos campos
-# quedan estructuralmente fuera de su alcance — ni con un request
-# manual (Thunder Client, curl, etc.) se pueden colar, porque Pydantic
-# simplemente no los conoce en este schema. Cambiar el correo, rol o
-# proyecto sigue siendo exclusivo de PATCH /users/{id} (requiere
-# permiso "full_management"). La contraseña se cambia aparte, con
-# verificación de la actual (ver ChangePasswordSchema).
+# A propósito NO incluye mail, id_rol ni estado ni contrasena:
+# cualquier usuario autenticado puede llamar este endpoint sobre SU
+# PROPIO registro (nunca el de otro), así que estos campos quedan
+# estructuralmente fuera de su alcance — ni con un request manual
+# (Thunder Client, curl, etc.) se pueden colar, porque Pydantic
+# simplemente no los conoce en este schema. Cambiar el correo o el rol
+# sigue siendo exclusivo de PATCH /users/{id} (requiere permiso
+# "full_management"). La contraseña se cambia aparte, con verificación
+# de la actual (ver ChangePasswordSchema).
 #
 # id_departamento SÍ se incluye, pero el controller (update_own_profile)
 # lo ignora si quien llama no es Administrador (1001) o Director

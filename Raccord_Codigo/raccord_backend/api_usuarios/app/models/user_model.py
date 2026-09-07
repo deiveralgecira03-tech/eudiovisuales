@@ -83,15 +83,19 @@ class User(Base):
     # Nullable a propósito: al registrarse (POST /register), el usuario
     # se crea sin departamento ni proyecto asignado todavía (ver
     # register_controller.register), igual que en el esquema original.
+    #
+    # ondelete="SET NULL" (antes CASCADE, ver sql/023_fk_ondelete_seguros.sql):
+    # borrar un departamento NO debe borrar a las personas de esa área
+    # — la app ya bloquea ese borrado si hay usuarios asignados
+    # (department_controller.delete_department), CASCADE era solo una
+    # trampa por si se borraba el departamento directo en SQL.
+    # index=True: Jefe de Departamento filtra/gestiona por su propia
+    # área en varios endpoints (ver sql/022_indices_faltantes.sql).
     id_departamento = Column(  # llave foránea -> departamentos.id_departamento
         UUID(as_uuid=True),
-        ForeignKey("departamentos.id_departamento", ondelete="CASCADE"),
-        nullable=True
-    )
-
-    id_project = Column(  # referencia a projects.id_project (sin FK declarada en la BD)
-        UUID(as_uuid=True),
-        nullable=True
+        ForeignKey("departamentos.id_departamento", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # A qué empresa/cliente pertenece este usuario — se setea al crearlo
@@ -99,10 +103,14 @@ class User(Base):
     # sql/011_users_id_client.sql para el porqué: antes se calculaba vía
     # user_projects -> projects.id_client, pero eso falla para un
     # usuario recién registrado que todavía no tiene ningún proyecto.
+    # index=True: el aislamiento multi-tenant por cliente se consulta en
+    # casi todos los endpoints de /users y /clients (ver
+    # sql/022_indices_faltantes.sql).
     id_client = Column(
         UUID(as_uuid=True),
         ForeignKey("clients.id_cliente", ondelete="CASCADE"),
-        nullable=True
+        nullable=True,
+        index=True,
     )
 
     id_rol = Column(

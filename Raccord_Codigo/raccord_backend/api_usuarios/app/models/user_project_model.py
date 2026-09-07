@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.config.database import Base
@@ -9,6 +9,15 @@ from app.config.database import Base
 # se convirtió a UUID.
 class UserProject(Base):
     __tablename__ = "user_projects"
+    # Esta tabla resuelve el ROL EFECTIVO de cada persona en cada
+    # proyecto (ver app/utils/project_scope.py::get_role_in_project) —
+    # se consulta en prácticamente TODA petición autenticada de la API.
+    # Sin este índice compuesto no tenía NINGÚN índice más allá de su PK
+    # "id", que no sirve para este filtro (ver
+    # sql/022_indices_faltantes.sql).
+    __table_args__ = (
+        Index("idx_user_projects_user_project", "id_user", "id_project"),
+    )
 
     id = Column(
         UUID(as_uuid=True),
@@ -25,7 +34,8 @@ class UserProject(Base):
     id_project = Column(
         UUID(as_uuid=True),
         ForeignKey("projects.id_project", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
+        index=True,
     )
 
     id_rol = Column(

@@ -38,10 +38,13 @@ class Scene(Base):
         Text
     )
 
+    # index=True: GET /scenes/script/{id_guion} filtra por esta columna
+    # (ver sql/022_indices_faltantes.sql).
     id_guion = Column(  # llave foránea -> guiones.id_guion
         UUID(as_uuid=True),
         ForeignKey("guiones.id_guion", ondelete="CASCADE"),
-        nullable=True
+        nullable=True,
+        index=True,
     )
 
     modo_vista = Column(
@@ -68,16 +71,22 @@ class Scene(Base):
         Integer
     )
 
+    # index=True: GET /scenes/rodaje/{id_rodaje} filtra por esta columna
+    # (ver sql/022_indices_faltantes.sql).
     id_rodaje = Column(  # llave foránea -> plan_rodaje.id_rodaje
         UUID(as_uuid=True),
         ForeignKey("plan_rodaje.id_rodaje", ondelete="CASCADE"),
-        nullable=True
+        nullable=True,
+        index=True,
     )
 
+    # index=True: GET /scenes/desglose/{id_desglose} filtra por esta
+    # columna (ver sql/022_indices_faltantes.sql).
     id_desglose = Column(  # llave foránea -> desgloses.id_desglose
         UUID(as_uuid=True),
         ForeignKey("desgloses.id_desglose", ondelete="CASCADE"),
-        nullable=True
+        nullable=True,
+        index=True,
     )
 
     # Estado de seguimiento de la escena (Pendiente / En proceso /

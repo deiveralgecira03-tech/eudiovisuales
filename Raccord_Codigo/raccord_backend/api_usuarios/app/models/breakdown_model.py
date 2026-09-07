@@ -36,10 +36,16 @@ class DesgloseItem(Base):
         nullable=False
     )
 
+    # ondelete="SET NULL" (antes sin especificar -> bloqueaba el borrado
+    # del departamento, ver sql/023_fk_ondelete_seguros.sql) e
+    # index=True (filtro real en /breakdown/pendientes, ver
+    # sql/022_indices_faltantes.sql) — mismo criterio que
+    # personal_produccion.id_departamento.
     id_departamento = Column(  # llave foránea -> departamentos.id_departamento
         UUID(as_uuid=True),
-        ForeignKey("departamentos.id_departamento"),
-        nullable=True
+        ForeignKey("departamentos.id_departamento", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     categoria = Column(
@@ -62,9 +68,13 @@ class DesgloseItem(Base):
         nullable=True
     )
 
+    # ondelete="SET NULL" (antes sin especificar -> bloqueaba con un 500
+    # el borrado de cualquier usuario que hubiera creado un item, ver
+    # sql/023_fk_ondelete_seguros.sql): es una columna de auditoría
+    # (quién lo creó), no de dueño del dato.
     id_user_creador = Column(  # llave foránea -> users.id_user
         UUID(as_uuid=True),
-        ForeignKey("users.id_user"),
+        ForeignKey("users.id_user", ondelete="SET NULL"),
         nullable=True
     )
 
@@ -133,9 +143,11 @@ class DesgloseItemDetalle(Base):
         nullable=True
     )
 
+    # ondelete="SET NULL" (mismo motivo que id_user_creador arriba, ver
+    # sql/023_fk_ondelete_seguros.sql).
     id_user_editor = Column(  # llave foránea -> users.id_user
         UUID(as_uuid=True),
-        ForeignKey("users.id_user"),
+        ForeignKey("users.id_user", ondelete="SET NULL"),
         nullable=True
     )
 

@@ -28,12 +28,16 @@ from app.utils.project_scope import (
     check_project_permission,
     resolve_project_of_scene,
 )
+from app.utils.module_access import check_module_view_access
 
 router = APIRouter()
 
 # Antes /scenes sin filtro devolvía las escenas de TODOS los proyectos.
 @router.get("/scenes/project/{id_project}")
 def scenes(id_project: str, db: Session = Depends(get_db), current_user: dict = Depends(require_project_member())):
+    # Guardia adicional: accesos personalizados por módulo (ver
+    # app/utils/module_access.py) — no reemplaza el chequeo de arriba.
+    check_module_view_access(db, current_user, id_project, "escenas", current_user.get("id_rol"))
     return get_scenes(id_project, db)
 
 @router.get("/scenes/script/{id_guion}")

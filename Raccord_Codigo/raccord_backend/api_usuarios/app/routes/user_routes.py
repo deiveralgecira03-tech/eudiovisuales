@@ -27,6 +27,7 @@ from app.controllers.user_controller import (
 # proyecto (user_projects) para "usuarios de un proyecto".
 from app.middleware.auth import get_current_user, require_permission
 from app.utils.project_scope import require_same_client_user, require_project_member, get_user_client
+from app.utils.module_access import check_module_view_access
 
 # ==========================================
 # ROUTER (CRUD de usuarios, todo protegido)
@@ -67,6 +68,10 @@ def users_by_project(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_project_member())
 ):
+    # Guardia adicional: accesos personalizados por módulo (ver
+    # app/utils/module_access.py) — no reemplaza el chequeo de arriba.
+    # Este listado es el que alimenta la pantalla "Roles del Equipo".
+    check_module_view_access(db, current_user, id_project, "roles", current_user.get("id_rol"))
     return get_users_by_project(id_project, db)
 
 

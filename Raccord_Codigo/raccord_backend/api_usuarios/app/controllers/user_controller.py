@@ -44,7 +44,6 @@ def get_users(id_client: str, db: Session):
             "fecha_de_creacion": str(u.fecha_de_creacion),
             "ultimo_acceso": str(u.ultimo_acceso),
             "id_departamento": u.id_departamento,
-            "id_project": u.id_project,
             "id_rol": u.id_rol
         }
         for u in users
@@ -75,7 +74,6 @@ def get_user(id: str, db: Session):
         "fecha_de_creacion": str(user.fecha_de_creacion),
         "ultimo_acceso": str(user.ultimo_acceso),
         "id_departamento": user.id_departamento,
-        "id_project": user.id_project,
         "id_rol": user.id_rol
     })
 
@@ -108,7 +106,6 @@ def create_user(user: UserSchema, db: Session):
         estado=user.estado,
         contrasena=hashed_password,
         id_departamento=user.id_departamento,
-        id_project=user.id_project,
         id_rol=user.id_rol
     )
 
@@ -144,7 +141,6 @@ def update_user_full(id: str, user: UserSchema, db: Session):
     user_db.estado = user.estado
     user_db.contrasena = hash_password(user.contrasena)
     user_db.id_departamento = user.id_departamento
-    user_db.id_project = user.id_project
     user_db.id_rol = user.id_rol
 
     db.commit()
@@ -275,7 +271,8 @@ def get_user_projects(id_user: str, db: Session):
 # Siempre opera sobre el propio usuario autenticado (id_user viene del
 # JWT, nunca de un parámetro de ruta) — así no hay forma de editar el
 # registro de otra persona. El schema (UserProfileUpdateSchema) ya
-# excluye mail/id_rol/id_departamento/id_project/estado/contrasena, ver
+# excluye mail/id_rol/estado/contrasena; id_departamento sí se recibe
+# pero el controller lo ignora salvo Administrador/Director — ver
 # comentario en app/schemas/user_schema.py.
 def update_own_profile(id_user: str, data, db: Session, id_rol: int = None):
     user_db = db.query(User).filter(User.id_user == id_user).first()

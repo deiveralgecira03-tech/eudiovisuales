@@ -56,10 +56,13 @@ class CrewMember(Base):
         nullable=False
     )
 
+    # index=True: Crew List se filtra por departamento (pedido explícito
+    # del usuario, ver sql/022_indices_faltantes.sql).
     id_departamento = Column(  # llave foránea -> departamentos.id_departamento (opcional)
         UUID(as_uuid=True),
         ForeignKey("departamentos.id_departamento", ondelete="SET NULL"),
-        nullable=True
+        nullable=True,
+        index=True,
     )
 
     celular = Column(

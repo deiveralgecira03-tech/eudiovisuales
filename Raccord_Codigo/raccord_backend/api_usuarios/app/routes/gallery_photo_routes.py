@@ -21,6 +21,7 @@ from app.utils.project_scope import (
     resolve_project_of_scene,
     resolve_project_via_scene_fk,
 )
+from app.utils.module_access import check_module_view_access
 
 router = APIRouter()
 
@@ -43,6 +44,9 @@ def photos_by_scene(
 # fotos de TODOS los proyectos.
 @router.get("/fotos/project/{id_project}")
 def all_photos(id_project: str, db: Session = Depends(get_db), current_user: dict = Depends(require_project_member())):
+    # Guardia adicional: accesos personalizados por módulo (ver
+    # app/utils/module_access.py) — no reemplaza el chequeo de arriba.
+    check_module_view_access(db, current_user, id_project, "galeria", current_user.get("id_rol"))
     return get_all_photos(id_project, db)
 
 

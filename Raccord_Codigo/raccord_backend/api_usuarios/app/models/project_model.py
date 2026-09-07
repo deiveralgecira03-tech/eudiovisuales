@@ -38,8 +38,12 @@ class Project(Base):
         String(255)
     )
 
+    # index=True: aislamiento multi-tenant, se filtra por cliente en
+    # cada listado de proyectos de una empresa (ver
+    # sql/022_indices_faltantes.sql).
     id_client = Column(  # llave foránea -> clients.id_cliente
         UUID(as_uuid=True),
         ForeignKey("clients.id_cliente", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
+        index=True,
     )

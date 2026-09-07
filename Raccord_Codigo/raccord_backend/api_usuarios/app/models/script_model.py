@@ -70,8 +70,11 @@ class Script(Base):
     archivo_tipo = Column(String(100), nullable=True)
     archivo_tamano = Column(Integer, nullable=True)
 
+    # index=True: listado principal de la pantalla Guión es por proyecto
+    # (ver sql/022_indices_faltantes.sql).
     id_project = Column(  # llave foránea -> projects.id_project
         UUID(as_uuid=True),
         ForeignKey("projects.id_project", ondelete="CASCADE"),
-        nullable=True
+        nullable=True,
+        index=True,
     )

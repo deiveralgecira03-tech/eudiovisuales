@@ -20,6 +20,7 @@ from app.utils.project_scope import (
     require_record_project_permission,
     check_project_permission,
 )
+from app.utils.module_access import check_module_view_access
 
 router = APIRouter()
 
@@ -27,6 +28,9 @@ router = APIRouter()
 # los proyectos.
 @router.get("/breakdown-sheets/project/{id_project}")
 def breakdown_sheets(id_project: str, db: Session = Depends(get_db), current_user: dict = Depends(require_project_member())):
+    # Guardia adicional: accesos personalizados por módulo (ver
+    # app/utils/module_access.py) — no reemplaza el chequeo de arriba.
+    check_module_view_access(db, current_user, id_project, "desglose", current_user.get("id_rol"))
     return get_breakdown_sheets(id_project, db)
 
 @router.get("/breakdown-sheets/{id}")
