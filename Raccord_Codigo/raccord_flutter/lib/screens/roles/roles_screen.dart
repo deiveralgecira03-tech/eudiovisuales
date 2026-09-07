@@ -14,6 +14,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/bulk_upload_button.dart';
 import '../../widgets/invite_person_dialog.dart';
+import '../../widgets/module_access_dialog.dart';
 import '../../widgets/state_views.dart';
 import '../../core/bulk_import.dart';
 
@@ -79,6 +80,24 @@ class _RolesScreenState extends State<RolesScreen> {
       return me.idDepartamento != null && me.idDepartamento == target.idDepartamento;
     }
     return true;
+  }
+
+  /// Solo Administrador/Director del proyecto ("full_management") puede
+  /// abrir el diálogo de personalizar accesos — mismo gate que exige el
+  /// backend en PUT/DELETE .../module-access (ver
+  /// app/routes/module_access_routes.py).
+  bool get _puedePersonalizarAccesos => context.read<AuthSession>().can('full_management');
+
+  Future<void> _openModuleAccessDialog(AppUser user) async {
+    final session = context.read<AuthSession>();
+    await showDialog<void>(
+      context: context,
+      builder: (_) => ModuleAccessDialog(
+        projectId: session.projectId ?? '',
+        idUser: user.idUser,
+        nombreCompleto: user.nombreCompleto,
+      ),
+    );
   }
 
   Future<void> _toggleEstado(AppUser user) async {
@@ -218,6 +237,8 @@ class _RolesScreenState extends State<RolesScreen> {
                                     departamentoNombre: _departamentoNombre(users[i].idDepartamento),
                                     canManageEstado: _puedeGestionarEstado(session, users[i]),
                                     onToggleEstado: () => _toggleEstado(users[i]),
+                                    canCustomizeAccess: _puedePersonalizarAccesos,
+                                    onCustomizeAccess: () => _openModuleAccessDialog(users[i]),
                                   ),
                                 ),
                               ),
@@ -233,6 +254,8 @@ class _RolesScreenState extends State<RolesScreen> {
                           departamentoNombre: _departamentoNombre(users[i].idDepartamento),
                           canManageEstado: _puedeGestionarEstado(session, users[i]),
                           onToggleEstado: () => _toggleEstado(users[i]),
+                          canCustomizeAccess: _puedePersonalizarAccesos,
+                          onCustomizeAccess: () => _openModuleAccessDialog(users[i]),
                         ),
                       );
                     },
@@ -335,11 +358,15 @@ class _UserRow extends StatelessWidget {
   final String? departamentoNombre;
   final bool canManageEstado;
   final VoidCallback? onToggleEstado;
+  final bool canCustomizeAccess;
+  final VoidCallback? onCustomizeAccess;
   const _UserRow({
     required this.user,
     required this.departamentoNombre,
     this.canManageEstado = false,
     this.onToggleEstado,
+    this.canCustomizeAccess = false,
+    this.onCustomizeAccess,
   });
 
   @override
@@ -383,6 +410,12 @@ class _UserRow extends StatelessWidget {
               color: suspendido ? AppColors.error : (pendiente ? AppColors.warning : AppColors.success),
             ),
           ),
+          if (canCustomizeAccess)
+            IconButton(
+              icon: const Icon(Icons.tune, size: 20, color: AppColors.grisMedio),
+              tooltip: 'Personalizar accesos',
+              onPressed: onCustomizeAccess,
+            ),
           if (canManageEstado)
             IconButton(
               icon: Icon(suspendido ? Icons.play_circle_outline : Icons.block_outlined, size: 20, color: suspendido ? AppColors.success : AppColors.error),
@@ -405,11 +438,15 @@ class _UserCard extends StatelessWidget {
   final String? departamentoNombre;
   final bool canManageEstado;
   final VoidCallback? onToggleEstado;
+  final bool canCustomizeAccess;
+  final VoidCallback? onCustomizeAccess;
   const _UserCard({
     required this.user,
     required this.departamentoNombre,
     this.canManageEstado = false,
     this.onToggleEstado,
+    this.canCustomizeAccess = false,
+    this.onCustomizeAccess,
   });
 
   @override
@@ -445,6 +482,12 @@ class _UserCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (canCustomizeAccess)
+                IconButton(
+                  icon: const Icon(Icons.tune, size: 20, color: AppColors.grisMedio),
+                  tooltip: 'Personalizar accesos',
+                  onPressed: onCustomizeAccess,
+                ),
               if (canManageEstado)
                 IconButton(
                   icon: Icon(suspendido ? Icons.play_circle_outline : Icons.block_outlined, size: 20, color: suspendido ? AppColors.success : AppColors.error),

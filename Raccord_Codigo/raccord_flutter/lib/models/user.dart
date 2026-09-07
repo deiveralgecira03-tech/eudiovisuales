@@ -66,7 +66,6 @@ class AppUser {
   final DateTime? fechaDeCreacion;
   final int? idRol;
   final String? idDepartamento;
-  final String? idProject;
 
   AppUser({
     required this.idUser,
@@ -82,7 +81,6 @@ class AppUser {
     this.fechaDeCreacion,
     this.idRol,
     this.idDepartamento,
-    this.idProject,
   });
 
   String get nombreCompleto => '$nombre $apellido'.trim();
@@ -104,7 +102,6 @@ class AppUser {
       fechaDeCreacion: fechaCreacion != null ? DateTime.tryParse(fechaCreacion) : null,
       idRol: asInt(pick(json, ['id_rol'])),
       idDepartamento: asString(pick(json, ['id_departamento'])),
-      idProject: asString(pick(json, ['id_project'])),
     );
   }
 }

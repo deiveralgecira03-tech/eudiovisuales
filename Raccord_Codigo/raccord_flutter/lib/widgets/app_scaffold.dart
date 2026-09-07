@@ -34,6 +34,22 @@ const appSideMenuItems = [
 // el backend ya la rechazaba con 403 para estos dos).
 const _kRestrictedMenuRoute = '/roles';
 
+// Ruta -> clave de módulo (ver app/utils/module_access.py / ModuloAccesos
+// en models/module_access.dart) — para que el menú también respete una
+// excepción puntual de "Personalizar accesos" (nivel "sin_acceso"),
+// además de la regla de rol de arriba.
+const Map<String, String> _kMenuRouteModulo = {
+  '/guiones': 'guion',
+  '/escenas': 'escenas',
+  '/desglose': 'desglose',
+  '/plan-rodaje': 'plan_rodaje',
+  '/personajes': 'personajes',
+  '/actores': 'cast',
+  '/galeria': 'galeria',
+  '/crew-list': 'crew_list',
+  '/roles': 'roles',
+};
+
 /// Reemplaza los `showModalBottomSheet` (hoja pegada al borde inferior)
 /// por un diálogo centrado en pantalla — se ve mejor en Web/Desktop, que
 /// es donde corre esta app la mayor parte del tiempo. El formulario que
@@ -73,9 +89,12 @@ class AppSideMenu extends StatelessWidget {
     // nadie, así que ni siquiera deben ver la entrada en el menú, aunque
     // el backend ya la rechazaba con 403 para ellos. Se evalúa contra el
     // rol EFECTIVO en el proyecto activo (session.can), no el rol global.
-    final visibleItems = appSideMenuItems.where(
-      (item) => item.$3 != _kRestrictedMenuRoute || session.can('invite_users'),
-    );
+    final visibleItems = appSideMenuItems.where((item) {
+      if (item.$3 == _kRestrictedMenuRoute && !session.can('invite_users')) return false;
+      final modulo = _kMenuRouteModulo[item.$3];
+      if (modulo != null && !session.canSeeModule(modulo)) return false;
+      return true;
+    });
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),

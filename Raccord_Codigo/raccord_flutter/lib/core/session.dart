@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../models/module_access.dart';
 import '../models/project.dart';
 import '../models/user.dart';
+import '../services/module_access_service.dart';
 import '../services/project_service.dart';
 import 'api_client.dart';
 import 'permissions.dart';
@@ -39,6 +41,15 @@ class AuthSession extends ChangeNotifier {
   int? _projectRole;
   bool _ready = false;
 
+  // Accesos personalizados por módulo (excepciones puntuales sobre el
+  // rol, ver app/utils/module_access.py) del PROPIO usuario en el
+  // proyecto activo — modulo -> nivel_efectivo. Solo en memoria (se
+  // refresca al bootstrap/setProject, igual que _projectRole); si aún
+  // no llegó la respuesta del backend, canSeeModule() no oculta nada
+  // (mismo criterio que el resto de este archivo: el peor caso es un
+  // ítem de menú visible que el backend rechaza, nunca al revés).
+  Map<String, String> _moduleLevels = {};
+
   String? get token => _token;
   SessionUser? get user => _user;
   String? get deviceId => _deviceId;
@@ -54,6 +65,11 @@ class AuthSession extends ChangeNotifier {
   // ahí no hay "proyecto" contra el cual resolver nada todavía. En
   // cuanto hay un proyecto activo, SIEMPRE manda _projectRole.
   bool can(String permission) => hasPermission(hasProject ? _projectRole : _user?.idRol, permission);
+
+  /// true si el módulo NO quedó forzado a "sin_acceso" por una
+  /// excepción puntual (ver ModuloAccesos) — el rol sigue siendo la
+  /// base (session.can), esto es solo la capa adicional de arriba.
+  bool canSeeModule(String modulo) => _moduleLevels[modulo] != 'sin_acceso';
 
   late final ApiClient api = ApiClient(tokenProvider: () => _token);
 
@@ -93,6 +109,7 @@ class AuthSession extends ChangeNotifier {
     // el arranque de la app.
     if (hasProject) {
       unawaited(refreshProjectRole());
+      unawaited(refreshModuleAccess());
     }
   }
 
@@ -117,6 +134,24 @@ class AuthSession extends ChangeNotifier {
     } catch (_) {
       // Sin conexión o error de red: se mantiene el rol cacheado hasta
       // el próximo intento — no tumba la app por esto.
+    }
+  }
+
+  /// Vuelve a consultar los accesos personalizados por módulo del
+  /// PROPIO usuario en el proyecto activo (ver ModuleAccessService) y
+  /// los cachea en memoria para que canSeeModule() decida qué mostrar
+  /// en el menú lateral. Igual que refreshProjectRole: se llama en
+  /// segundo plano, nunca bloquea la navegación ni tumba la app si
+  /// falla.
+  Future<void> refreshModuleAccess() async {
+    if (_user == null || !hasProject) return;
+    try {
+      final accesos = await ModuleAccessService(api).list(_projectId!, _user!.idUser);
+      _moduleLevels = {for (final a in accesos) a.modulo: a.nivelEfectivo};
+      notifyListeners();
+    } catch (_) {
+      // Sin conexión, o la persona ya no pertenece a este proyecto:
+      // se mantiene lo cacheado (o vacío) hasta el próximo intento.
     }
   }
 
@@ -183,12 +218,14 @@ class AuthSession extends ChangeNotifier {
     if (_projectRole == null) {
       await refreshProjectRole();
     }
+    unawaited(refreshModuleAccess());
   }
 
   Future<void> clearProject() async {
     _projectId = null;
     _projectName = null;
     _projectRole = null;
+    _moduleLevels = {};
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kProjectId);
     await prefs.remove(_kProjectName);
@@ -202,6 +239,7 @@ class AuthSession extends ChangeNotifier {
     _projectId = null;
     _projectName = null;
     _projectRole = null;
+    _moduleLevels = {};
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kToken);

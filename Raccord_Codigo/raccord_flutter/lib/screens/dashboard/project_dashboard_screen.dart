@@ -15,14 +15,15 @@ class _ModuleDef {
   final IconData icon;
   final Color color;
   final String route;
-  const _ModuleDef(this.title, this.icon, this.color, this.route);
+  final String modulo;
+  const _ModuleDef(this.title, this.icon, this.color, this.route, this.modulo);
 }
 
 const _modules = [
-  _ModuleDef('Guión', Icons.description_outlined, AppColors.azulProfundo, '/guiones'),
-  _ModuleDef('Escenas', Icons.movie_filter_outlined, AppColors.moradoTech, '/escenas'),
-  _ModuleDef('Desglose', Icons.checklist_outlined, AppColors.grisMedio, '/desglose'),
-  _ModuleDef('Plan de Rodaje', Icons.event_note_outlined, AppColors.coral, '/plan-rodaje'),
+  _ModuleDef('Guión', Icons.description_outlined, AppColors.azulProfundo, '/guiones', 'guion'),
+  _ModuleDef('Escenas', Icons.movie_filter_outlined, AppColors.moradoTech, '/escenas', 'escenas'),
+  _ModuleDef('Desglose', Icons.checklist_outlined, AppColors.grisMedio, '/desglose', 'desglose'),
+  _ModuleDef('Plan de Rodaje', Icons.event_note_outlined, AppColors.coral, '/plan-rodaje', 'plan_rodaje'),
 ];
 
 /// Shell del proyecto (mockups 7, 7.1, 7.2): header, menú lateral con
@@ -89,6 +90,7 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                       crossAxisSpacing: 20,
                       childAspectRatio: 1.05,
                       children: _modules
+                          .where((m) => session.canSeeModule(m.modulo))
                           .map((m) => ModuleCard(
                                 icon: m.icon,
                                 color: m.color,
