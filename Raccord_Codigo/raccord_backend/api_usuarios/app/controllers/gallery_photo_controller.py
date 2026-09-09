@@ -36,6 +36,10 @@ def _serialize(p: GalleryPhoto, scene: Scene | None = None):
     if scene is not None:
         data["numero_de_escena"] = scene.numero_de_escena
         data["encabezado"] = scene.encabezado
+        # Para agrupar la Galería global por día dramático (panel
+        # lateral estilo Google Photos, ver gallery_screen.dart) — no
+        # es propio de la foto, viene de la escena a la que pertenece.
+        data["dia_dramatico"] = scene.dia_dramatico
     return data
 
 
@@ -164,6 +168,27 @@ def get_photo_archivo(id_foto: str, db: Session):
         media_type=photo.archivo_tipo,
         headers={"Content-Disposition": f'inline; filename="{photo.archivo_nombre}"'}
     )
+
+
+# ==========================================
+# UPDATE DETALLES DE LA FOTO (tipo, personaje, descripción, notas)
+# ==========================================
+# Edición parcial: solo toca los campos que el frontend efectivamente
+# envió (ver exclude_unset en la ruta), nunca el archivo/binario en sí.
+# Mismo permiso que subir ("upload_photos", ver gallery_photo_routes.py).
+def update_photo(id_foto: str, data: dict, db: Session):
+    photo = db.query(GalleryPhoto).filter(GalleryPhoto.id_foto == id_foto).first()
+
+    if not photo:
+        return api_response(False, "Foto no encontrada", error="PHOTO_NOT_FOUND")
+
+    for campo, valor in data.items():
+        setattr(photo, campo, valor)
+
+    db.commit()
+    db.refresh(photo)
+
+    return api_response(True, "Detalles de la foto actualizados", _serialize(photo))
 
 
 # ==========================================

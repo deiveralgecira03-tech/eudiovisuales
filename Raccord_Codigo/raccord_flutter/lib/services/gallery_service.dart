@@ -53,6 +53,15 @@ class GalleryService {
     return api.getBytes('/fotos/$idFoto/archivo');
   }
 
+  /// Edición parcial de los detalles de una foto ya subida (visor
+  /// Polaroid) — solo manda las claves presentes en [campos], nunca
+  /// el archivo/binario en sí. Claves válidas: tipo_foto,
+  /// personaje_codigo, descripcion, notas_continuidad.
+  Future<GalleryPhoto> update(String idFoto, Map<String, dynamic> campos) async {
+    final data = await api.patch('/fotos/$idFoto', body: campos);
+    return GalleryPhoto.fromJson(Map<String, dynamic>.from(data as Map));
+  }
+
   Future<void> delete(String idFoto) async {
     await api.delete('/fotos/$idFoto');
   }

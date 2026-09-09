@@ -6,10 +6,12 @@ from app.controllers.gallery_photo_controller import (
     get_all_photos,
     upload_photo,
     get_photo_archivo,
+    update_photo,
     delete_photo,
 )
 from app.models.scene_model import Scene
 from app.models.gallery_photo_model import GalleryPhoto
+from app.schemas.gallery_photo_schema import GalleryPhotoUpdateSchema
 
 # 🔐 autenticación / permisos — resueltos por proyecto, ver
 # app/utils/project_scope.py. GalleryPhoto/Scene no tienen columna
@@ -83,6 +85,23 @@ def download_photo_file(
     )),
 ):
     return get_photo_archivo(id_foto, db)
+
+
+# Editar detalles de una foto ya subida (tipo, personaje, descripción,
+# notas) — mismo permiso que subirla ("upload_photos"), resuelto contra
+# el proyecto de la escena dueña de la foto. exclude_unset=True: solo
+# se actualizan los campos que el visor Polaroid del frontend envió.
+@router.patch("/fotos/{id_foto}")
+def edit_photo(
+    id_foto: str,
+    data: GalleryPhotoUpdateSchema,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_record_project_permission(
+        "upload_photos", model=GalleryPhoto, pk_column="id_foto", pk_path_param="id_foto",
+        resolve_project=resolve_project_via_scene_fk("id_escena"), not_found_message="Foto no encontrada",
+    )),
+):
+    return update_photo(id_foto, data.dict(exclude_unset=True), db)
 
 
 # Eliminar foto: permiso propio "delete_photos" (separado de

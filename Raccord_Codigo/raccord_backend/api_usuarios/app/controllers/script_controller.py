@@ -83,7 +83,15 @@ def get_scripts_by_project(id_project: str, db: Session):
 # CREATE SCRIPT
 # ==========================================
 def create_script(script: ScriptSchema, db: Session):
-    existing = db.query(Script).filter(Script.numero_de_version == script.numero_de_version).first()
+    # BUGFIX: antes comparaba numero_de_version contra TODOS los
+    # guiones de la base de datos, sin filtrar por id_project — un V2
+    # ya usado en el proyecto de otra persona bloqueaba crear un V2
+    # acá, aunque este proyecto no tuviera ninguno. La versión solo
+    # tiene que ser única DENTRO del mismo proyecto.
+    existing = db.query(Script).filter(
+        Script.numero_de_version == script.numero_de_version,
+        Script.id_project == script.id_project,
+    ).first()
 
     if existing:
         return api_response(False, "Ya existe un guion con ese número de versión", error="DUPLICATE_VERSION")
@@ -119,8 +127,11 @@ def update_script_full(id: str, script: ScriptSchema, db: Session):
     if not script_db:
         return api_response(False, "Guion no encontrado")
 
+    # BUGFIX: mismo caso que en create_script — la unicidad de versión
+    # es POR PROYECTO, no global.
     version_exists = db.query(Script).filter(
         Script.numero_de_version == script.numero_de_version,
+        Script.id_project == script.id_project,
         Script.id_guion != id
     ).first()
 
@@ -157,8 +168,14 @@ def update_script(id: str, script, db: Session):
     update_data = script.model_dump(exclude_unset=True)
 
     if "numero_de_version" in update_data:
+        # BUGFIX: mismo caso que en create_script — la unicidad de
+        # versión es POR PROYECTO, no global. Se usa
+        # update_data.get("id_project") si el propio PATCH también
+        # está moviendo el guion de proyecto, si no el proyecto actual
+        # del guion (script_db.id_project) — nunca "cualquier proyecto".
         version_exists = db.query(Script).filter(
             Script.numero_de_version == update_data["numero_de_version"],
+            Script.id_project == update_data.get("id_project", script_db.id_project),
             Script.id_guion != id
         ).first()
 

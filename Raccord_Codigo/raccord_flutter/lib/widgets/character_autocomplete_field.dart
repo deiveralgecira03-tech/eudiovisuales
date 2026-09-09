@@ -18,6 +18,11 @@ class CharacterAutocompleteField extends StatelessWidget {
   final String? hint;
   final List<CharacterModel> personajes;
   final void Function(CharacterModel personaje) onSelected;
+  // Texto inicial del campo (ej. al editar algo que ya tenía un
+  // personaje asignado) — sin esto el campo siempre arranca vacío,
+  // que es lo que se quiere al SUBIR una foto nueva pero no al editar
+  // una ya existente (ver photo_viewer_dialog.dart).
+  final String? initialValue;
 
   const CharacterAutocompleteField({
     super.key,
@@ -25,6 +30,7 @@ class CharacterAutocompleteField extends StatelessWidget {
     required this.personajes,
     required this.onSelected,
     this.hint,
+    this.initialValue,
   });
 
   @override
@@ -36,6 +42,7 @@ class CharacterAutocompleteField extends StatelessWidget {
         const SizedBox(height: 8),
         Autocomplete<CharacterModel>(
           displayStringForOption: (p) => p.nombre,
+          initialValue: TextEditingValue(text: initialValue ?? ''),
           optionsBuilder: (value) {
             final q = value.text.trim().toLowerCase();
             if (q.isEmpty) return const Iterable<CharacterModel>.empty();

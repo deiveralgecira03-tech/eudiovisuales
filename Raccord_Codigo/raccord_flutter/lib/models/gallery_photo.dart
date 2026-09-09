@@ -39,6 +39,11 @@ class GalleryPhoto {
   // /scenes/{id}/fotos quedan null porque ya se sabe de qué escena son.
   final String? numeroDeEscenaOrigen;
   final String? encabezadoEscenaOrigen;
+  // Día dramático de la escena dueña de la foto (ver Scene.diaDramatico)
+  // — solo viene en la Galería global (GET /fotos), para poder agrupar
+  // ahí por día dramático (panel lateral estilo Google Photos, ver
+  // gallery_screen.dart). null = escena sin día dramático asignado.
+  final int? diaDramaticoOrigen;
 
   GalleryPhoto({
     required this.idFoto,
@@ -52,6 +57,7 @@ class GalleryPhoto {
     this.fechaSubida,
     this.numeroDeEscenaOrigen,
     this.encabezadoEscenaOrigen,
+    this.diaDramaticoOrigen,
   });
 
   factory GalleryPhoto.fromJson(Map<String, dynamic> json) {
@@ -68,6 +74,7 @@ class GalleryPhoto {
       fechaSubida: fecha != null ? DateTime.tryParse(fecha) : null,
       numeroDeEscenaOrigen: asString(pick(json, ['numero_de_escena'])),
       encabezadoEscenaOrigen: asString(pick(json, ['encabezado'])),
+      diaDramaticoOrigen: asInt(pick(json, ['dia_dramatico'])),
     );
   }
 }

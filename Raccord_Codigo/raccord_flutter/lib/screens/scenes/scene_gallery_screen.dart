@@ -9,11 +9,13 @@ import '../../models/scene.dart';
 import '../../services/gallery_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
+import '../../widgets/photo_viewer_dialog.dart';
 import '../../widgets/state_views.dart';
 
-/// Solo lectura: fotos de continuidad de una escena, sin edición ni
-/// carga (eso vive en SceneEditScreen). Es lo que abre el ícono de
-/// ojo en la lista de Escenas.
+/// Fotos de continuidad de una escena, sin carga (eso vive en
+/// SceneEditScreen) — es lo que abre el ícono de ojo en la lista de
+/// Escenas. El visor de cada foto sí permite editar/eliminar según
+/// permisos (mismo criterio que en Galería y Continuidad Visual).
 class SceneGalleryScreen extends StatefulWidget {
   final Scene scene;
   const SceneGalleryScreen({super.key, required this.scene});
@@ -44,6 +46,10 @@ class _SceneGalleryScreenState extends State<SceneGalleryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final session = context.watch<AuthSession>();
+    final canEdit = session.can('upload_photos');
+    final canDelete = session.can('delete_photos');
+
     return AppScaffold(
       title: '${widget.scene.encabezado} · Fotos',
       showBack: true,
@@ -70,7 +76,15 @@ class _SceneGalleryScreenState extends State<SceneGalleryScreen> {
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
-            itemBuilder: (context, i) => _GalleryTile(photo: photos[i]),
+            itemBuilder: (context, i) => _GalleryTile(
+              photo: photos[i],
+              allPhotos: photos,
+              index: i,
+              canEdit: canEdit,
+              canDelete: canDelete,
+              onDeleted: _reload,
+              onUpdated: _reload,
+            ),
           );
         },
       ),
@@ -80,7 +94,22 @@ class _SceneGalleryScreenState extends State<SceneGalleryScreen> {
 
 class _GalleryTile extends StatelessWidget {
   final GalleryPhoto photo;
-  const _GalleryTile({required this.photo});
+  final List<GalleryPhoto> allPhotos;
+  final int index;
+  final bool canEdit;
+  final bool canDelete;
+  final VoidCallback onDeleted;
+  final VoidCallback onUpdated;
+
+  const _GalleryTile({
+    required this.photo,
+    required this.allPhotos,
+    required this.index,
+    required this.canEdit,
+    required this.canDelete,
+    required this.onDeleted,
+    required this.onUpdated,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -109,47 +138,15 @@ class _GalleryTile extends StatelessWidget {
   }
 
   void _open(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: FutureBuilder<List<int>>(
-                future: GalleryService(context.read<AuthSession>().api).archivoBytes(photo.idFoto),
-                builder: (context, snap) {
-                  if (!snap.hasData) {
-                    return const Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator());
-                  }
-                  return Image.memory(Uint8List.fromList(snap.data!), fit: BoxFit.contain);
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${photo.tipoFoto}${photo.personajeCodigo != null && photo.personajeCodigo!.isNotEmpty ? ' · ${photo.personajeCodigo}' : ''}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                  ),
-                  if (photo.descripcion != null && photo.descripcion!.isNotEmpty)
-                    Text(photo.descripcion!, style: const TextStyle(color: Colors.white70)),
-                  if (photo.notasContinuidad != null && photo.notasContinuidad!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(photo.notasContinuidad!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    showPhotoViewerDialog(
+      context,
+      photo: photo,
+      photos: allPhotos,
+      initialIndex: index,
+      canEdit: canEdit,
+      canDelete: canDelete,
+      onDeleted: onDeleted,
+      onUpdated: onUpdated,
     );
   }
 }

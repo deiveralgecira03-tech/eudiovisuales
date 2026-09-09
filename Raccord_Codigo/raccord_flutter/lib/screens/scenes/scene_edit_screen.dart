@@ -22,6 +22,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/character_autocomplete_field.dart';
+import '../../widgets/photo_viewer_dialog.dart';
 import '../../widgets/state_views.dart';
 import 'scenes_screen.dart' show colorForEstadoEscena;
 
@@ -459,8 +460,12 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
               ),
               itemBuilder: (context, i) => _PhotoThumb(
                 photo: photos[i],
+                allPhotos: photos,
+                index: i,
+                canEdit: canUpload,
                 canDelete: canDeletePhotos,
                 onDeleted: _reloadPhotos,
+                onUpdated: _reloadPhotos,
               ),
             );
           },
@@ -875,10 +880,22 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
 
 class _PhotoThumb extends StatelessWidget {
   final GalleryPhoto photo;
+  final List<GalleryPhoto> allPhotos;
+  final int index;
+  final bool canEdit;
   final bool canDelete;
   final VoidCallback onDeleted;
+  final VoidCallback onUpdated;
 
-  const _PhotoThumb({required this.photo, required this.canDelete, required this.onDeleted});
+  const _PhotoThumb({
+    required this.photo,
+    required this.allPhotos,
+    required this.index,
+    required this.canEdit,
+    required this.canDelete,
+    required this.onDeleted,
+    required this.onUpdated,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -945,64 +962,15 @@ class _PhotoThumb extends StatelessWidget {
   }
 
   void _openViewer(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: FutureBuilder<List<int>>(
-                future: GalleryService(context.read<AuthSession>().api).archivoBytes(photo.idFoto),
-                builder: (context, snap) {
-                  if (!snap.hasData) {
-                    return const Padding(
-                      padding: EdgeInsets.all(40),
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                  return Image.memory(Uint8List.fromList(snap.data!), fit: BoxFit.contain);
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${photo.tipoFoto}${photo.personajeCodigo != null && photo.personajeCodigo!.isNotEmpty ? ' · ${photo.personajeCodigo}' : ''}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                        if (photo.descripcion != null && photo.descripcion!.isNotEmpty)
-                          Text(photo.descripcion!, style: const TextStyle(color: Colors.white70)),
-                        if (photo.notasContinuidad != null && photo.notasContinuidad!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(photo.notasContinuidad!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (canDelete)
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.white70),
-                      tooltip: 'Eliminar foto',
-                      onPressed: () async {
-                        Navigator.of(context).pop(); // cierra el visor antes de confirmar
-                        await _delete(context);
-                      },
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    showPhotoViewerDialog(
+      context,
+      photo: photo,
+      photos: allPhotos,
+      initialIndex: index,
+      canEdit: canEdit,
+      canDelete: canDelete,
+      onDeleted: onDeleted,
+      onUpdated: onUpdated,
     );
   }
 }
