@@ -1,4 +1,4 @@
-# HU-032 — Checklist de Escenas Grabadas vs Pendientes
+# HU-036 — Checklist de Escenas Grabadas vs Pendientes
 
 ## Identificación
 

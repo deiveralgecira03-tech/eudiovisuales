@@ -1,4 +1,4 @@
-# HU-031 — Listado de Vestuario por Personaje
+# HU-035 — Listado de Vestuario por Personaje
 
 ## Identificación
 

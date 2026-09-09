@@ -1,4 +1,4 @@
-# HU-029 — Informe de Continuidad por Escena
+# HU-033 — Informe de Continuidad por Escena
 
 ## Identificación
 

@@ -1,4 +1,4 @@
-# HU-033 — Reporte de Auditoría de Accesos
+# HU-037 — Reporte de Auditoría de Accesos
 
 ## Identificación
 

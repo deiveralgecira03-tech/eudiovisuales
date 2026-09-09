@@ -1,4 +1,4 @@
-# HU-030 — Parte de Rodaje Diario Semi-Automático
+# HU-034 — Parte de Rodaje Diario Semi-Automático
 
 ## Identificación
 
@@ -21,5 +21,5 @@
 ## Criterios de Aceptación
 
 - El sistema pre-completa automáticamente escenas rodadas, fotografías subidas y resumen de estados de continuidad del día.
-- El Scipt solo debe completar manualmente minutaje, incidencias técnicas, notas generales y observaciones para el día siguiente.
-- El parte se genera en PDF con marca de agua.
+- El Script solo debe completar manualmente minutaje, incidencias técnicas, notas generales y observaciones para el día siguiente.
+- El parte se genera en PDF con marca de agua y se envía automáticamente por correo a Productor de Línea, Director y Primera AD.

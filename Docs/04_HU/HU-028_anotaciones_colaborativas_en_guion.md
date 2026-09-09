@@ -1,4 +1,4 @@
-# HU-026 — Anotaciones Colaborativas en Guion
+# HU-028 — Anotaciones Colaborativas en Guion
 
 ## Identificación
 

@@ -1,4 +1,4 @@
-# HU-022 — Comunicación Interna por Canales Segmentados
+# HU-023 — Comunicación Interna por Canales Segmentados
 
 ## Identificación
 
@@ -15,7 +15,7 @@
 ## Historia
 
 *Como* miembro del equipo,
-*quiero* comunicarme por canales segmentados (general, por departamento, o directo),
+*quiero* comunicarme por canales segmentados (general, por departamento, por escena, por personaje o directo),
 *para* que la conversación llegue solo a quien realmente le corresponde.
 
 ## Criterios de Aceptación

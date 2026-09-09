@@ -1,4 +1,4 @@
-# HU-021 — Notificaciones Push Instantáneas de Cambios de Calendario
+# HU-022 — Notificaciones Push Instantáneas de Cambios de Calendario
 
 ## Identificación
 
@@ -20,7 +20,7 @@
 
 ## Criterios de Aceptación
 
-- El sistema identifica automáticamente a los usuarios afectados por la creación, modificación o cancelación de un evento1
+- El sistema identifica automáticamente a los usuarios afectados por la creación, modificación o cancelación de un evento.
 - La notificación se entrega en menos de 30 segundos e incluye qué cambió, quién lo hizo y un enlace directo al evento.
 - El nivel de prioridad (Normal/Urgente/Crítico) determina el color, sonido y vibración de la notificación.
 - Si la entrega falla, el sistema reintenta hasta 3 veces antes de alertar a los administradores.

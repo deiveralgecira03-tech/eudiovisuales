@@ -1,4 +1,4 @@
-# HU-023 — Directorio de Equipo (Crew List)
+# HU-025 — Directorio de Equipo (Crew List)
 
 ## Identificación
 
@@ -7,7 +7,7 @@
 | ID | HU-025 |
 | Título | Directorio de Equipo (Crew List) |
 | Prioridad | Baja |
-| Estado | Completado  |
+| Estado | Poceso  |
 | RF asociado | RF-025 |
 
 ---
