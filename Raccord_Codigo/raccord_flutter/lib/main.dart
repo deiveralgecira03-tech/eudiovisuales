@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'core/navigation_keys.dart';
 import 'core/session.dart';
 import 'core/theme_controller.dart';
 import 'screens/auth/forgot_password_screen.dart';
@@ -22,6 +23,7 @@ import 'screens/scripts/scripts_screen.dart';
 import 'screens/shooting_days/shooting_days_screen.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_logo.dart';
+import 'widgets/inactivity_watcher.dart';
 
 void main() {
   // Por defecto, cuando un widget lanza una excepción durante su
@@ -69,11 +71,19 @@ class RaccordApp extends StatelessWidget {
     return MaterialApp(
       title: 'Raccord',
       debugShowCheckedModeBanner: false,
+      navigatorKey: rootNavigatorKey,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeController.mode,
       home: const _SplashGate(),
       onGenerateRoute: _onGenerateRoute,
+      // Envuelve TODO el árbol de rutas (por encima del Navigator) para
+      // poder detectar actividad del usuario (click/toque/scroll/tecla)
+      // sin importar la pantalla en la que esté, y cerrar la sesión tras
+      // 15 minutos de inactividad — ver widgets/inactivity_watcher.dart.
+      builder: (context, child) => InactivityWatcher(
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

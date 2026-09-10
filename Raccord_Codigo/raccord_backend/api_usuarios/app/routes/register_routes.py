@@ -9,6 +9,7 @@ from app.controllers.register_controller import register, invite_users
 
 # 🔐 autenticación / permisos
 from app.middleware.auth import require_permission
+from app.utils.rate_limit import rate_limit
 
 # ==========================================
 # ROUTER
@@ -19,8 +20,14 @@ router = APIRouter(
 
 
 # REGISTER (público: alta de empresa + primer usuario)
+# Límite bajo por IP: evita que un script cree decenas de
+# empresas/usuarios en minutos (spam de cuentas, saturar la BD).
 @router.post("/register")
-def register_user(data: RegisterSchema, db: Session = Depends(get_db)):
+def register_user(
+    data: RegisterSchema,
+    db: Session = Depends(get_db),
+    _rl=Depends(rate_limit("register", max_attempts=5, window_seconds=300)),
+):
     return register(data, db)
 
 

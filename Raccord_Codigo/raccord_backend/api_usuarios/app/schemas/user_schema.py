@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
@@ -11,12 +11,12 @@ class UserSchema(BaseModel):
     apellido: str
     identificacion: str
     id_identificacion: str
-    mail: str
+    mail: EmailStr
     msisdn: str
     direccion: str
     fecha_de_nacimiento: datetime
     estado: str
-    contrasena: str
+    contrasena: str = Field(min_length=8, max_length=72)
     id_departamento: str
     id_rol: int
 
@@ -26,12 +26,12 @@ class UserUpdateSchema(BaseModel):
     apellido: Optional[str] = None
     identificacion: Optional[str] = None
     id_identificacion: Optional[str] = None
-    mail: Optional[str] = None
+    mail: Optional[EmailStr] = None
     msisdn: Optional[str] = None
     direccion: Optional[str] = None
     fecha_de_nacimiento: Optional[datetime] = None
     estado: Optional[str] = None
-    contrasena: Optional[str] = None
+    contrasena: Optional[str] = Field(default=None, min_length=8, max_length=72)
     id_departamento: Optional[str] = None
     id_rol: Optional[int] = None
 
@@ -69,7 +69,7 @@ class UserProfileUpdateSchema(BaseModel):
 # ==========================================
 class ChangePasswordSchema(BaseModel):
     contrasena_actual: str
-    nueva_contrasena: str
+    nueva_contrasena: str = Field(min_length=8, max_length=72)
 
 
 # ==========================================

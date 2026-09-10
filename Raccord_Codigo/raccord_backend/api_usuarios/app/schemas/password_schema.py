@@ -1,14 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 
 # ==========================================
 # RECUPERACIÓN DE CONTRASEÑA
 # ==========================================
 class RecoverSchema(BaseModel):
-    mail: str
+    mail: EmailStr
 
 
 class ResetPasswordSchema(BaseModel):
-    mail: str
+    mail: EmailStr
     codigo: str
-    nueva_contrasena: str
+    nueva_contrasena: str = Field(min_length=8, max_length=72)

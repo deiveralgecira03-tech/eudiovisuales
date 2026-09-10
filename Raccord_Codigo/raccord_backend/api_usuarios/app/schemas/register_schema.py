@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
 
@@ -9,7 +9,7 @@ class RegisterSchema(BaseModel):
     # Datos empresa
     razon_social: str
     representante_legal: str
-    email_empresa: str
+    email_empresa: EmailStr
     address: Optional[str] = None
     telephone: Optional[str] = None
     number_cellphone: Optional[str] = None
@@ -19,9 +19,9 @@ class RegisterSchema(BaseModel):
     # Datos usuario
     nombre: str
     apellido: str
-    mail: str
+    mail: EmailStr
     msisdn: str
-    contrasena: str
+    contrasena: str = Field(min_length=8, max_length=72)
 
 
 # ==========================================
@@ -33,7 +33,7 @@ class RegisterSchema(BaseModel):
 # la misma estructura con N filas — mismo endpoint para ambos casos.
 class InviteItemSchema(BaseModel):
     nombre_completo: str
-    mail: str
+    mail: EmailStr
     id_departamento: str
     id_rol: int
 

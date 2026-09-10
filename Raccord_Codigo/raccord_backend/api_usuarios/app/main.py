@@ -1,4 +1,7 @@
 import logging
+import os
+
+from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,6 +45,8 @@ from app.models.crew_member_model import CrewMember
 from app.models.module_access_model import UserProjectModuleAccess
 from app.utils.response import api_response
 
+load_dotenv()
+
 logger = logging.getLogger("raccord")
 
 # CREATE TABLES
@@ -71,9 +76,22 @@ app = FastAPI(
 #
 # `allow_origin_regex` cubre cualquier puerto de localhost/127.0.0.1 para
 # desarrollo, sin tener que fijar `--web-port` cada vez que se corre Flutter.
+#
+# PRODUCCIÓN: cuando esto se despliegue en un dominio real, se agrega
+# ese dominio en la variable de entorno ALLOWED_ORIGINS (separados por
+# coma, ej. "https://app.raccord.com,https://raccord.com") en vez de
+# tocar este archivo o usar "*" — con allow_credentials=True, FastAPI
+# ni siquiera permite "*" como origen (lo bloquea en runtime), así que
+# la whitelist explícita es la única opción correcta acá.
+_extra_origins = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=["http://localhost:3000", "http://localhost:5173", *_extra_origins],
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],

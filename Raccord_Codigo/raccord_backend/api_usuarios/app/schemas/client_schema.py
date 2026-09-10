@@ -1,11 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 class ClientSchema(BaseModel):
     document: str
     razon_social: str
     representante_legal: str
-    email: str
+    email: EmailStr
     address: Optional[str] = None
     telephone: Optional[str] = None
     number_cellphone: Optional[str] = None
@@ -15,7 +15,7 @@ class ClientUpdateSchema(BaseModel):
     document: Optional[str] = None
     razon_social: Optional[str] = None
     representante_legal: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
     address: Optional[str] = None
     telephone: Optional[str] = None
     number_cellphone: Optional[str] = None

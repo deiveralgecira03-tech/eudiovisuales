@@ -1,11 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 # ==========================================
 # LOGIN
 # ==========================================
 class LoginSchema(BaseModel):
-    mail: str
+    mail: EmailStr
     contrasena: str
 
 
@@ -13,13 +13,13 @@ class LoginSchema(BaseModel):
 # 2FA (segundo factor, parte del flujo de login)
 # ==========================================
 class TwoFactorSendSchema(BaseModel):
-    mail: str
+    mail: EmailStr
     device_id: str
     contrasena: str
 
 
 class TwoFactorVerifySchema(BaseModel):
-    mail: str
+    mail: EmailStr
     codigo: str
     device_id: str
     contrasena: str
