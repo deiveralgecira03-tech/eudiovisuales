@@ -12,6 +12,7 @@ from app.schemas.script_schema import ScriptSchema
 
 from app.utils.response import api_response
 from app.utils.minio_client import BUCKET_GUIONES, BUCKET_IMAGENES, upload_file, delete_file, download_file
+from app.utils.watermark import add_watermark
 from app.utils.script_parser import parse_script
 
 # Solo guiones en estos 2 estados se pueden segmentar automáticamente
@@ -301,14 +302,14 @@ async def upload_script_archivo(id: str, file: UploadFile, db: Session):
 # directo en la respuesta, igual que antes cuando salía de una columna
 # BYTEA — así se evita el problema de CORS de exponer una URL de MinIO
 # directo al navegador (ver nota en app/utils/minio_client.py).
-def get_script_archivo(id: str, db: Session):
+def get_script_archivo(id: str, db: Session, current_user: dict):
     script = db.query(Script).filter(Script.id_guion == id).first()
 
     if not script:
         raise HTTPException(status_code=404, detail="Guion no encontrado")
 
     if not script.archivo_key:
-        raise HTTPException(status_code=404, detail="Este guion todavía no tiene un archivo PDF cargado")
+        raise HTTPException(status_code=404, detail="Este guion todavia no tiene un archivo PDF cargado")
 
     nombre = script.archivo_nombre or f"guion_{id}.pdf"
 
@@ -316,6 +317,12 @@ def get_script_archivo(id: str, db: Session):
         contenido = download_file(BUCKET_GUIONES, script.archivo_key)
     except Exception:
         raise HTTPException(status_code=404, detail="No se pudo recuperar el archivo desde el almacenamiento")
+
+    mail_usuario = current_user.get("mail", "usuario desconocido")
+    try:
+        contenido = add_watermark(contenido, mail_usuario)
+    except Exception:
+        pass
 
     return Response(
         content=contenido,

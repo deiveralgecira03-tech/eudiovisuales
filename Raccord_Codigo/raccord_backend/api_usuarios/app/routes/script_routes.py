@@ -114,7 +114,7 @@ def download_script_file(
         None, model=Script, pk_column="id_guion", not_found_message="Guion no encontrado",
     )),
 ):
-    return get_script_archivo(id, db)
+    return get_script_archivo(id, db, current_user)
 
 
 # ==========================================

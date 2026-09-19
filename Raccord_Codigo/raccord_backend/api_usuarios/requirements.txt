@@ -16,3 +16,4 @@ minio
 # desde Word/Final Draft/Celtx/etc.), no para guiones escaneados como
 # imagen (esos necesitarían OCR, fuera de alcance por ahora).
 pypdf
+reportlab

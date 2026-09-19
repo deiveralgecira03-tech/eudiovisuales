@@ -5,17 +5,6 @@
 #
 #   docker compose up -d --build
 #
-# IMPORTANTE (una sola vez, antes del primer "docker compose up"):
-# ya tienes "postgres-db" y "adminer" corriendo como contenedores
-# sueltos (creados con "docker run"). Compose va a crear contenedores
-# nuevos con esos mismos nombres apuntando al MISMO volumen de datos,
-# así que hay que quitar los sueltos primero para que no choquen:
-#
-#   docker rm -f postgres-db adminer
-#
-# El volumen de datos (postgres_data, abajo) NO se toca con ese
-# comando - solo se borran los contenedores, los datos siguen intactos
-# en el volumen.
 
 services:
   db:
@@ -29,10 +18,6 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      # Mismo volumen que ya usa tu contenedor postgres-db actual
-      # (visto con "docker inspect postgres-db"). Como ya tiene datos,
-      # Postgres arranca usándolos tal cual - las variables de arriba
-      # solo aplican si el volumen estuviera vacío.
       - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U carlos.yaya -d raccord"]
@@ -138,11 +123,4 @@ services:
 
 volumes:
   postgres_data:
-    external: true
-    # Nombre real del volumen que ya tiene tus datos (visto con
-    # "docker inspect postgres-db"). "external: true" le dice a
-    # compose que NO cree un volumen nuevo, que use este que ya existe.
-    name: afbf8ec9e0032afaa85fa6ec45ae734bbafde776efede1686bcdbc21addaf709
   minio_data:
-    # Este sí lo crea compose solo (no existía antes), no necesita
-    # "external: true".
