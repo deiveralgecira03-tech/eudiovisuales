@@ -655,6 +655,14 @@ class _ScriptDetailScreenState extends State<ScriptDetailScreen> {
           sourceName: 'guion-$idGuion',
           params: PdfViewerParams(
             backgroundColor: AppColors.bg,
+            // A pedido explícito del usuario: no se puede seleccionar ni
+            // copiar texto mientras se ve el guion embebido en Raccord
+            // (protección de contenido, mismo espíritu que la marca de
+            // agua). No aplica al PDF ya descargado — eso lo abre una
+            // app externa que Raccord no controla. El parámetro correcto
+            // en esta versión de pdfrx (2.4.7) es textSelectionParams,
+            // no un booleano suelto "enableTextSelection".
+            textSelectionParams: const PdfTextSelectionParams(enabled: false),
             loadingBannerBuilder: (context, bytesDownloaded, totalBytes) => const _PdfLoadingView(),
             // Acá es donde antes fallaba en silencio con Syncfusion: si
             // pdfium no puede parsear el archivo (corrupto, encriptado,

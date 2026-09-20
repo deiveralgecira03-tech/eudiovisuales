@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/api_exception.dart';
 import '../../core/pdf_export.dart';
 import '../../core/session.dart';
+import '../../core/watermark.dart';
 import '../../models/scene.dart';
 import '../../models/shooting_day.dart';
 import '../../services/scene_service.dart';
@@ -557,6 +558,7 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
     }
 
     try {
+      final session = context.read<AuthSession>();
       await exportTablePdf(
         fileName: 'plan_de_rodaje',
         titulo: 'Plan de Rodaje',
@@ -566,6 +568,7 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
           'Estado', 'Día dramático', 'Fecha de grabación',
         ],
         rows: rows,
+        marcaAguaTexto: watermarkTextFor(session),
       );
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Descarga iniciada')));
     } catch (_) {

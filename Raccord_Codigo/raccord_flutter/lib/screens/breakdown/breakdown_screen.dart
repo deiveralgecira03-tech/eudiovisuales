@@ -8,6 +8,7 @@ import '../../core/api_exception.dart';
 import '../../core/pdf_export.dart';
 import '../../core/responsive.dart';
 import '../../core/session.dart';
+import '../../core/watermark.dart';
 import '../../models/breakdown.dart';
 import '../../models/scene.dart';
 import '../../services/breakdown_service.dart';
@@ -376,6 +377,7 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
   Future<void> _download() async {
     if (_selectedScene == null || _items == null) return;
     try {
+      final session = context.read<AuthSession>();
       await exportTablePdf(
         fileName: 'desglose_esc_${_selectedScene!.numeroDeEscena}',
         titulo: 'Desglose de Producción — ESC ${_selectedScene!.numeroDeEscena}',
@@ -390,6 +392,7 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
               item.notas ?? '',
             ],
         ],
+        marcaAguaTexto: watermarkTextFor(session),
       );
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Descarga iniciada')));
     } catch (_) {

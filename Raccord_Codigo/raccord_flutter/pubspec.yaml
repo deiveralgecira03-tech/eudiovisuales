@@ -14,6 +14,11 @@ dependencies:
   http_parser: ^4.0.2
   shared_preferences: ^2.2.3
   provider: ^6.1.2
+  # Bloquea screenshots/grabación de pantalla en Android e iOS nativos
+  # (FLAG_SECURE / API de iOS). En Web no tiene efecto real — ningún
+  # navegador expone esa capacidad — por eso en main.dart se activa
+  # solo cuando !kIsWeb (ver comentario ahí sobre la limitación).
+  screen_protector: ^1.5.3
   intl: ^0.19.0
   uuid: ^4.4.0
   # Selector de PDF (Android/iOS/Web/Desktop) para subir el guion.

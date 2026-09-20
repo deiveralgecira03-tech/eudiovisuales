@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/session.dart';
+import '../../core/watermark.dart';
 import '../../models/gallery_photo.dart';
 import '../../services/gallery_service.dart';
 import '../../theme/app_theme.dart';
@@ -142,6 +143,35 @@ class _GalleryScreenState extends State<GalleryScreen> {
     return (archivoNombre.substring(0, idx), archivoNombre.substring(idx + 1));
   }
 
+  /// Quita caracteres inválidos para nombre de archivo en Windows
+  /// (< > : " / \ | ? *) y cambia espacios por guion bajo.
+  String _sanitizarNombreArchivo(String texto) {
+    return texto.replaceAll(RegExp(r'[<>:"/\\|?*]'), '').replaceAll(RegExp(r'\s+'), '_').trim();
+  }
+
+  /// Nombre legible para el archivo descargado: "ESC{n}_{encabezado}_
+  /// {tipo}_{consecutivo}" en vez del id interno (llave primaria) que
+  /// trae `archivoNombre` — pedido explícito del usuario. `encabezado`
+  /// solo viene poblado en la Galería global (GET /fotos); si por algo
+  /// faltara, se cae al nombre original tal cual.
+  String _nombreParaDescarga(GalleryPhoto foto, int indiceEnLote) {
+    final encabezado = foto.encabezadoEscenaOrigen;
+    if (encabezado == null || encabezado.isEmpty) {
+      return _splitNombreArchivo(foto.archivoNombre).$1;
+    }
+    final numeroEscena = foto.numeroDeEscenaOrigen;
+    final partes = <String>[
+      if (numeroEscena != null && numeroEscena.isNotEmpty) 'ESC$numeroEscena',
+      _sanitizarNombreArchivo(encabezado),
+      foto.tipoFoto,
+      '${indiceEnLote + 1}',
+    ];
+    var nombre = partes.join('_');
+    // Margen de sobra respecto al límite práctico de ruta en Windows.
+    if (nombre.length > 120) nombre = nombre.substring(0, 120);
+    return nombre;
+  }
+
   MimeType _mimeFor(String extension) {
     switch (extension.toLowerCase()) {
       case 'jpg':
@@ -164,13 +194,30 @@ class _GalleryScreenState extends State<GalleryScreen> {
     setState(() => _descargando = true);
     final session = context.read<AuthSession>();
     final service = GalleryService(session.api);
+    final marcaAguaTexto = watermarkTextFor(session);
     try {
-      for (final foto in elegidas) {
-        final bytes = await service.archivoBytes(foto.idFoto);
-        final (nombre, extension) = _splitNombreArchivo(foto.archivoNombre);
+      for (var i = 0; i < elegidas.length; i++) {
+        final foto = elegidas[i];
+        final bytesOriginales = await service.archivoBytes(foto.idFoto);
+        final (_, extensionOriginal) = _splitNombreArchivo(foto.archivoNombre);
+        final nombre = _nombreParaDescarga(foto, i);
+
+        // Si por lo que sea la marca de agua falla (ej. un archivo que
+        // no es una imagen válida), se descarga igual la foto original
+        // sin marca, en vez de bloquear la descarga completa.
+        Uint8List bytesFinal;
+        String extension;
+        try {
+          bytesFinal = await watermarkImageBytes(Uint8List.fromList(bytesOriginales), marcaAguaTexto);
+          extension = 'png'; // watermarkImageBytes siempre devuelve PNG
+        } catch (_) {
+          bytesFinal = Uint8List.fromList(bytesOriginales);
+          extension = extensionOriginal;
+        }
+
         await FileSaver.instance.saveFile(
           name: nombre,
-          bytes: Uint8List.fromList(bytes),
+          bytes: bytesFinal,
           fileExtension: extension,
           mimeType: _mimeFor(extension),
         );

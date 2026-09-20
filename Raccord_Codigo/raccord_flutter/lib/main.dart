@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show BrowserContextMenu;
 import 'package:provider/provider.dart';
+import 'package:screen_protector/screen_protector.dart';
 
 import 'core/navigation_keys.dart';
 import 'core/session.dart';
@@ -25,7 +28,48 @@ import 'theme/app_theme.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/inactivity_watcher.dart';
 
+// ==========================================
+// PROTECCION CONTRA CAPTURAS DE PANTALLA
+// ==========================================
+// IMPORTANTE (limitacion real, no un bug): en la version WEB no existe
+// ninguna API de navegador para bloquear un screenshot de verdad — ni
+// Chrome, ni Edge, ni Safari la exponen. Lo unico que se puede hacer
+// ahi es desalentar (deshabilitar el menu de clic derecho), nunca
+// impedir una captura con Print Screen, la Herramienta de Recortes, o
+// una foto con el celular a la pantalla. La proteccion real solo
+// aplica cuando esta app corre como APK/IPA nativo:
+//   - Android: FLAG_SECURE real — la captura sale en negro.
+//   - iOS: Apple no permite bloquear el screenshot en si, pero si
+//     oculta el contenido en el selector de apps (app switcher) y se
+//     puede detectar cuando alguien grabo pantalla.
+// El paquete screen_protector no tiene implementacion web, por eso se
+// guarda todo detras de "!kIsWeb" y con try/catch: si algun dia se
+// compila Raccord como app nativa, la proteccion real queda activa
+// sin tocar nada mas aca.
+Future<void> _protegerPantalla() async {
+  if (kIsWeb) {
+    // Unico deterrente real posible en navegador: apagar el menu
+    // contextual (clic derecho) que ofrece "Guardar imagen como...".
+    // No bloquea capturas, solo quita un atajo comodo.
+    BrowserContextMenu.disableContextMenu();
+    return;
+  }
+
+  try {
+    await ScreenProtector.preventScreenshotOn();
+    // En Android, ademas oculta el contenido en la vista de apps
+    // recientes (donde Android toma una miniatura automatica).
+    await ScreenProtector.protectDataLeakageWithBlur();
+  } catch (_) {
+    // Si corre en una plataforma sin soporte (ej. desktop), no debe
+    // tumbar el arranque de la app por esto.
+  }
+}
+
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  _protegerPantalla();
+
   // Por defecto, cuando un widget lanza una excepción durante su
   // construcción, Flutter muestra una caja gris SIN texto (el
   // ErrorWidget por defecto no imprime el mensaje salvo en modo

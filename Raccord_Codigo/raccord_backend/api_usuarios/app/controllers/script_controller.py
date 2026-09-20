@@ -1,12 +1,17 @@
+import logging
+
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger("raccord")
 
 from app.models.script_model import Script
 from app.models.scene_model import Scene
 from app.models.gallery_photo_model import GalleryPhoto
 from app.models.character_model import Character
 from app.models.scene_character_model import SceneCharacter
+from app.models.user_model import User
 
 from app.schemas.script_schema import ScriptSchema
 
@@ -318,11 +323,25 @@ def get_script_archivo(id: str, db: Session, current_user: dict):
     except Exception:
         raise HTTPException(status_code=404, detail="No se pudo recuperar el archivo desde el almacenamiento")
 
-    mail_usuario = current_user.get("mail", "usuario desconocido")
+    # El JWT (current_user) solo trae id_user/mail/id_rol (ver
+    # _build_session_response en login_controller.py), no el nombre —
+    # por eso hay que ir a buscarlo a la BD para que la marca de agua
+    # muestre "Nombre Apellido" en vez del correo.
+    usuario_db = db.query(User).filter(User.id_user == current_user.get("id_user")).first()
+    if usuario_db and (usuario_db.nombre or usuario_db.apellido):
+        texto_marca = f"{usuario_db.nombre or ''} {usuario_db.apellido or ''}".strip()
+    else:
+        texto_marca = current_user.get("mail", "usuario desconocido")
+
     try:
-        contenido = add_watermark(contenido, mail_usuario)
+        contenido = add_watermark(contenido, texto_marca)
     except Exception:
-        pass
+        # Antes esto era "except Exception: pass": si la marca de agua
+        # fallaba por lo que fuera, se servia el PDF original sin marca
+        # y sin ningun rastro del error. Se deja el mismo comportamiento
+        # (no se rompe la descarga), pero ahora el error queda logueado
+        # para poder diagnosticar por que no aparece la marca de agua.
+        logger.exception("Fallo al aplicar marca de agua al guion %s", id)
 
     return Response(
         content=contenido,
