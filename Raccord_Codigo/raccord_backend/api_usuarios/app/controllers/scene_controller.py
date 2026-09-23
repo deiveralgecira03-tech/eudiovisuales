@@ -2,6 +2,8 @@ from sqlalchemy.orm import Session
 
 from app.models.scene_model import Scene
 from app.models.script_model import Script
+from app.models.scene_character_model import SceneCharacter
+from app.models.character_model import Character
 
 from app.schemas.scene_schema import SceneSchema
 
@@ -9,10 +11,28 @@ from app.utils.response import api_response
 
 
 # ==========================================
+# SERIALIZAR PERSONAJE (para el cast embebido) — mismo shape que
+# scene_character_controller._serialize_character, para que el frontend
+# pueda reusar el mismo parseo sin importar de qué endpoint vino.
+# ==========================================
+def _serialize_character(c: Character):
+    return {
+        "id_personaje": c.id_personaje,
+        "nombre": c.nombre,
+        "edad": c.edad,
+        "codigo_personaje": c.codigo_personaje,
+    }
+
+
+# ==========================================
 # SERIALIZAR ESCENA
 # ==========================================
-def _serialize(s: Scene):
-    return {
+# `cast`: lista de personajes ya resuelta por el caller (ver get_scenes),
+# o None si no se pidió (endpoints que no la necesitan no pagan el costo
+# de la query extra). Cuando es None, la clave "cast" ni siquiera se
+# incluye, para no cambiar el shape que ya consumían otros lugares.
+def _serialize(s: Scene, cast: list | None = None):
+    data = {
         "id_escena": s.id_escena,
         "numero_de_escena": s.numero_de_escena,
         "encabezado": s.encabezado,
@@ -35,6 +55,9 @@ def _serialize(s: Scene):
         "bloque_grabacion": s.bloque_grabacion,
         "comentarios": s.comentarios
     }
+    if cast is not None:
+        data["cast"] = cast
+    return data
 
 
 # ==========================================
@@ -51,7 +74,30 @@ def get_scenes(id_project: str, db: Session):
         .order_by(Scene.id_escena)
         .all()
     )
-    return api_response(True, "Lista de escenas", [_serialize(s) for s in scenes])
+
+    # Cast de TODAS las escenas en 2 consultas (en vez de que el
+    # frontend dispare un GET /scenes/{id}/cast POR escena). Con ~129
+    # escenas en un proyecto real, eso eran ~129 peticiones HTTP
+    # "paralelas" pero en la práctica servidas en oleadas por el límite
+    # de conexiones concurrentes del cliente — muy lento en la red real
+    # de un dispositivo físico (Plan de Rodaje tardaba decenas de
+    # segundos en cargar). Ver shooting_days_screen.dart, que ahora usa
+    # este campo embebido en vez de ese prefetch por escena.
+    cast_by_scene: dict[str, list] = {}
+    scene_ids = [s.id_escena for s in scenes]
+    if scene_ids:
+        links = db.query(SceneCharacter).filter(SceneCharacter.id_escena.in_(scene_ids)).all()
+        character_ids = list({link.id_personaje for link in links})
+        characters_by_id = {}
+        if character_ids:
+            characters = db.query(Character).filter(Character.id_personaje.in_(character_ids)).all()
+            characters_by_id = {c.id_personaje: c for c in characters}
+        for link in links:
+            character = characters_by_id.get(link.id_personaje)
+            if character:
+                cast_by_scene.setdefault(link.id_escena, []).append(_serialize_character(character))
+
+    return api_response(True, "Lista de escenas", [_serialize(s, cast_by_scene.get(s.id_escena, [])) for s in scenes])
 
 
 # ==========================================

@@ -8,6 +8,7 @@ import '../../services/scene_service.dart';
 import '../../services/script_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/simple_bar_chart.dart';
 
 class _ModuleDef {
@@ -36,9 +37,25 @@ class ProjectDashboardScreen extends StatefulWidget {
 }
 
 class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
+  // GlobalObjectKey en vez de un GlobalKey<> a secas: su igualdad se basa
+  // en el VALOR (projectId), igual que la ValueKey que se usaba antes acá
+  // (ver comentario grande más abajo, junto a _ProjectCharts) — así se
+  // conserva ese fix (recrea el State si cambia de proyecto) y ADEMÁS
+  // permite llegar al State desde afuera (currentState) para poder
+  // disparar su recarga con el gesto de "deslizar hacia abajo".
+  GlobalObjectKey<_ProjectChartsState>? _chartsKey;
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh): las
+  // tarjetas de módulos de arriba son estáticas (no piden datos), así
+  // que solo hace falta recargar el panel de gráficos/resumen.
+  Future<void> _onPullRefresh() async {
+    await _chartsKey?.currentState?._load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.watch<AuthSession>();
+    _chartsKey = GlobalObjectKey<_ProjectChartsState>(session.projectId ?? 'sin-proyecto');
 
     return AppScaffold(
       // El Dashboard ES la pantalla del proyecto, así que su título
@@ -51,6 +68,10 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
       // Ya estamos en el Dashboard: no tiene sentido mostrar el ícono de
       // casa que lleva ahí mismo.
       showHome: false,
+      // El ícono de notificaciones vive SOLO acá — pedido explícito del
+      // usuario, para no quitarle espacio al logo/título en el resto de
+      // pantallas.
+      showNotifications: true,
       // Flecha para volver a "Gestión de Proyectos": la persona puede
       // trabajar en varios proyectos sin tener que salir de la plataforma
       // (cerrar sesión) para cambiar de uno a otro.
@@ -68,7 +89,10 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
       // true), igual que en todas las demás pantallas del proyecto.
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView(
+        child: MobileRefresh(
+          onRefresh: _onPullRefresh,
+          child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           child: Center(
             child: ConstrainedBox(
               // Ancho máximo generoso (pedido explícito del usuario: "que
@@ -81,21 +105,40 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   LayoutBuilder(builder: (context, constraints) {
-                    final cols = constraints.maxWidth > 900 ? 4 : (constraints.maxWidth > 560 ? 2 : 1);
-                    return GridView.count(
-                      crossAxisCount: cols,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      mainAxisSpacing: 20,
-                      crossAxisSpacing: 20,
-                      childAspectRatio: 1.05,
+                    // En PC (>900px) se ven las 4 tarjetas en una sola
+                    // fila. Por debajo de eso, antes caía a 1 sola
+                    // columna (cada tarjeta ocupando TODO el ancho de la
+                    // pantalla) — en celular eso las hacía verse enormes.
+                    // Ahora se usan 2 columnas (grilla 2x2) en cualquier
+                    // pantalla móvil/tablet, y solo se baja a 1 columna en
+                    // celulares realmente angostos (<340px), donde ni 2
+                    // columnas entrarían con un tamaño usable.
+                    final cols = constraints.maxWidth > 900 ? 4 : (constraints.maxWidth > 340 ? 2 : 1);
+                    final spacing = constraints.maxWidth <= 560 ? 12.0 : 20.0;
+                    final cardWidth = (constraints.maxWidth - spacing * (cols - 1)) / cols;
+                    // GridView.count con un childAspectRatio fijo se
+                    // desbordaba "BOTTOM OVERFLOWED BY X PIXELS" en
+                    // anchos intermedios (ej. tablet en horizontal con 4
+                    // columnas): el contenido de ModuleCard mide un alto
+                    // ligeramente distinto según el ancho real de cada
+                    // tarjeta, y una sola proporción fija no acertaba en
+                    // todos los tamaños de pantalla a la vez. Con `Wrap`
+                    // cada tarjeta mide su ALTO real según su contenido
+                    // (solo se fija el ancho vía SizedBox) — no hay
+                    // proporción que adivinar, así que no puede desbordar.
+                    return Wrap(
+                      spacing: spacing,
+                      runSpacing: spacing,
                       children: _modules
                           .where((m) => session.canSeeModule(m.modulo))
-                          .map((m) => ModuleCard(
-                                icon: m.icon,
-                                color: m.color,
-                                title: m.title,
-                                onTap: () => Navigator.of(context).pushNamed(m.route),
+                          .map((m) => SizedBox(
+                                width: cardWidth,
+                                child: ModuleCard(
+                                  icon: m.icon,
+                                  color: m.color,
+                                  title: m.title,
+                                  onTap: () => Navigator.of(context).pushNamed(m.route),
+                                ),
                               ))
                           .toList(),
                     );
@@ -115,10 +158,16 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                   // Cambiar la key según projectId fuerza a Flutter a
                   // descartar ese State viejo y crear uno nuevo (con
                   // initState nuevo) apenas hay proyecto disponible.
-                  _ProjectCharts(key: ValueKey(session.projectId)),
+                  // (Ahora es un GlobalObjectKey — ver _chartsKey arriba —
+                  // en vez de una ValueKey simple, para además poder
+                  // disparar su recarga desde el pull-to-refresh de esta
+                  // pantalla, pero el efecto de "recrear si cambia el
+                  // proyecto" es el mismo.)
+                  _ProjectCharts(key: _chartsKey),
                 ],
               ),
             ),
+          ),
           ),
         ),
       ),
@@ -219,20 +268,24 @@ class _ProjectChartsState extends State<_ProjectCharts> {
           final cols = constraints.maxWidth > 900
               ? 5
               : (constraints.maxWidth > 680 ? 3 : (constraints.maxWidth > 420 ? 2 : 1));
-          return GridView.count(
-            crossAxisCount: cols,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 14,
-            crossAxisSpacing: 14,
-            childAspectRatio: 2.6,
-            children: [
-              StatCard(label: 'Guiones', value: '${_guiones ?? 0}', icon: Icons.description_outlined, color: AppColors.azulProfundo),
-              StatCard(label: 'Escenas', value: '${scenes.length}', icon: Icons.movie_filter_outlined, color: AppColors.moradoTech),
-              StatCard(label: 'Días Dramáticos', value: '$diasDramaticos', icon: Icons.auto_stories_outlined, color: AppColors.coral),
-              StatCard(label: 'Fechas de Grabación', value: '${diasRodaje.total}', icon: Icons.calendar_month_outlined, color: AppColors.azulProfundo),
-              StatCard(label: 'Personajes', value: '${_personajes ?? 0}', icon: Icons.people_alt_outlined, color: AppColors.moradoTech),
-            ],
+          const spacing = 14.0;
+          final cardWidth = (constraints.maxWidth - spacing * (cols - 1)) / cols;
+          // Mismo motivo que la grilla de módulos de arriba: un
+          // childAspectRatio fijo (2.6) se quedaba corto por 1-2px justo
+          // en el punto donde entran 5 columnas en una tablet — con
+          // `Wrap` cada tarjeta mide su alto real (fijo, ~72px, no
+          // depende del ancho) y nunca se desborda.
+          final stats = [
+            StatCard(label: 'Guiones', value: '${_guiones ?? 0}', icon: Icons.description_outlined, color: AppColors.azulProfundo),
+            StatCard(label: 'Escenas', value: '${scenes.length}', icon: Icons.movie_filter_outlined, color: AppColors.moradoTech),
+            StatCard(label: 'Días Dramáticos', value: '$diasDramaticos', icon: Icons.auto_stories_outlined, color: AppColors.coral),
+            StatCard(label: 'Fechas de Grabación', value: '${diasRodaje.total}', icon: Icons.calendar_month_outlined, color: AppColors.azulProfundo),
+            StatCard(label: 'Personajes', value: '${_personajes ?? 0}', icon: Icons.people_alt_outlined, color: AppColors.moradoTech),
+          ];
+          return Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: [for (final s in stats) SizedBox(width: cardWidth, child: s)],
           );
         }),
         const SizedBox(height: 14),

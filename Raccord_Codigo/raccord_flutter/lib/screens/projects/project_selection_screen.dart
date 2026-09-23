@@ -8,6 +8,7 @@ import '../../models/project.dart';
 import '../../services/project_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/state_views.dart';
 import 'project_form_screen.dart';
 
@@ -48,7 +49,19 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
     return service.myProjects(session.user?.idUser ?? '');
   }
 
-  void _reload() => setState(() => _future = _load());
+  // Con llaves para que el callback de setState devuelva void y no el
+  // Future de _load() (ver crew_list_screen.dart para el detalle del bug).
+  void _reload() => setState(() {
+        _future = _load();
+      });
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh).
+  Future<void> _onPullRefresh() async {
+    _reload();
+    try {
+      await _future;
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +92,10 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: MobileRefresh(
+          onRefresh: _onPullRefresh,
+          child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 32),
           // Se centra todo el contenido y se limita su ancho máximo para
           // que, en pantallas anchas (navegador de escritorio), las
@@ -201,6 +217,7 @@ class _ProjectSelectionScreenState extends State<ProjectSelectionScreen> {
                 ],
               ),
             ),
+          ),
           ),
         ),
       ),

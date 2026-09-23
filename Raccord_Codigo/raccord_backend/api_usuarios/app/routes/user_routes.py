@@ -27,7 +27,7 @@ from app.controllers.user_controller import (
 # proyecto (user_projects) para "usuarios de un proyecto".
 from app.middleware.auth import get_current_user, require_permission
 from app.utils.project_scope import require_same_client_user, require_project_member, get_user_client
-from app.utils.module_access import check_module_view_access
+from app.utils.module_access import check_module_view_access, check_module_view_access_any
 
 # ==========================================
 # ROUTER (CRUD de usuarios, todo protegido)
@@ -70,8 +70,14 @@ def users_by_project(
 ):
     # Guardia adicional: accesos personalizados por módulo (ver
     # app/utils/module_access.py) — no reemplaza el chequeo de arriba.
-    # Este listado es el que alimenta la pantalla "Roles del Equipo".
-    check_module_view_access(db, current_user, id_project, "roles", current_user.get("id_rol"))
+    # Este listado alimenta DOS pantallas con requisitos distintos:
+    # "Roles del Equipo" (módulo "roles") y "Crew List" (módulo
+    # "crew_list", p. ej. Onset/Usuario tienen "ver" ahí aunque no
+    # tengan acceso a "roles"). Antes se chequeaba solo "roles" y por
+    # eso Onset/Usuario recibían 403 al abrir Crew List pese a tener
+    # "crew_list": "ver" en la matriz de roles. Ahora basta con tener
+    # acceso a CUALQUIERA de los dos módulos.
+    check_module_view_access_any(db, current_user, id_project, ["roles", "crew_list"], current_user.get("id_rol"))
     return get_users_by_project(id_project, db)
 
 

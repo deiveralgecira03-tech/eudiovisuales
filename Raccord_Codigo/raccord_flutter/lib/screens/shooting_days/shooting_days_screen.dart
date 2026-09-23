@@ -12,6 +12,7 @@ import '../../services/shooting_day_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/state_views.dart';
 import '../scenes/scene_edit_screen.dart';
@@ -244,10 +245,17 @@ class _PlanData {
   // vez acá — antes cada fila del stripboard (_RepartoBadges) lo pedía
   // por su cuenta de forma perezosa, lo cual funcionaba para mostrarlo
   // pero no alcanzaba para poder ORDENAR por "ID de reparto" (no hay
-  // forma de ordenar por un dato que todavía no se cargó). No hay
-  // endpoint de "cast" en lote en el backend, así que se hacen N
-  // peticiones en paralelo (Future.wait) — el costo se paga una sola
-  // vez al entrar a la pantalla, no por cada fila visible.
+  // forma de ordenar por un dato que todavía no se cargó).
+  //
+  // Antes esto se armaba con un GET /scenes/{id}/cast POR escena en
+  // paralelo (Future.wait) — con ~129 escenas en un proyecto real, el
+  // límite de conexiones HTTP concurrentes del cliente terminaba
+  // sirviendo esas ~129 peticiones en oleadas, y en la red real de un
+  // dispositivo físico (a diferencia de localhost) eso tardaba decenas
+  // de segundos. Ahora el backend embebe el cast de TODAS las escenas
+  // en la MISMA respuesta de `sceneService.all()` (ver Scene.cast en
+  // models/scene.dart y scene_controller.py), así que esto solo
+  // reorganiza datos que ya llegaron — 0 peticiones adicionales.
   final Map<String, List<Map<String, dynamic>>> castByScene;
   _PlanData({required this.days, required this.scenes, required this.castByScene});
 }
@@ -280,24 +288,32 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
     final days = results[0] as List<ShootingDay>;
     final scenes = results[1] as List<Scene>;
 
-    final castLists = await Future.wait(scenes.map((s) async {
-      if (s.idEscena == null) return const <Map<String, dynamic>>[];
-      try {
-        return await sceneService.cast(s.idEscena!);
-      } catch (_) {
-        return const <Map<String, dynamic>>[];
-      }
-    }));
+    // `scene.cast` ya viene embebido en la respuesta de `sceneService.all()`
+    // (ver comentario en _PlanData.castByScene). Si por lo que sea llega
+    // null (ej. backend viejo sin este campo todavía desplegado), se cae
+    // a lista vacía para esa escena en vez de romper la pantalla.
     final castByScene = <String, List<Map<String, dynamic>>>{};
-    for (var i = 0; i < scenes.length; i++) {
-      final id = scenes[i].idEscena;
-      if (id != null) castByScene[id] = castLists[i];
+    for (final s in scenes) {
+      final id = s.idEscena;
+      if (id != null) castByScene[id] = s.cast ?? const <Map<String, dynamic>>[];
     }
 
     return _PlanData(days: days, scenes: scenes, castByScene: castByScene);
   }
 
-  void _reload() => setState(() => _future = _load());
+  // Con llaves para que el callback de setState devuelva void y no el
+  // Future de _load() (ver crew_list_screen.dart para el detalle del bug).
+  void _reload() => setState(() {
+        _future = _load();
+      });
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh).
+  Future<void> _onPullRefresh() async {
+    _reload();
+    try {
+      await _future;
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -389,10 +405,21 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
           // Solo se muestra el estado vacío si de verdad no hay nada
           // (ni días ni escenas).
           if (days.isEmpty && data.scenes.isEmpty) {
-            return const EmptyView(message: 'Todavía no hay días de rodaje ni escenas planificadas.', icon: Icons.event_note_outlined);
+            return MobileRefresh(
+              onRefresh: _onPullRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  EmptyView(message: 'Todavía no hay días de rodaje ni escenas planificadas.', icon: Icons.event_note_outlined),
+                ],
+              ),
+            );
           }
 
-          return ListView(
+          return MobileRefresh(
+            onRefresh: _onPullRefresh,
+            child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(20),
             children: [
               const _StripboardLegend(),
@@ -472,6 +499,7 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
                   ),
                 ),
             ],
+            ),
           );
         },
       ),
@@ -559,7 +587,7 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
 
     try {
       final session = context.read<AuthSession>();
-      await exportTablePdf(
+      final guardado = await exportTablePdf(
         fileName: 'plan_de_rodaje',
         titulo: 'Plan de Rodaje',
         headers: const [
@@ -570,7 +598,11 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
         rows: rows,
         marcaAguaTexto: watermarkTextFor(session),
       );
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Descarga iniciada')));
+      // guardado == false: la persona cerró el selector "Guardar como"
+      // sin elegir carpeta — no es un error, no hace falta avisar nada.
+      if (mounted && guardado) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PDF guardado correctamente')));
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo generar el archivo.')));

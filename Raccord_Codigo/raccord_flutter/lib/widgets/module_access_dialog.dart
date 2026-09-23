@@ -49,7 +49,13 @@ class _ModuleAccessDialogState extends State<ModuleAccessDialog> {
     return ModuleAccessService(session.api).list(widget.projectId, widget.idUser);
   }
 
-  void _reload() => setState(() => _future = _load());
+  // Con llaves para que el callback de setState devuelva void y no el
+  // Future de _load() — de lo contrario Flutter lanza 'setState()
+  // callback argument returned a Future' y el widget nunca se
+  // reconstruye (ver mismo fix en crew_list_screen.dart).
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<void> _applyChange(String modulo, String? nivelSeleccionado, bool teniaExcepcion) async {
     final session = context.read<AuthSession>();

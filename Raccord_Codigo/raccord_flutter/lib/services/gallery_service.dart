@@ -1,4 +1,5 @@
 import '../core/api_client.dart';
+import '../core/api_exception.dart';
 import '../core/json_utils.dart';
 import '../models/gallery_photo.dart';
 
@@ -46,7 +47,16 @@ class GalleryService {
         if (notasContinuidad != null && notasContinuidad.isNotEmpty) 'notas_continuidad': notasContinuidad,
       },
     );
-    return GalleryPhoto.fromJson(Map<String, dynamic>.from(data as Map));
+    // ApiClient._parse devuelve null si la respuesta vino sin cuerpo o
+    // con un cuerpo que no pudo decodificar como JSON — antes eso hacía
+    // que `data as Map` lanzara un TypeError crudo ("type Null is not a
+    // subtype of type Map") que escapaba como excepción NO-ApiException
+    // y quedaba sin mensaje claro para el usuario. Se convierte acá en
+    // un error explícito y entendible.
+    if (data is! Map) {
+      throw ApiException('El servidor no confirmó la subida de la foto. Verifica tu conexión e inténtalo de nuevo.', errorCode: 'UPLOAD_NO_RESPONSE');
+    }
+    return GalleryPhoto.fromJson(Map<String, dynamic>.from(data));
   }
 
   Future<List<int>> archivoBytes(String idFoto) {

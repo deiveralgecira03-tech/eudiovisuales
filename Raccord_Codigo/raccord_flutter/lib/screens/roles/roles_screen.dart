@@ -14,6 +14,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/bulk_upload_button.dart';
 import '../../widgets/invite_person_dialog.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/module_access_dialog.dart';
 import '../../widgets/state_views.dart';
 import '../../core/bulk_import.dart';
@@ -60,7 +61,19 @@ class _RolesScreenState extends State<RolesScreen> {
     }
   }
 
-  void _reload() => setState(() => _future = _load());
+  // Con llaves para que el callback de setState devuelva void y no el
+  // Future de _load() (ver crew_list_screen.dart para el detalle del bug).
+  void _reload() => setState(() {
+        _future = _load();
+      });
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh).
+  Future<void> _onPullRefresh() async {
+    _reload();
+    try {
+      await _future;
+    } catch (_) {}
+  }
 
   bool _esPendiente(AppUser u) => (u.estado ?? '').toLowerCase() == 'pendiente';
   bool _esSuspendido(AppUser u) => (u.estado ?? '').toLowerCase() == 'suspendido';
@@ -158,17 +171,21 @@ class _RolesScreenState extends State<RolesScreen> {
               onDone: _reload,
             ),
           ),
-        if (canInvite)
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ElevatedButton.icon(
-              onPressed: () => _openInviteDialog(context),
-              icon: const Icon(Icons.mail_outline, size: 18),
-              label: const Text('Invitar persona'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.moradoTech),
-            ),
-          ),
       ],
+      // "Invitar persona" bajó de la barra superior a un botón flotante
+      // (mismo patrón que "Nuevo día" en Plan de Rodaje) — pedido
+      // explícito del usuario: el logo nunca debe achicarse, así que la
+      // acción principal de esta pantalla se saca de arriba en vez de
+      // competir por ese espacio con el wordmark.
+      floatingActionButton: canInvite
+          ? FloatingActionButton.extended(
+              onPressed: () => _openInviteDialog(context),
+              icon: const Icon(Icons.mail_outline),
+              label: const Text('Invitar persona'),
+              backgroundColor: AppColors.moradoTech,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: FutureBuilder<List<AppUser>>(
         future: _future,
         builder: (context, snap) {
@@ -178,7 +195,13 @@ class _RolesScreenState extends State<RolesScreen> {
           }
           final users = snap.data ?? [];
           if (users.isEmpty) {
-            return const EmptyView(message: 'Aún no hay personas vinculadas a este proyecto.', icon: Icons.group_outlined);
+            return MobileRefresh(
+              onRefresh: _onPullRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [EmptyView(message: 'Aún no hay personas vinculadas a este proyecto.', icon: Icons.group_outlined)],
+              ),
+            );
           }
 
           final pendientes = users.where(_esPendiente).length;
@@ -209,56 +232,61 @@ class _RolesScreenState extends State<RolesScreen> {
                 ),
                 const SizedBox(height: 16),
                 Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // La tabla de 4 columnas (Expanded con flex) no se
-                      // desborda en angosto gracias al `Expanded`, pero
-                      // queda ilegible (columnas comprimidas a unos pocos
-                      // px). Por debajo de 640px de ancho se reemplaza por
-                      // una lista de tarjetas apiladas, una por persona.
-                      final wide = constraints.maxWidth > 640;
-                      if (wide) {
-                        return Column(
-                          children: [
-                            _TableHeader(),
-                            const SizedBox(height: 4),
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.border),
-                                ),
-                                child: ListView.separated(
-                                  itemCount: users.length,
-                                  separatorBuilder: (_, __) => const Divider(height: 1),
-                                  itemBuilder: (context, i) => _UserRow(
-                                    user: users[i],
-                                    departamentoNombre: _departamentoNombre(users[i].idDepartamento),
-                                    canManageEstado: _puedeGestionarEstado(session, users[i]),
-                                    onToggleEstado: () => _toggleEstado(users[i]),
-                                    canCustomizeAccess: _puedePersonalizarAccesos,
-                                    onCustomizeAccess: () => _openModuleAccessDialog(users[i]),
+                  child: MobileRefresh(
+                    onRefresh: _onPullRefresh,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // La tabla de 4 columnas (Expanded con flex) no se
+                        // desborda en angosto gracias al `Expanded`, pero
+                        // queda ilegible (columnas comprimidas a unos pocos
+                        // px). Por debajo de 640px de ancho se reemplaza por
+                        // una lista de tarjetas apiladas, una por persona.
+                        final wide = constraints.maxWidth > 640;
+                        if (wide) {
+                          return Column(
+                            children: [
+                              _TableHeader(),
+                              const SizedBox(height: 4),
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.border),
+                                  ),
+                                  child: ListView.separated(
+                                    physics: const AlwaysScrollableScrollPhysics(),
+                                    itemCount: users.length,
+                                    separatorBuilder: (_, __) => const Divider(height: 1),
+                                    itemBuilder: (context, i) => _UserRow(
+                                      user: users[i],
+                                      departamentoNombre: _departamentoNombre(users[i].idDepartamento),
+                                      canManageEstado: _puedeGestionarEstado(session, users[i]),
+                                      onToggleEstado: () => _toggleEstado(users[i]),
+                                      canCustomizeAccess: _puedePersonalizarAccesos,
+                                      onCustomizeAccess: () => _openModuleAccessDialog(users[i]),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          );
+                        }
+                        return ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: users.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, i) => _UserCard(
+                            user: users[i],
+                            departamentoNombre: _departamentoNombre(users[i].idDepartamento),
+                            canManageEstado: _puedeGestionarEstado(session, users[i]),
+                            onToggleEstado: () => _toggleEstado(users[i]),
+                            canCustomizeAccess: _puedePersonalizarAccesos,
+                            onCustomizeAccess: () => _openModuleAccessDialog(users[i]),
+                          ),
                         );
-                      }
-                      return ListView.separated(
-                        itemCount: users.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, i) => _UserCard(
-                          user: users[i],
-                          departamentoNombre: _departamentoNombre(users[i].idDepartamento),
-                          canManageEstado: _puedeGestionarEstado(session, users[i]),
-                          onToggleEstado: () => _toggleEstado(users[i]),
-                          canCustomizeAccess: _puedePersonalizarAccesos,
-                          onCustomizeAccess: () => _openModuleAccessDialog(users[i]),
-                        ),
-                      );
-                    },
+                      },
+                    ),
                   ),
                 ),
               ],

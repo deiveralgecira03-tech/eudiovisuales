@@ -1,7 +1,10 @@
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:file_saver/file_saver.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
@@ -12,6 +15,7 @@ import '../../services/gallery_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/photo_viewer_dialog.dart';
 import '../../widgets/state_views.dart';
 
@@ -76,7 +80,19 @@ class _GalleryScreenState extends State<GalleryScreen> {
     return GalleryService(session.api).all(session.projectId ?? '');
   }
 
-  void _reload() => setState(() => _future = _load());
+  // Con llaves para que el callback de setState devuelva void y no el
+  // Future de _load() (ver crew_list_screen.dart para el detalle del bug).
+  void _reload() => setState(() {
+        _future = _load();
+      });
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh).
+  Future<void> _onPullRefresh() async {
+    _reload();
+    try {
+      await _future;
+    } catch (_) {}
+  }
 
   /// Extrae el número inicial de "numeroDeEscena" (ej. "3", "3A") para
   /// ordenar los grupos numéricamente en vez de alfabéticamente (donde
@@ -184,6 +200,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
   }
 
+  // true en Android/iOS (nunca en Web/Windows, donde no existe una
+  // "Galería del sistema" a la que guardar): ahí las fotos se guardan
+  // con el paquete "gal" directo en la Galería, en vez del selector
+  // "Guardar como" genérico de file_saver (ver _descargarSeleccionadas).
+  bool get _guardarEnGaleriaNativa => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
   // Descarga CADA foto seleccionada por separado (una descarga del
   // navegador por foto) — a pedido explícito del usuario, nada de
   // .zip: en el navegador del celular quedaba feo/confuso.
@@ -195,6 +217,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
     final session = context.read<AuthSession>();
     final service = GalleryService(session.api);
     final marcaAguaTexto = watermarkTextFor(session);
+    // En Android/iOS (_guardarEnGaleriaNativa) se guarda directo en la
+    // Galería con "gal" — antes se usaba FileSaver.saveAs() ahí también,
+    // que abre el selector "Guardar como" genérico: la persona terminaba
+    // guardando en "Documentos" (o donde sea que tocara) y la foto nunca
+    // aparecía reflejada en la Galería como cualquier otra foto
+    // descargada (reporte explícito del usuario). En Web/Windows, donde
+    // no existe una "Galería del sistema", se sigue usando saveAs().
+    var guardadas = 0;
     try {
       for (var i = 0; i < elegidas.length; i++) {
         final foto = elegidas[i];
@@ -215,12 +245,26 @@ class _GalleryScreenState extends State<GalleryScreen> {
           extension = extensionOriginal;
         }
 
-        await FileSaver.instance.saveFile(
-          name: nombre,
-          bytes: bytesFinal,
-          fileExtension: extension,
-          mimeType: _mimeFor(extension),
-        );
+        if (_guardarEnGaleriaNativa) {
+          // Gal.putImageBytes guarda directo en la Galería/Fotos del
+          // sistema (álbum "Raccord") — sin selector, sin pasos extra,
+          // igual que cualquier otra foto descargada en el celular.
+          try {
+            await Gal.putImageBytes(bytesFinal, name: nombre, album: 'Raccord');
+            guardadas++;
+          } on GalException catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.type.message)));
+          }
+        } else {
+          final savedPath = await FileSaver.instance.saveAs(
+            name: nombre,
+            bytes: bytesFinal,
+            fileExtension: extension,
+            mimeType: _mimeFor(extension),
+          );
+          if (savedPath != null) guardadas++;
+        }
         // Pequeña pausa entre descargas: si se disparan todas de
         // corrido, algunos navegadores bloquean o preguntan por
         // "este sitio quiere descargar varios archivos".
@@ -233,6 +277,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
         _seleccionando = false;
         _seleccionadas.clear();
       });
+      if (guardadas > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(guardadas == 1 ? 'Foto guardada correctamente' : '$guardadas fotos guardadas correctamente')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _descargando = false);
@@ -260,9 +309,17 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
           final todas = snap.data ?? [];
           if (todas.isEmpty) {
-            return const EmptyView(
-              message: 'Todavía no hay fotos de continuidad en ninguna escena.',
-              icon: Icons.photo_library_outlined,
+            return MobileRefresh(
+              onRefresh: _onPullRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  EmptyView(
+                    message: 'Todavía no hay fotos de continuidad en ninguna escena.',
+                    icon: Icons.photo_library_outlined,
+                  ),
+                ],
+              ),
             );
           }
 
@@ -374,13 +431,24 @@ class _GalleryScreenState extends State<GalleryScreen> {
               const SizedBox(height: 16),
               Expanded(
                 child: fotos.isEmpty
-                    ? const EmptyView(message: 'Ninguna foto coincide con la búsqueda.', icon: Icons.search_off)
+                    ? MobileRefresh(
+                        onRefresh: _onPullRefresh,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            EmptyView(message: 'Ninguna foto coincide con la búsqueda.', icon: Icons.search_off),
+                          ],
+                        ),
+                      )
                     : Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: SingleChildScrollView(
+                            child: MobileRefresh(
+                              onRefresh: _onPullRefresh,
+                              child: SingleChildScrollView(
                               controller: _scrollController,
+                              physics: const AlwaysScrollableScrollPhysics(),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -458,6 +526,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                     ),
                                 ],
                               ),
+                            ),
                             ),
                           ),
                           if (dias.length > 1) ...[

@@ -13,10 +13,12 @@ from app.controllers.login_controller import (
     login_user,
     check_2fa_required,
     send_2fa_code,
-    verify_2fa_code
+    verify_2fa_code,
+    logout_user
 )
 
 from app.utils.rate_limit import rate_limit
+from app.middleware.auth import get_current_user
 
 # ==========================================
 # ROUTER (público, es el punto de entrada de sesión)
@@ -38,6 +40,20 @@ def login(
     _rl=Depends(rate_limit("login", max_attempts=8, window_seconds=60)),
 ):
     return login_user(user.mail, user.contrasena, db)
+
+
+# LOGOUT
+# Requiere estar autenticado (el propio token es lo que se va a
+# revocar). Ver app/utils/token_revocation.py y
+# app/middleware/auth.py: desde acá en adelante, ESTE token deja de
+# servir contra la API aunque su firma y su "exp" sigan siendo
+# válidos.
+@router.post("/logout")
+def logout(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return logout_user(current_user, db)
 
 
 # 2FA - VERIFICAR SI NECESITA 2FA

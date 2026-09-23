@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/bulk_import.dart';
+import '../core/responsive.dart';
 
 /// Botón "Carga masiva" reutilizable (escenas, personajes, actores,
 /// roles). Se encarga de la parte genérica: elegir el archivo
@@ -25,11 +26,27 @@ class _BulkUploadButtonState extends State<BulkUploadButton> {
 
   @override
   Widget build(BuildContext context) {
+    final icon = _loading
+        ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+        : const Icon(Icons.upload_file_outlined, size: 18);
+
+    // En móvil/tablet angosto, el texto "Carga masiva" junto a los demás
+    // botones de la barra superior (Agregar Persona, home, notificaciones,
+    // menú, avatar) era lo que desbordaba el AppBar. Se colapsa a un
+    // ícono solo (con tooltip) en pantallas angostas, igual que el resto
+    // de acciones responsive del AppBar.
+    if (isMobileScreen(context)) {
+      return IconButton(
+        onPressed: _loading ? null : _run,
+        icon: icon,
+        tooltip: 'Carga masiva',
+        style: IconButton.styleFrom(side: BorderSide(color: Theme.of(context).colorScheme.outline)),
+      );
+    }
+
     return OutlinedButton.icon(
       onPressed: _loading ? null : _run,
-      icon: _loading
-          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-          : const Icon(Icons.upload_file_outlined, size: 18),
+      icon: icon,
       label: const Text('Carga masiva'),
     );
   }

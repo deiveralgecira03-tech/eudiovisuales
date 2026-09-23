@@ -43,6 +43,7 @@ from app.models.scene_character_model import SceneCharacter
 from app.models.gallery_photo_model import GalleryPhoto
 from app.models.crew_member_model import CrewMember
 from app.models.module_access_model import UserProjectModuleAccess
+from app.models.revoked_token_model import RevokedToken
 from app.utils.response import api_response
 
 load_dotenv()

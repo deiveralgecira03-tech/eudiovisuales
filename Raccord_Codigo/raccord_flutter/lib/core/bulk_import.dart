@@ -20,19 +20,18 @@ import 'package:file_picker/file_picker.dart';
 ///
 /// Devuelve `null` si la persona cancela el selector de archivos.
 Future<List<Map<String, String>>?> pickAndParseBulkFile() async {
-  final result = await FilePicker.platform.pickFiles(
+  // file_picker 13.x: pickFile() (singular) reemplaza al viejo patrón
+  // pickFiles(...).files.single — devuelve el PlatformFile directo (o
+  // null si se cancela), sin el wrapper FilePickerResult. withData ya
+  // no existe: los bytes se piden aparte, siempre async, con
+  // readAsBytes() (ver abajo) — funciona igual en Web que en nativo.
+  final picked = await FilePicker.pickFile(
     type: FileType.custom,
     allowedExtensions: ['csv', 'json'],
-    withData: true,
   );
-  if (result == null || result.files.isEmpty) return null;
+  if (picked == null) return null;
 
-  final picked = result.files.single;
-  final bytes = picked.bytes;
-  if (bytes == null) {
-    throw Exception('No se pudo leer el archivo seleccionado');
-  }
-
+  final bytes = await picked.readAsBytes();
   final nombre = picked.name.toLowerCase();
 
   if (nombre.endsWith('.json')) {

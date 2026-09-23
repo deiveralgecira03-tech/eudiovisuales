@@ -17,6 +17,7 @@ import '../../services/script_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/state_views.dart';
 import '../scenes/scenes_screen.dart' show colorForEstadoEscena;
 
@@ -104,6 +105,16 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
   /// [_diaDeRodajeCalculado]), no solo la seleccionada.
   List<Scene> _allScenes = [];
 
+  // Guard contra condición de carrera: si el usuario selecciona una
+  // escena y, antes de que esa petición termine, selecciona otra (o
+  // reintenta), la respuesta de la petición VIEJA llegaba después y su
+  // `finally` apagaba `_loadingItems` de la petición NUEVA (todavía en
+  // vuelo) sin datos ni error que mostrar — la pantalla quedaba
+  // "congelada" sin spinner y sin contenido, indistinguible de un
+  // cuelgue real. Cada llamada a `_selectScene` toma un número de turno;
+  // solo la última en curso puede tocar el estado.
+  int _selectToken = 0;
+
   @override
   void initState() {
     super.initState();
@@ -155,6 +166,7 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
   }
 
   Future<void> _selectScene(Scene scene) async {
+    final token = ++_selectToken;
     setState(() {
       _selectedScene = scene;
       _loadingItems = true;
@@ -164,22 +176,34 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
     });
 
     final session = context.read<AuthSession>();
-    // En móvil la vista dividida no está disponible (ver build()), así
-    // que no tiene sentido descargar el PDF del guion completo solo para
-    // nunca mostrarlo.
-    if (scene.idGuion != null && !isMobileScreen(context)) {
-      setState(() => _pdfBytes = ScriptService(session.api).archivoBytes(scene.idGuion!));
+    // La vista dividida (y por lo tanto el PDF del guion) solo existe en
+    // PC/Web, y solo tiene sentido descargarlo si además está prendida —
+    // antes se descargaba igual aunque estuviera apagada.
+    if (scene.idGuion != null && canUseSplitView(context) && _vistaDividida) {
+      // Con llaves para que el callback de setState devuelva void y no
+      // el Future de archivoBytes() (mismo bug que en crew_list_screen.dart
+      // — con body de una sola expresión, Dart hace que setState()
+      // "devuelva" el Future en vez de nada, y Flutter lo rechaza antes
+      // de reconstruir el widget).
+      setState(() {
+        _pdfBytes = ScriptService(session.api).archivoBytes(scene.idGuion!);
+      });
     }
     try {
       final items = await BreakdownService(session.api).itemsByScene(scene.idEscena!);
-      if (!mounted) return;
+      // Si mientras esta petición estaba en vuelo el usuario ya
+      // seleccionó OTRA escena (token cambió), esta respuesta llegó
+      // tarde y no debe pisar el estado de la selección actual.
+      if (!mounted || token != _selectToken) return;
       setState(() => _items = items);
     } on ApiException catch (e) {
+      if (!mounted || token != _selectToken) return;
       setState(() => _itemsError = e.message);
     } catch (_) {
+      if (!mounted || token != _selectToken) return;
       setState(() => _itemsError = 'No se pudo cargar el desglose.');
     } finally {
-      if (mounted) setState(() => _loadingItems = false);
+      if (mounted && token == _selectToken) setState(() => _loadingItems = false);
     }
   }
 
@@ -187,17 +211,30 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
     if (_selectedScene != null) _selectScene(_selectedScene!);
   }
 
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh) — un
+  // caso recarga la lista de escenas (cuando todavía no hay ninguna
+  // seleccionada), el otro recarga el desglose de la escena elegida.
+  Future<void> _onPullRefreshScenes() async {
+    setState(() => _scenesFuture = _loadScenes());
+    try {
+      await _scenesFuture;
+    } catch (_) {}
+  }
+
+  Future<void> _onPullRefreshItems() async {
+    _reloadItems();
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.watch<AuthSession>();
     final canManage = session.can('manage_general_breakdown');
     final canDownload = session.can('download_files');
-    // La vista dividida (guion en PDF al lado del desglose) no se ofrece
-    // en móvil, ni siquiera apilada: además de quedar inutilizable en una
-    // pantalla angosta, carga el visor de PDF (pdfrx/PDFium — su propio
-    // worker WASM) sin necesidad, solo para generar ruido en consola.
-    final mobile = isMobileScreen(context);
-    final mostrarVistaDividida = _vistaDividida && !mobile;
+    // La vista dividida (guion en PDF al lado del desglose) solo se
+    // ofrece en PC/Web — en móvil/tablet (app nativa) nunca debe
+    // aparecer, sin importar el ancho de pantalla.
+    final splitViewAllowed = canUseSplitView(context);
+    final mostrarVistaDividida = _vistaDividida && splitViewAllowed;
 
     return AppScaffold(
       title: 'Desglose de Producción',
@@ -209,7 +246,7 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
             tooltip: 'Descargar desglose de esta escena (PDF)',
             onPressed: (_items == null || _items!.isEmpty) ? null : () => _download(),
           ),
-        if (_selectedScene != null && !mobile)
+        if (_selectedScene != null && splitViewAllowed)
           IconButton(
             icon: Icon(_vistaDividida ? Icons.vertical_split : Icons.vertical_split_outlined),
             tooltip: _vistaDividida ? 'Cerrar vista dividida' : 'Vista dividida con el guion',
@@ -252,8 +289,16 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
             ),
             const SizedBox(height: 20),
             if (_selectedScene == null)
-              const Expanded(
-                child: EmptyView(message: 'Busca y selecciona una escena para ver su desglose.', icon: Icons.checklist_outlined),
+              Expanded(
+                child: MobileRefresh(
+                  onRefresh: _onPullRefreshScenes,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      EmptyView(message: 'Busca y selecciona una escena para ver su desglose.', icon: Icons.checklist_outlined),
+                    ],
+                  ),
+                ),
               )
             else
               Expanded(
@@ -349,12 +394,15 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
         if (!_loadingItems && _itemsError != null) Expanded(child: ErrorView(message: _itemsError!, onRetry: _reloadItems)),
         if (!_loadingItems && _itemsError == null && _items != null)
           Expanded(
-            child: _CategoryCardsGrid(
-              items: _items!,
-              canManage: canManage,
-              onAdd: (categoria) => _openForm(context, initialCategoria: categoria),
-              onEdit: (item) => _openForm(context, existing: item),
-              onDelete: (item) => _deleteItem(item),
+            child: MobileRefresh(
+              onRefresh: _onPullRefreshItems,
+              child: _CategoryCardsGrid(
+                items: _items!,
+                canManage: canManage,
+                onAdd: (categoria) => _openForm(context, initialCategoria: categoria),
+                onEdit: (item) => _openForm(context, existing: item),
+                onDelete: (item) => _deleteItem(item),
+              ),
             ),
           ),
       ],
@@ -378,7 +426,7 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
     if (_selectedScene == null || _items == null) return;
     try {
       final session = context.read<AuthSession>();
-      await exportTablePdf(
+      final guardado = await exportTablePdf(
         fileName: 'desglose_esc_${_selectedScene!.numeroDeEscena}',
         titulo: 'Desglose de Producción — ESC ${_selectedScene!.numeroDeEscena}',
         subtitulo: _selectedScene!.encabezado,
@@ -394,7 +442,11 @@ class _BreakdownScreenState extends State<BreakdownScreen> {
         ],
         marcaAguaTexto: watermarkTextFor(session),
       );
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Descarga iniciada')));
+      // guardado == false: la persona cerró el selector "Guardar como"
+      // sin elegir carpeta — no es un error, no hace falta avisar nada.
+      if (mounted && guardado) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PDF guardado correctamente')));
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo generar el archivo.')));
@@ -447,14 +499,10 @@ class _SceneSearchField extends StatelessWidget {
       },
       onSelected: onSelected,
       fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
-        return TextField(
+        return _SceneSearchTextField(
           controller: controller,
           focusNode: focusNode,
-          decoration: const InputDecoration(
-            labelText: 'Escena',
-            hintText: 'Busca por número o por texto del encabezado...',
-            prefixIcon: Icon(Icons.search),
-          ),
+          fallbackText: selected != null ? _label(selected!) : '',
         );
       },
       optionsViewBuilder: (context, onSelected, options) {
@@ -490,6 +538,105 @@ class _SceneSearchField extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// TextField del [_SceneSearchField]. Se necesita como widget aparte
+/// (con estado propio) porque el `Autocomplete` de Flutter, tal como
+/// viene de fábrica, solo vuelve a llamar a `optionsBuilder` cuando el
+/// TEXTO del campo cambia — no cuando el campo simplemente recupera el
+/// foco. Por eso, al seleccionar una escena y luego volver a tocar la
+/// barra de búsqueda, el usuario no veía de nuevo la lista: el campo
+/// quedaba listo para escribir, mostrando el nombre de la escena ya
+/// seleccionada en vez de las opciones (reporte explícito del usuario,
+/// reproducible tanto en Web como en móvil).
+///
+/// La solución: al ganar el foco, se limpia el texto (lo que sí dispara
+/// `optionsBuilder` con una consulta vacía → devuelve todas las escenas
+/// → Autocomplete muestra la lista completa de inmediato, sin que el
+/// usuario tenga que escribir nada). Si el usuario toca fuera del campo
+/// sin volver a elegir una escena, se restaura el texto de la escena que
+/// ya estaba seleccionada para que no parezca que se perdió la
+/// selección.
+class _SceneSearchTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String fallbackText;
+
+  const _SceneSearchTextField({
+    required this.controller,
+    required this.focusNode,
+    required this.fallbackText,
+  });
+
+  @override
+  State<_SceneSearchTextField> createState() => _SceneSearchTextFieldState();
+}
+
+class _SceneSearchTextFieldState extends State<_SceneSearchTextField> {
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (widget.focusNode.hasFocus) {
+      if (widget.controller.text.isNotEmpty) {
+        widget.controller.clear();
+      }
+    } else {
+      if (widget.controller.text.trim().isEmpty && widget.fallbackText.isNotEmpty) {
+        widget.controller.text = widget.fallbackText;
+      }
+    }
+    // Para que la flecha de abajo rote y quede apuntando hacia arriba
+    // mientras la lista está desplegada (foco activo).
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final abierto = widget.focusNode.hasFocus;
+    return TextField(
+      controller: widget.controller,
+      focusNode: widget.focusNode,
+      decoration: InputDecoration(
+        labelText: 'Escena',
+        hintText: 'Busca por número o toca la flecha para ver todas...',
+        prefixIcon: const Icon(Icons.search),
+        // Flecha explícita para desplegar/cerrar la lista completa de
+        // escenas sin tener que escribir nada — pedido explícito del
+        // usuario, funciona igual en móvil y en Web. Tocarla solo
+        // alterna el foco del campo: al ganarlo, _onFocusChange (arriba)
+        // ya limpia el texto, lo que dispara `optionsBuilder` con una
+        // consulta vacía y el Autocomplete muestra TODAS las escenas; al
+        // perderlo, se cierra sola (mismo comportamiento que tocar fuera
+        // del campo). Elegir una escena de la lista ya la cierra solo,
+        // sin necesidad de nada extra acá.
+        suffixIcon: IconButton(
+          icon: AnimatedRotation(
+            turns: abierto ? 0.5 : 0,
+            duration: const Duration(milliseconds: 150),
+            child: const Icon(Icons.keyboard_arrow_down),
+          ),
+          tooltip: abierto ? 'Cerrar lista' : 'Ver todas las escenas',
+          onPressed: () {
+            if (abierto) {
+              widget.focusNode.unfocus();
+            } else {
+              widget.focusNode.requestFocus();
+            }
+          },
+        ),
+      ),
     );
   }
 }
@@ -625,6 +772,7 @@ class _CategoryCardsGrid extends StatelessWidget {
     return LayoutBuilder(builder: (context, constraints) {
       final cols = constraints.maxWidth >= 900 ? 3 : (constraints.maxWidth >= 560 ? 2 : 1);
       return GridView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
           mainAxisSpacing: 12,

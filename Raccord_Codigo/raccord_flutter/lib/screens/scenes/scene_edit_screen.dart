@@ -22,6 +22,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/character_autocomplete_field.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/photo_viewer_dialog.dart';
 import '../../widgets/state_views.dart';
 import 'scenes_screen.dart' show colorForEstadoEscena;
@@ -69,6 +70,15 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
   bool _vistaDividida = false;
   Future<List<int>>? _pdfBytes;
 
+  // isMobileScreen() usa MediaQuery.of(context), que todavía no está
+  // disponible dentro de initState() (el árbol de widgets no terminó de
+  // montarse) — llamarlo ahí tira "dependOnInheritedWidgetOfExactType...
+  // called before initState() completed". Por eso esa parte se movió a
+  // didChangeDependencies(), que es el lugar correcto para leer
+  // MediaQuery/Theme por primera vez. Este flag evita repetir la carga
+  // cada vez que cambian las dependencias (ej. al rotar la pantalla).
+  bool _didInitDependencies = false;
+
   @override
   void initState() {
     super.initState();
@@ -77,13 +87,6 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
       final session = context.read<AuthSession>();
       _cast = SceneService(session.api).cast(idEscena);
       _photos = GalleryService(session.api).byScene(idEscena);
-    }
-    // En móvil la vista dividida no está disponible (ver build()), así
-    // que no tiene sentido descargar el PDF del guion completo solo para
-    // nunca mostrarlo.
-    if (widget.scene.idGuion != null && !isMobileScreen(context)) {
-      final session = context.read<AuthSession>();
-      _pdfBytes = ScriptService(session.api).archivoBytes(widget.scene.idGuion!);
     }
     final session = context.read<AuthSession>();
     CharacterService(session.api).all(session.projectId ?? '').then((list) {
@@ -94,11 +97,29 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didInitDependencies) return;
+    _didInitDependencies = true;
+    // En móvil/tablet (app nativa) la vista dividida no está disponible
+    // (ver build()) — solo en PC/Web —, así que no tiene sentido
+    // descargar el PDF del guion completo solo para nunca mostrarlo.
+    if (widget.scene.idGuion != null && canUseSplitView(context)) {
+      final session = context.read<AuthSession>();
+      _pdfBytes = ScriptService(session.api).archivoBytes(widget.scene.idGuion!);
+    }
+  }
+
   void _reloadCast() {
     final idEscena = widget.scene.idEscena;
     if (idEscena == null) return;
     final session = context.read<AuthSession>();
-    setState(() => _cast = SceneService(session.api).cast(idEscena));
+    // Con llaves — mismo motivo que _reloadPhotos más abajo (evita
+    // 'setState() callback argument returned a Future').
+    setState(() {
+      _cast = SceneService(session.api).cast(idEscena);
+    });
   }
 
   Future<void> _addCharacterToCast(CharacterModel personaje) async {
@@ -146,7 +167,30 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
     final idEscena = widget.scene.idEscena;
     if (idEscena == null) return;
     final session = context.read<AuthSession>();
-    setState(() => _photos = GalleryService(session.api).byScene(idEscena));
+    // Con llaves para que el callback de setState devuelva void y no el
+    // Future de byScene() — si no, Flutter lanza 'setState() callback
+    // argument returned a Future' ANTES de reconstruir el widget, así
+    // que la grilla de fotos nunca se actualizaba tras subir una foto
+    // (la foto SÍ se subía bien, pero no aparecía hasta salir y volver
+    // a entrar a la escena — reporte explícito del usuario).
+    setState(() {
+      _photos = GalleryService(session.api).byScene(idEscena);
+    });
+  }
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh):
+  // refresca fotos y reparto, pero NO los campos del formulario de
+  // información — recargar esos pisaría cualquier edición sin guardar
+  // que la persona tenga en pantalla.
+  Future<void> _onPullRefresh() async {
+    _reloadPhotos();
+    _reloadCast();
+    try {
+      await Future.wait([
+        if (_photos != null) _photos!,
+        if (_cast != null) _cast!,
+      ]);
+    } catch (_) {}
   }
 
   @override
@@ -158,10 +202,10 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
     // de continuidad, pero no eliminarlas.
     final canDeletePhotos = session.can('delete_photos');
     // La vista dividida (guion en PDF al lado de la info) no se ofrece
-    // en móvil: además de quedar inutilizable en una pantalla angosta,
-    // carga el visor de PDF (pdfrx/PDFium) sin necesidad.
-    final mobile = isMobileScreen(context);
-    final mostrarVistaDividida = _vistaDividida && !mobile;
+    // solo se ofrece en PC/Web — en móvil/tablet (app nativa) nunca debe
+    // aparecer, sin importar el ancho de pantalla.
+    final splitViewAllowed = canUseSplitView(context);
+    final mostrarVistaDividida = _vistaDividida && splitViewAllowed;
 
     return PopScope(
       canPop: false,
@@ -174,7 +218,7 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
         showBack: true,
         onBack: () => Navigator.of(context).pop(_changed),
         actions: [
-          if (widget.scene.idGuion != null && !mobile)
+          if (widget.scene.idGuion != null && splitViewAllowed)
             IconButton(
               icon: Icon(_vistaDividida ? Icons.vertical_split : Icons.vertical_split_outlined),
               tooltip: _vistaDividida ? 'Cerrar vista dividida' : 'Vista dividida con el guion',
@@ -238,9 +282,16 @@ class _SceneEditScreenState extends State<SceneEditScreen> {
               );
             }
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: contenido,
+            // Único caso que realmente se ejecuta en móvil/tablet
+            // (mostrarVistaDividida es siempre false ahí): se envuelve en
+            // MobileRefresh para el gesto de "deslizar hacia abajo".
+            return MobileRefresh(
+              onRefresh: _onPullRefresh,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: contenido,
+              ),
             );
           },
         ),
@@ -566,7 +617,7 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
           if (collageCountFor(_modoSubida) != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Elegirás ${collageCountFor(_modoSubida)} fotos de tu galería/carpeta y se combinarán en una sola imagen.',
+              'Elegirás ${collageCountFor(_modoSubida)} fotos (con la cámara, una por una, o de tu galería/carpeta) y se combinarán en una sola imagen.',
               style: const TextStyle(color: AppColors.grisMedio, fontSize: 12),
             ),
           ],
@@ -616,23 +667,28 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
     );
   }
 
-  /// Punto de entrada del botón "Subir Foto(s)": en modo "Individual" primero
+  /// Punto de entrada del botón "Subir Foto(s)": en modo "Individual"
   /// pregunta el origen (cámara o galería/archivos) y delega a
-  /// [_captureFromCamera] o [_pickFromFiles]; en modo "Collage N" va
-  /// directo a [_pickAndUploadCollage] (solo galería/archivos, ver ahí
-  /// por qué no se ofrece cámara para collage).
+  /// [_captureFromCamera] o [_pickFromFiles]; en modo "Collage N" también
+  /// pregunta el origen (mismo diálogo), y delega a
+  /// [_pickAndUploadCollage], que a su vez toma las N fotos con la
+  /// cámara en secuencia o las elige todas juntas de la galería, según
+  /// lo que haya contestado acá.
   Future<void> _pickAndUpload() async {
     final idEscena = widget.scene.idEscena;
     if (idEscena == null) return;
 
     final n = collageCountFor(_modoSubida);
+
+    final source = await _askPhotoSource(
+      title: n != null ? '¿De dónde quieres tomar las $n fotos del collage?' : '¿De dónde quieres subir la foto?',
+    );
+    if (source == null) return; // se canceló el diálogo
+
     if (n != null) {
-      await _pickAndUploadCollage(idEscena, n);
+      await _pickAndUploadCollage(idEscena, n, source);
       return;
     }
-
-    final source = await _askPhotoSource();
-    if (source == null) return; // se canceló el diálogo
 
     if (source == _PhotoSource.camera) {
       await _captureFromCamera(idEscena);
@@ -641,33 +697,44 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
     }
   }
 
-  /// Pide exactamente [n] imágenes de la galería/carpeta (no ofrece
-  /// cámara: tomar N fotos en secuencia con la cámara es un flujo
-  /// bastante más largo y no era necesario para el caso de uso), las
-  /// combina en una sola imagen con [_buildCollage] y sube ÚNICAMENTE
-  /// el resultado combinado — las N fotos originales no quedan
-  /// guardadas por separado.
-  Future<void> _pickAndUploadCollage(String idEscena, int n) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: true,
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
+  /// Junta las [n] imágenes del collage según [source]: con cámara
+  /// ([_captureNFromCamera]) toma una foto a la vez, dejando confirmar
+  /// cada una con el propio flujo nativo de la cámara antes de pasar a
+  /// la siguiente — pedido explícito del usuario ("tomo la foto 1 y le
+  /// doy chulo de bien y luego la segunda..."), en vez de forzar a
+  /// elegir todas de la galería de una sola vez (que sigue disponible
+  /// como alternativa). Las combina en una sola imagen con
+  /// [_buildCollage] y sube ÚNICAMENTE el resultado combinado — las N
+  /// fotos originales no quedan guardadas por separado.
+  Future<void> _pickAndUploadCollage(String idEscena, int n, _PhotoSource source) async {
+    List<Uint8List> imagenesBytes;
 
-    final archivos = result.files.where((f) => f.bytes != null).toList();
-    if (archivos.length != n) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Elige exactamente $n fotos para el collage (seleccionaste ${archivos.length}).')),
-        );
+    if (source == _PhotoSource.camera) {
+      final capturadas = await _captureNFromCamera(n);
+      if (capturadas == null) return; // canceló alguna captura: se aborta el collage completo
+      imagenesBytes = capturadas;
+    } else {
+      // file_picker 13.x: pickFiles() ya no envuelve el resultado en
+      // FilePickerResult — devuelve la lista de PlatformFile directo
+      // (vacía si se cancela). Los bytes se leen aparte, async, con
+      // readAsBytes() por archivo (ver Future.wait abajo).
+      final picked = await FilePicker.pickFiles(type: FileType.image);
+      if (picked.isEmpty) return;
+
+      if (picked.length != n) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Elige exactamente $n fotos para el collage (seleccionaste ${picked.length}).')),
+          );
+        }
+        return;
       }
-      return;
+      imagenesBytes = await Future.wait(picked.map((f) => f.readAsBytes()));
     }
 
     setState(() => _loading = true);
     try {
-      final collageBytes = await _buildCollage(archivos.map((f) => f.bytes!).toList());
+      final collageBytes = await _buildCollage(imagenesBytes);
       await _uploadBytes(idEscena, [(bytes: collageBytes, name: 'collage_$n.png')]);
     } catch (e) {
       if (mounted) {
@@ -678,6 +745,45 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Toma [n] fotos en secuencia con la cámara del dispositivo — cada
+  /// captura usa el propio flujo nativo de la cámara del sistema (foto,
+  /// confirmar/"chulo" o repetir) antes de pasar a la siguiente. Si la
+  /// persona cancela CUALQUIER captura (botón atrás del visor nativo),
+  /// se aborta el collage entero en vez de armarlo con menos fotos de
+  /// las que pidió — pedido explícito del usuario: "si dijo dos, por lo
+  /// menos las dos fotos deben estar correctas".
+  Future<List<Uint8List>?> _captureNFromCamera(int n) async {
+    final capturadas = <Uint8List>[];
+    for (var i = 0; i < n; i++) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Foto ${i + 1} de $n — tómala y confírmala.'), duration: const Duration(seconds: 2)),
+        );
+      }
+      final XFile? foto;
+      try {
+        // Mismos límites que la captura individual (_captureFromCamera):
+        // 1920px de lado mayor evita fotos de varios MB sin redimensionar.
+        foto = await ImagePicker().pickImage(
+          source: ImageSource.camera,
+          imageQuality: 90,
+          maxWidth: 1920,
+          maxHeight: 1920,
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo acceder a la cámara. Verifica los permisos del dispositivo.')),
+          );
+        }
+        return null;
+      }
+      if (foto == null) return null; // canceló esta captura: se aborta todo el collage
+      capturadas.add(await foto.readAsBytes());
+    }
+    return capturadas;
   }
 
   /// Decodifica cada imagen y las dibuja sobre un lienzo cuadrado fijo
@@ -767,7 +873,7 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
   /// escritorio el atributo que abre la cámara no funciona y solo
   /// termina reabriendo el mismo explorador de archivos, así que ahí
   /// directo se muestra únicamente la opción de galería/carpeta.
-  Future<_PhotoSource?> _askPhotoSource() {
+  Future<_PhotoSource?> _askPhotoSource({String title = '¿De dónde quieres subir la foto?'}) {
     final showCamera = defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
 
     return showDialog<_PhotoSource>(
@@ -782,9 +888,9 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
-                  child: Text('¿De dónde quieres subir la foto?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                  child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 ),
                 if (showCamera)
                   ListTile(
@@ -810,7 +916,18 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
   Future<void> _captureFromCamera(String idEscena) async {
     final XFile? foto;
     try {
-      foto = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 90);
+      // maxWidth/maxHeight: la cámara de un celular moderno saca fotos
+      // de varios MB (4000x3000px+) — sin este límite, esa foto se subía
+      // sin redimensionar y la subida podía tardar mucho más de lo
+      // razonable en red real (a diferencia de imageQuality, que solo
+      // comprime JPEG pero no toca la resolución). 1920px de lado mayor
+      // es de sobra para fotos de continuidad.
+      foto = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 90,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
     } catch (e) {
       // P.ej. el navegador/SO negó el permiso de cámara, o el
       // dispositivo (desktop nativo) no tiene una cámara soportada.
@@ -828,14 +945,12 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
   }
 
   Future<void> _pickFromFiles(String idEscena) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: true,
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
+    // file_picker 13.x: pickFiles() devuelve la lista de PlatformFile
+    // directo (vacía si se cancela); los bytes se leen aparte, async.
+    final picked = await FilePicker.pickFiles(type: FileType.image);
+    if (picked.isEmpty) return;
 
-    final archivos = result.files.where((f) => f.bytes != null).map((f) => (bytes: f.bytes!, name: f.name)).toList();
+    final archivos = await Future.wait(picked.map((f) async => (bytes: await f.readAsBytes(), name: f.name)));
     await _uploadBytes(idEscena, archivos);
   }
 
@@ -865,6 +980,18 @@ class _UploadPhotoCardState extends State<_UploadPhotoCard> {
       widget.onUploaded();
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      // Antes este catch no existía: cualquier error que NO fuera
+      // ApiException (ej. la respuesta del servidor llegó vacía/no-JSON
+      // y GalleryService.upload no pudo parsearla) se escapaba en
+      // silencio — la UI dejaba de decir "Subiendo..." pero no mostraba
+      // ningún error ni recargaba la lista, así que la foto simplemente
+      // "desaparecía" sin explicación. Ahora siempre se avisa algo.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo subir la foto. Verifica tu conexión e inténtalo de nuevo.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

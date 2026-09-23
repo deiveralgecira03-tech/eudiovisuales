@@ -87,6 +87,16 @@ class Scene {
   // usuario (2026-09-02).
   final String? comentarios;
 
+  // Cast (reparto) de la escena, embebido por el backend en
+  // GET /scenes/project/{id} (ver scene_controller.py) — solo viene
+  // presente ahí; en otros endpoints de Scene es null. Antes Plan de
+  // Rodaje pedía esto por separado con un GET /scenes/{id}/cast POR
+  // escena (SceneService.cast), que con ~129 escenas en un proyecto
+  // real disparaba ~129 peticiones HTTP y tardaba decenas de segundos
+  // en un dispositivo físico. Cada item trae las mismas claves que
+  // SceneService.cast(): id_personaje, nombre, edad, codigo_personaje.
+  final List<Map<String, dynamic>>? cast;
+
   Scene({
     this.idEscena,
     required this.numeroDeEscena,
@@ -109,6 +119,7 @@ class Scene {
     this.ordenRodaje,
     this.bloqueGrabacion,
     this.comentarios,
+    this.cast,
   });
 
   String get modoYMomento {
@@ -120,6 +131,7 @@ class Scene {
 
   factory Scene.fromJson(Map<String, dynamic> json) {
     final fecha = asString(pick(json, ['fecha_de_grabacion']));
+    final rawCast = json['cast'];
     return Scene(
       idEscena: asString(pick(json, ['id_escena'])),
       numeroDeEscena: asString(pick(json, ['numero_de_escena'])) ?? '',
@@ -142,6 +154,7 @@ class Scene {
       ordenRodaje: asInt(pick(json, ['orden_rodaje'])),
       bloqueGrabacion: asInt(pick(json, ['bloque_grabacion'])),
       comentarios: asString(pick(json, ['comentarios'])),
+      cast: rawCast is List ? rawCast.whereType<Map<String, dynamic>>().toList() : null,
     );
   }
 

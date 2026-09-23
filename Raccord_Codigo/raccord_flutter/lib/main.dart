@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show BrowserContextMenu;
 import 'package:provider/provider.dart';
-import 'package:screen_protector/screen_protector.dart';
+// import 'package:screen_protector/screen_protector.dart'; // ver nota 2026-09-20 más abajo
 
 import 'core/navigation_keys.dart';
 import 'core/session.dart';
@@ -27,6 +27,7 @@ import 'screens/shooting_days/shooting_days_screen.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/inactivity_watcher.dart';
+import 'widgets/offline_banner.dart';
 
 // ==========================================
 // PROTECCION CONTRA CAPTURAS DE PANTALLA
@@ -46,6 +47,17 @@ import 'widgets/inactivity_watcher.dart';
 // guarda todo detras de "!kIsWeb" y con try/catch: si algun dia se
 // compila Raccord como app nativa, la proteccion real queda activa
 // sin tocar nada mas aca.
+//
+// PAUSADO 2026-09-20 (temporal): screen_protector 1.5.3 no compila en
+// Android con el "Built-in Kotlin" de Flutter 3.44+/AGP 9+ — bug
+// confirmado y todavía abierto en el repo del paquete (issues #66,
+// #67, #68, #70 en github.com/prongbang/screen_protector). Mientras
+// no publiquen el fix (o se resuelva la combinación exacta de
+// versiones Gradle/AGP/Kotlin), esta protección queda apagada SOLO en
+// nativo para poder compilar. El deterrente web (clic derecho) sigue
+// activo, no depende de este paquete. Para reactivar: descomentar el
+// import de arriba, el bloque de abajo, y agregar de nuevo
+// "screen_protector: ^1.5.3" en pubspec.yaml.
 Future<void> _protegerPantalla() async {
   if (kIsWeb) {
     // Unico deterrente real posible en navegador: apagar el menu
@@ -55,15 +67,15 @@ Future<void> _protegerPantalla() async {
     return;
   }
 
-  try {
-    await ScreenProtector.preventScreenshotOn();
-    // En Android, ademas oculta el contenido en la vista de apps
-    // recientes (donde Android toma una miniatura automatica).
-    await ScreenProtector.protectDataLeakageWithBlur();
-  } catch (_) {
-    // Si corre en una plataforma sin soporte (ej. desktop), no debe
-    // tumbar el arranque de la app por esto.
-  }
+  // try {
+  //   await ScreenProtector.preventScreenshotOn();
+  //   // En Android, ademas oculta el contenido en la vista de apps
+  //   // recientes (donde Android toma una miniatura automatica).
+  //   await ScreenProtector.protectDataLeakageWithBlur();
+  // } catch (_) {
+  //   // Si corre en una plataforma sin soporte (ej. desktop), no debe
+  //   // tumbar el arranque de la app por esto.
+  // }
 }
 
 void main() {
@@ -125,8 +137,14 @@ class RaccordApp extends StatelessWidget {
       // poder detectar actividad del usuario (click/toque/scroll/tecla)
       // sin importar la pantalla en la que esté, y cerrar la sesión tras
       // 15 minutos de inactividad — ver widgets/inactivity_watcher.dart.
-      builder: (context, child) => InactivityWatcher(
-        child: child ?? const SizedBox.shrink(),
+      // OfflineBannerWidget va POR FUERA: así el banner de "sin
+      // conexión" se ve por encima de todo (incluidos diálogos), en
+      // TODA la app (login, 2FA, selección de proyecto, dashboard...),
+      // no solo en las pantallas con AppScaffold.
+      builder: (context, child) => OfflineBannerWidget(
+        child: InactivityWatcher(
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     );
   }

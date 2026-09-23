@@ -14,6 +14,7 @@ from app.utils.hash import verify_password
 from app.utils.security import create_access_token
 from app.utils.response import api_response
 from app.utils.mail import send_2fa_email
+from app.utils.token_revocation import revoke_token
 
 # ==========================================
 # 2FA - INTERRUPTOR GLOBAL (TEMPORAL)
@@ -162,6 +163,18 @@ def login_user(mail: str, contrasena: str, db: Session):
     db.commit()
 
     return _build_session_response(user, db, "Login exitoso")
+
+
+# ==========================================
+# LOGOUT (revocación real del JWT actual)
+# ==========================================
+# current_user es el payload YA decodificado del token que se está
+# cerrando (viene de Depends(get_current_user), ver login_routes.py),
+# así que jti/exp son los del propio token — no hace falta volver a
+# tocar el usuario en BD para esto.
+def logout_user(current_user: dict, db: Session):
+    revoke_token(db, current_user.get("jti"), current_user.get("exp"))
+    return api_response(True, "Sesión cerrada correctamente")
 
 
 # ==========================================

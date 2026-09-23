@@ -233,7 +233,24 @@ class AuthSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Cierra sesión también del lado del SERVIDOR (POST /users/logout
+  /// revoca el jti de este token, ver app/utils/token_revocation.py en
+  /// el backend) antes de limpiar el estado local. Debe ir primero:
+  /// una vez que _token se pone en null, api ya no puede mandar el
+  /// Bearer que identifica cuál token hay que revocar.
+  ///
+  /// Si la llamada falla (sin conexión, token ya vencido, etc.) el
+  /// logout local sigue adelante igual — no tiene sentido dejar a la
+  /// persona "atrapada" en la app porque el aviso al servidor no pudo
+  /// salir; en el peor caso ese token queda válido hasta su
+  /// expiración natural, exactamente como pasaba antes de este fix.
   Future<void> logout() async {
+    if (_token != null) {
+      try {
+        await api.post('/users/logout');
+      } catch (_) {}
+    }
+
     _token = null;
     _user = null;
     _projectId = null;

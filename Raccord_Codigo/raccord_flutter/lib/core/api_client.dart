@@ -5,11 +5,27 @@ import 'package:http_parser/http_parser.dart';
 import 'api_config.dart';
 import 'api_exception.dart';
 
+/// Tiempo máximo que se espera CUALQUIER petición antes de darla por
+/// caída y mostrar un error, en vez de dejar la pantalla "cargando"
+/// para siempre. Antes no había timeout: si el backend configurado no
+/// respondía (ej. IP/puerto mal apuntado desde un celular físico), el
+/// usuario se quedaba viendo un spinner sin ningún mensaje, sin forma
+/// de saber que algo estaba mal.
+const kApiRequestTimeout = Duration(seconds: 8);
+
+/// Timeout específico para subir archivos (fotos, PDFs) — 8s se queda
+/// corto para una foto de cámara sin comprimir (varios MB) sobre una
+/// red real (a diferencia de JSON liviano en localhost). 30s da margen
+/// de sobra sin dejar a la persona esperando para siempre si el
+/// backend/red realmente está caído.
+const kApiUploadTimeout = Duration(seconds: 30);
+
 /// Envoltorio delgado sobre [http] que:
 /// - arma la URL base + Bearer token en cada petición protegida
 /// - decodifica el envelope {success, message, data, error} que usa
 ///   toda la API de Raccord (ver app/utils/response.py)
 /// - convierte respuestas no exitosas en [ApiException]
+/// - corta cualquier petición colgada a los [kApiRequestTimeout]
 class ApiClient {
   final String? Function() tokenProvider;
   final http.Client _http;
@@ -40,39 +56,45 @@ class ApiClient {
   }
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query, bool auth = true}) async {
-    final res = await _http.get(_uri(path, query), headers: _headers(auth: auth));
+    final res = await _http.get(_uri(path, query), headers: _headers(auth: auth)).timeout(kApiRequestTimeout, onTimeout: _onTimeout);
     return _parse(res);
   }
 
   Future<dynamic> post(String path, {Object? body, bool auth = true}) async {
-    final res = await _http.post(
-      _uri(path),
-      headers: _headers(auth: auth),
-      body: jsonEncode(body ?? {}),
-    );
+    final res = await _http
+        .post(
+          _uri(path),
+          headers: _headers(auth: auth),
+          body: jsonEncode(body ?? {}),
+        )
+        .timeout(kApiRequestTimeout, onTimeout: _onTimeout);
     return _parse(res);
   }
 
   Future<dynamic> put(String path, {Object? body, bool auth = true}) async {
-    final res = await _http.put(
-      _uri(path),
-      headers: _headers(auth: auth),
-      body: jsonEncode(body ?? {}),
-    );
+    final res = await _http
+        .put(
+          _uri(path),
+          headers: _headers(auth: auth),
+          body: jsonEncode(body ?? {}),
+        )
+        .timeout(kApiRequestTimeout, onTimeout: _onTimeout);
     return _parse(res);
   }
 
   Future<dynamic> patch(String path, {Object? body, bool auth = true}) async {
-    final res = await _http.patch(
-      _uri(path),
-      headers: _headers(auth: auth),
-      body: jsonEncode(body ?? {}),
-    );
+    final res = await _http
+        .patch(
+          _uri(path),
+          headers: _headers(auth: auth),
+          body: jsonEncode(body ?? {}),
+        )
+        .timeout(kApiRequestTimeout, onTimeout: _onTimeout);
     return _parse(res);
   }
 
   Future<dynamic> delete(String path, {bool auth = true}) async {
-    final res = await _http.delete(_uri(path), headers: _headers(auth: auth));
+    final res = await _http.delete(_uri(path), headers: _headers(auth: auth)).timeout(kApiRequestTimeout, onTimeout: _onTimeout);
     return _parse(res);
   }
 
@@ -101,15 +123,23 @@ class ApiClient {
       filename: filename,
       contentType: contentType != null ? MediaType.parse(contentType) : null,
     ));
-    final streamed = await _http.send(request);
-    final res = await http.Response.fromStream(streamed);
+    // Antes SOLO el envío tenía timeout — la lectura del cuerpo de la
+    // respuesta (fromStream) podía quedarse esperando para siempre sin
+    // avisar nada si el backend tardaba en terminar de procesar/guardar
+    // el archivo. Eso era lo que dejaba la UI trabada en "subiendo
+    // foto..." indefinidamente con fotos de cámara (más pesadas que las
+    // de galería/archivo, que sí solían terminar a tiempo).
+    final streamed = await _http.send(request).timeout(kApiUploadTimeout, onTimeout: _onTimeout);
+    final res = await http.Response.fromStream(streamed).timeout(kApiUploadTimeout, onTimeout: _onTimeout);
     return _parse(res);
   }
 
   /// Descarga bytes crudos (no JSON) — usado para leer el PDF de un
   /// guion (GET /scripts/{id}/archivo) antes de mostrarlo en el visor.
   Future<List<int>> getBytes(String path, {bool auth = true}) async {
-    final res = await _http.get(_uri(path), headers: _headers(auth: auth)..remove('Content-Type'));
+    final res = await _http
+        .get(_uri(path), headers: _headers(auth: auth)..remove('Content-Type'))
+        .timeout(kApiRequestTimeout, onTimeout: _onTimeout);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       String message = 'No se pudo descargar el archivo (${res.statusCode})';
       try {
@@ -119,6 +149,24 @@ class ApiClient {
       throw ApiException(message, statusCode: res.statusCode);
     }
     return res.bodyBytes;
+  }
+
+  /// Mensaje único para cualquier petición que se pasó de
+  /// [kApiRequestTimeout] sin respuesta — normalmente porque
+  /// ApiConfig.baseUrl apunta a una dirección/puerto que no responde
+  /// (ej. servidor caído, o IP mal configurada desde un dispositivo
+  /// físico). errorCode 'TIMEOUT' para que la UI lo distinga de un
+  /// error de credenciales/validación si hace falta.
+  // Devuelve Never (nunca retorna, siempre lanza): por eso sirve tal
+  // cual como onTimeout tanto para Future<http.Response> (get/post/...)
+  // como para Future<http.StreamedResponse> (send, usado en postFile)
+  // — Never es subtipo de cualquier tipo, así que encaja en ambas
+  // firmas sin necesitar un callback distinto por cada una.
+  Never _onTimeout() {
+    throw ApiException(
+      'El servidor no respondió a tiempo. Verifica tu conexión e inténtalo de nuevo.',
+      errorCode: 'TIMEOUT',
+    );
   }
 
   dynamic _parse(http.Response res) {

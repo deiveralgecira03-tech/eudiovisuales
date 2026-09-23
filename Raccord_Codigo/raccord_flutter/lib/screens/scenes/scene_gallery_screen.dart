@@ -9,6 +9,7 @@ import '../../models/scene.dart';
 import '../../services/gallery_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/photo_viewer_dialog.dart';
 import '../../widgets/state_views.dart';
 
@@ -41,7 +42,19 @@ class _SceneGalleryScreenState extends State<SceneGalleryScreen> {
     final idEscena = widget.scene.idEscena;
     if (idEscena == null) return;
     final session = context.read<AuthSession>();
-    setState(() => _photos = GalleryService(session.api).byScene(idEscena));
+    // Con llaves para que el callback de setState devuelva void y no el
+    // Future de byScene() (ver mismo fix en scene_edit_screen.dart).
+    setState(() {
+      _photos = GalleryService(session.api).byScene(idEscena);
+    });
+  }
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh).
+  Future<void> _onPullRefresh() async {
+    _reload();
+    try {
+      await _photos;
+    } catch (_) {}
   }
 
   @override
@@ -60,30 +73,42 @@ class _SceneGalleryScreenState extends State<SceneGalleryScreen> {
           if (snap.hasError) return ErrorView(message: 'No se pudieron cargar las fotos.', onRetry: _reload);
           final photos = snap.data ?? [];
           if (photos.isEmpty) {
-            return const EmptyView(
-              message: 'Esta escena todavía no tiene fotos de continuidad.',
-              icon: Icons.photo_library_outlined,
+            return MobileRefresh(
+              onRefresh: _onPullRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  EmptyView(
+                    message: 'Esta escena todavía no tiene fotos de continuidad.',
+                    icon: Icons.photo_library_outlined,
+                  ),
+                ],
+              ),
             );
           }
-          return GridView.builder(
-            padding: const EdgeInsets.all(20),
-            itemCount: photos.length,
-            // `MaxCrossAxisExtent` calcula columnas según el ancho real en
-            // vez de un `crossAxisCount` fijo — menos columnas en móvil,
-            // más en tablet/desktop.
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 160,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
-            itemBuilder: (context, i) => _GalleryTile(
-              photo: photos[i],
-              allPhotos: photos,
-              index: i,
-              canEdit: canEdit,
-              canDelete: canDelete,
-              onDeleted: _reload,
-              onUpdated: _reload,
+          return MobileRefresh(
+            onRefresh: _onPullRefresh,
+            child: GridView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              itemCount: photos.length,
+              // `MaxCrossAxisExtent` calcula columnas según el ancho real en
+              // vez de un `crossAxisCount` fijo — menos columnas en móvil,
+              // más en tablet/desktop.
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 160,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemBuilder: (context, i) => _GalleryTile(
+                photo: photos[i],
+                allPhotos: photos,
+                index: i,
+                canEdit: canEdit,
+                canDelete: canDelete,
+                onDeleted: _reload,
+                onUpdated: _reload,
+              ),
             ),
           );
         },

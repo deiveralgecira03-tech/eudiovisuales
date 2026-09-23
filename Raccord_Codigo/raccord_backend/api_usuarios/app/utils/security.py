@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import uuid
 from jose import jwt, JWTError
 import os
 from dotenv import load_dotenv
@@ -20,7 +21,11 @@ def create_access_token(data: dict):
     to_encode = data.copy()
 
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    # jti = id único de ESTE token (no del usuario). Es lo que permite
+    # invalidarlo puntualmente en el logout (ver app/utils/token_revocation.py)
+    # sin tocar los demás tokens del mismo usuario que sigan vivos en
+    # otro dispositivo/pestaña.
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
 
     token = jwt.encode(
         to_encode,

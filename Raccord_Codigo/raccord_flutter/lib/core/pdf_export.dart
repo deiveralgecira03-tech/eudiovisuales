@@ -54,7 +54,17 @@ pw.Widget _buildWatermarkOverlay(String texto, PdfPageFormat pageFormat) {
 /// criterio que el guion en PDF: nombre y apellido + fecha/hora) — se
 /// estampa en mosaico sobre cada página, a pedido explícito del usuario
 /// para trazabilidad de todo lo que se descarga desde Raccord.
-Future<void> exportTablePdf({
+///
+/// Devuelve `true` si el archivo se guardó de verdad, `false` si la
+/// persona cerró/canceló el selector "Guardar como" sin elegir carpeta.
+/// Antes se usaba `FileSaver.saveFile()`, que en Android guarda directo
+/// en una carpeta PRIVADA de la app (`Android/data/<paquete>/files/...`)
+/// sin preguntar ni avisar — no dispara la notificación de descarga de
+/// Android ni aparece en "Archivos"/Descargas, así que la persona nunca
+/// encontraba el PDF aunque la app dijera "Descarga iniciada". `saveAs()`
+/// abre el selector nativo de Android para que la persona elija la
+/// carpeta (típicamente Descargas), igual que cualquier otra descarga.
+Future<bool> exportTablePdf({
   required String fileName,
   required String titulo,
   String? subtitulo,
@@ -115,10 +125,11 @@ Future<void> exportTablePdf({
   );
 
   final bytes = await doc.save();
-  await FileSaver.instance.saveFile(
+  final savedPath = await FileSaver.instance.saveAs(
     name: fileName,
     bytes: Uint8List.fromList(bytes),
     fileExtension: 'pdf',
     mimeType: MimeType.pdf,
   );
+  return savedPath != null;
 }

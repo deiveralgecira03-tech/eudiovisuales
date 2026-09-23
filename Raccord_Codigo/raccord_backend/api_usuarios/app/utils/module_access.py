@@ -205,3 +205,23 @@ def check_module_view_access(db: Session, current_user: dict, id_project, modulo
             status.HTTP_403_FORBIDDEN,
             "No tienes acceso a este módulo en este proyecto",
         )
+
+
+def check_module_view_access_any(db: Session, current_user: dict, id_project, modulos: list[str], id_rol: Optional[int]):
+    """Igual que check_module_view_access, pero para endpoints que
+    alimentan a MÁS DE UNA pantalla con distintos requisitos de acceso
+    (p. ej. GET /users/project/{id} sirve tanto a "Roles del Equipo"
+    como a "Crew List"). Basta con tener acceso a UNO de los módulos
+    listados en [modulos] para pasar — solo se bloquea si TODOS
+    resultan "sin_acceso"."""
+    from fastapi import HTTPException, status
+
+    niveles = [
+        get_effective_module_level(db, current_user.get("id_user"), id_project, modulo, id_rol)
+        for modulo in modulos
+    ]
+    if all(nivel == "sin_acceso" for nivel in niveles):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "No tienes acceso a este módulo en este proyecto",
+        )

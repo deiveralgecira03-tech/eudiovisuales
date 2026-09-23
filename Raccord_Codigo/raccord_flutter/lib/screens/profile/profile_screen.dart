@@ -15,6 +15,7 @@ import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/state_views.dart';
 
 /// Mi Perfil: datos personales editables + campos de solo lectura
@@ -118,10 +119,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _reloadAvatar(String idUser) {
     final session = context.read<AuthSession>();
-    setState(() => _avatarBytes = UserService(session.api).photoBytes(idUser));
+    // Con llaves — mismo motivo que en crew_list_screen.dart (evita
+    // 'setState() callback argument returned a Future').
+    setState(() {
+      _avatarBytes = UserService(session.api).photoBytes(idUser);
+    });
   }
 
   String _fmtDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh) — NO
+  // se usa mientras se está editando el formulario, así que recargar
+  // acá (que sí pisa los controllers con lo que venga del servidor) es
+  // seguro: es justo lo que la persona pide al deslizar.
+  Future<void> _onPullRefresh() async {
+    final nuevo = _load();
+    setState(() => _future = nuevo);
+    try {
+      await nuevo;
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +150,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) return const LoadingView();
           if (snap.hasError) {
-            return ErrorView(message: 'No se pudo cargar tu perfil.', onRetry: () => setState(() => _future = _load()));
+            return ErrorView(
+              message: 'No se pudo cargar tu perfil.',
+              // Con llaves para que el callback de setState devuelva void y
+              // no el Future de _load() (ver crew_list_screen.dart).
+              onRetry: () => setState(() {
+                _future = _load();
+              }),
+            );
           }
           final data = snap.data!;
           final user = data.user;
@@ -148,7 +172,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // puede editar su propio departamento desde Mi Perfil.
           final canEditDepartamentoAqui = effectiveRol != 1001;
 
-          return SingleChildScrollView(
+          return MobileRefresh(
+            onRefresh: _onPullRefresh,
+            child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(20),
             // Align + topCenter en vez de solo ConstrainedBox: un
             // ConstrainedBox solo no se centra a sí mismo dentro del
@@ -321,6 +348,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               ),
             ),
+            ),
           );
         },
       ),
@@ -384,19 +412,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickAndUploadAvatar() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
-    if (file.bytes == null) return;
+    // file_picker 13.x: pickFile() (singular) devuelve el
+    // PlatformFile directo; los bytes se leen aparte, async, con
+    // readAsBytes().
+    final picked = await FilePicker.pickFile(type: FileType.image);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
 
     setState(() => _uploadingAvatar = true);
     final session = context.read<AuthSession>();
 
     try {
       await UserService(session.api).uploadOwnPhoto(
-        bytes: file.bytes!,
-        filename: file.name,
-        contentType: _contentTypeFor(file.name),
+        bytes: bytes,
+        filename: picked.name,
+        contentType: _contentTypeFor(picked.name),
       );
       _reloadAvatar(session.user?.idUser ?? '');
       if (mounted) {

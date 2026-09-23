@@ -1,10 +1,13 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
 
 from jose import jwt, JWTError
 
+from app.config.database import get_db
 from app.utils.security import SECRET_KEY, ALGORITHM
 from app.utils.permissions import has_permission
+from app.utils.token_revocation import is_token_revoked
 
 # ==========================================
 # ESQUEMA DE AUTENTICACIÓN (Bearer Token)
@@ -16,7 +19,8 @@ security = HTTPBearer()
 # OBTENER USUARIO DESDE TOKEN
 # ==========================================
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
 ):
 
     token = credentials.credentials  # <-- solo el token sin "Bearer"
@@ -29,14 +33,26 @@ def get_current_user(
             algorithms=[ALGORITHM]
         )
 
-        return payload  # devuelve datos del token (id_user, mail, id_rol, etc.)
-
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
+    # Token con firma y "exp" válidos, pero cerrado explícitamente por
+    # el propio usuario (POST /users/logout) — ver
+    # app/utils/token_revocation.py. Sin este chequeo, "Salir" solo
+    # borraba el token del lado del cliente y el mismo token seguía
+    # sirviendo contra la API hasta su expiración natural.
+    if is_token_revoked(db, payload.get("jti")):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión cerrada. Vuelve a iniciar sesión.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    return payload  # devuelve datos del token (id_user, mail, id_rol, etc.)
 
 
 # ==========================================

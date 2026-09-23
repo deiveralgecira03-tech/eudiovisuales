@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api_exception.dart';
 import '../../core/bulk_import.dart';
 import '../../core/invite_helpers.dart';
 import '../../core/session.dart';
@@ -13,6 +14,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/bulk_upload_button.dart';
 import '../../widgets/invite_person_dialog.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/state_views.dart';
 
@@ -85,7 +87,31 @@ class _CrewListScreenState extends State<CrewListScreen> {
     }
   }
 
-  void _reload() => setState(() => _future = _load());
+  // OJO: setState(() => _future = _load()) parece inofensivo pero NO lo
+  // es — como es un body de una sola expresión, Dart hace que el
+  // callback "devuelva" el Future de _load() en vez de void. Flutter
+  // detecta eso y lanza 'setState() callback argument returned a
+  // Future' ANTES de llegar a marcar el widget para reconstruir, así
+  // que la pantalla nunca se actualizaba: por eso "Reintentar" se
+  // quedaba pegado en el mismo error sin importar cuántas veces se
+  // tocara. Con llaves ({ ... }) el callback es un bloque que no
+  // devuelve nada, evitando el problema.
+  void _reload() => setState(() {
+        _future = _load();
+      });
+
+  // Para el gesto de "deslizar hacia abajo para recargar" (ver
+  // MobileRefresh): dispara la recarga y espera a que termine, para que
+  // el ícono de refresco no desaparezca antes de tiempo. Si la recarga
+  // falla, el propio FutureBuilder ya se encarga de mostrar el
+  // ErrorView correspondiente — acá solo evitamos que el error se
+  // propague sin manejar.
+  Future<void> _onPullRefresh() async {
+    _reload();
+    try {
+      await _future;
+    } catch (_) {}
+  }
 
   String? _departamentoNombre(String? idDepartamento) {
     if (idDepartamento == null || idDepartamento.isEmpty) return null;
@@ -109,22 +135,34 @@ class _CrewListScreenState extends State<CrewListScreen> {
             padding: const EdgeInsets.only(right: 8),
             child: BulkUploadButton(onRows: _bulkInvite, onDone: _reload),
           ),
-        if (canManage)
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ElevatedButton.icon(
-              onPressed: () => _openInviteDialog(context),
-              icon: const Icon(Icons.person_add_alt_outlined, size: 18),
-              label: const Text('Agregar Persona'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.moradoTech),
-            ),
-          ),
       ],
+      // "Agregar Persona" bajó de la barra superior a un botón flotante
+      // (mismo patrón que "Nuevo día" en Plan de Rodaje y "Invitar
+      // persona" en Roles del Equipo) — el logo nunca debe achicarse, así
+      // que la acción principal se saca de arriba.
+      floatingActionButton: canManage
+          ? FloatingActionButton.extended(
+              onPressed: () => _openInviteDialog(context),
+              icon: const Icon(Icons.person_add_alt_outlined),
+              label: const Text('Agregar Persona'),
+              backgroundColor: AppColors.moradoTech,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: FutureBuilder<List<AppUser>>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) return const LoadingView();
-          if (snap.hasError) return ErrorView(message: 'No se pudo cargar el crew list.', onRetry: _reload);
+          if (snap.hasError) {
+            // Antes se mostraba siempre el mismo mensaje genérico, sin
+            // importar la causa real (403 por acceso restringido al
+            // módulo, error de red, etc.) — eso hacía imposible
+            // diagnosticar el problema solo con lo que se ve en
+            // pantalla. Ahora, si es un error del backend (ApiException),
+            // se muestra su mensaje real tal cual lo manda el servidor.
+            final message = snap.error is ApiException ? (snap.error as ApiException).message : 'No se pudo cargar el crew list.';
+            return ErrorView(message: message, onRetry: _reload);
+          }
 
           final all = snap.data ?? [];
           var filtered = _query.isEmpty
@@ -189,46 +227,56 @@ class _CrewListScreenState extends State<CrewListScreen> {
                           message: all.isEmpty ? 'Todavía no hay personas registradas en la plataforma.' : 'Sin resultados.',
                           icon: all.isEmpty ? Icons.badge_outlined : Icons.search_off,
                         )
-                      : LayoutBuilder(
-                          builder: (context, constraints) {
-                            // Misma regla que Roles del Equipo: por debajo
-                            // de 640px la tabla de 6 columnas queda
-                            // ilegible, se reemplaza por tarjetas apiladas.
-                            final wide = constraints.maxWidth > 640;
-                            if (wide) {
-                              return Column(
-                                children: [
-                                  const _CrewTableHeader(),
-                                  const SizedBox(height: 4),
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: AppColors.surface,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: AppColors.border),
-                                      ),
-                                      child: ListView.separated(
-                                        itemCount: pageItems.length,
-                                        separatorBuilder: (_, __) => const Divider(height: 1),
-                                        itemBuilder: (context, i) => _CrewUserRow(
-                                          user: pageItems[i],
-                                          departamentoNombre: _departamentoNombre(pageItems[i].idDepartamento),
+                      : MobileRefresh(
+                          onRefresh: _onPullRefresh,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              // Misma regla que Roles del Equipo: por debajo
+                              // de 640px la tabla de 6 columnas queda
+                              // ilegible, se reemplaza por tarjetas apiladas.
+                              final wide = constraints.maxWidth > 640;
+                              if (wide) {
+                                return Column(
+                                  children: [
+                                    const _CrewTableHeader(),
+                                    const SizedBox(height: 4),
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surface,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: AppColors.border),
+                                        ),
+                                        child: ListView.separated(
+                                          // AlwaysScrollableScrollPhysics: sin esto,
+                                          // el gesto de "jalar para refrescar" no se
+                                          // activa cuando la página actual tiene pocos
+                                          // resultados y el contenido no llena la
+                                          // pantalla.
+                                          physics: const AlwaysScrollableScrollPhysics(),
+                                          itemCount: pageItems.length,
+                                          separatorBuilder: (_, __) => const Divider(height: 1),
+                                          itemBuilder: (context, i) => _CrewUserRow(
+                                            user: pageItems[i],
+                                            departamentoNombre: _departamentoNombre(pageItems[i].idDepartamento),
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                );
+                              }
+                              return ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                itemCount: pageItems.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                                itemBuilder: (context, i) => _CrewUserCard(
+                                  user: pageItems[i],
+                                  departamentoNombre: _departamentoNombre(pageItems[i].idDepartamento),
+                                ),
                               );
-                            }
-                            return ListView.separated(
-                              itemCount: pageItems.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 10),
-                              itemBuilder: (context, i) => _CrewUserCard(
-                                user: pageItems[i],
-                                departamentoNombre: _departamentoNombre(pageItems[i].idDepartamento),
-                              ),
-                            );
-                          },
+                            },
+                          ),
                         ),
                 ),
                 if (filtered.isNotEmpty) ...[

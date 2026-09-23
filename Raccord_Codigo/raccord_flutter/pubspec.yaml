@@ -18,11 +18,25 @@ dependencies:
   # (FLAG_SECURE / API de iOS). En Web no tiene efecto real — ningún
   # navegador expone esa capacidad — por eso en main.dart se activa
   # solo cuando !kIsWeb (ver comentario ahí sobre la limitación).
-  screen_protector: ^1.5.3
+  #
+  # PAUSADO 2026-09-20 (temporal): no compila en Android con el
+  # "Built-in Kotlin" de Flutter 3.44+/AGP 9+ — bug confirmado, aún
+  # abierto en github.com/prongbang/screen_protector (issues #66, #67,
+  # #68, #70). Ver nota completa en lib/main.dart (_protegerPantalla).
+  # Reactivar cuando publiquen el fix.
+  # screen_protector: ^1.5.3
   intl: ^0.19.0
   uuid: ^4.4.0
   # Selector de PDF (Android/iOS/Web/Desktop) para subir el guion.
-  file_picker: ^8.1.2
+  # Subido de 8.1.2 a 13.x el 2026-09-20: la versión vieja no compila
+  # contra Android API 36 (requisito de flutter_plugin_android_lifecycle,
+  # dependencia transitiva) — bloqueaba compilar la app nativa. La API
+  # cambió de instancia (FilePicker.platform.pickFiles) a estática
+  # (FilePicker.pickFiles) desde la 11.0.0; los 6 usos en el código ya
+  # se actualizaron. También cambió el default de allowMultiple a
+  # true (antes false) — se agregó allowMultiple: false explícito en
+  # los 4 lugares que esperan un solo archivo.
+  file_picker: ^13.1.0
   # Visor de PDF embebido en la app (open source, MIT) para abrir el
   # guion sin salir de Raccord. Reemplaza a syncfusion_flutter_pdfviewer:
   # ese visor daba "There was an error opening this document" en Web de
@@ -62,6 +76,22 @@ dependencies:
   # del paquete "excel" que quedó descartado antes por pedir archive ^3.x
   # sin solape posible.
   pdf: ^3.13.0
+  # Banner global de "sin conexión" (ver widgets/offline_banner.dart):
+  # detecta en tiempo real si el dispositivo tiene Wi-Fi/datos móviles
+  # activos. NO verifica que haya Internet de verdad (podría haber
+  # Wi-Fi sin salida real) — solo avisa temprano del caso más común
+  # (radio apagado / modo avión) mientras cada pantalla sigue
+  # manejando sus propios errores de red como hasta ahora.
+  connectivity_plus: ^7.3.1
+  # Guarda fotos de continuidad DIRECTO en la Galería/Fotos del sistema
+  # (Android/iOS/macOS/Windows) — a diferencia de file_saver.saveAs()
+  # (que abre el selector "Guardar como" genérico de documentos, por
+  # eso las fotos terminaban en "Documentos" y no se veían reflejadas
+  # en la Galería del celular como cualquier otra foto descargada). Solo
+  # para fotos: los PDF (guion, reportes) siguen usando file_saver, que
+  # es lo correcto para documentos. No tiene dependencias propias más
+  # allá de Flutter, así que no choca con pdfrx/pdf/archive.
+  gal: ^2.3.3
 
 dev_dependencies:
   flutter_test:

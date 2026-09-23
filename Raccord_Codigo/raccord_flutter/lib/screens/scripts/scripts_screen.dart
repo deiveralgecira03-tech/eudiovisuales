@@ -14,6 +14,7 @@ import '../../services/script_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/state_views.dart';
 
 /// Mockup 8: Guiones (lista + filtro + edición inline + subir/crear
@@ -44,7 +45,19 @@ class _ScriptsScreenState extends State<ScriptsScreen> {
     return ScriptService(session.api).byProject(session.projectId ?? '');
   }
 
-  void _reload() => setState(() => _future = _load());
+  // Con llaves para que el callback de setState devuelva void y no el
+  // Future de _load() (ver crew_list_screen.dart para el detalle del bug).
+  void _reload() => setState(() {
+        _future = _load();
+      });
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh).
+  Future<void> _onPullRefresh() async {
+    _reload();
+    try {
+      await _future;
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +81,13 @@ class _ScriptsScreenState extends State<ScriptsScreen> {
           if (snap.hasError) return ErrorView(message: 'No se pudieron cargar los guiones.', onRetry: _reload);
           final scripts = snap.data ?? [];
           if (scripts.isEmpty) {
-            return const EmptyView(message: 'Este proyecto todavía no tiene guiones cargados.', icon: Icons.description_outlined);
+            return MobileRefresh(
+              onRefresh: _onPullRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [EmptyView(message: 'Este proyecto todavía no tiene guiones cargados.', icon: Icons.description_outlined)],
+              ),
+            );
           }
 
           final filtered = _filtroEstado == null ? scripts : scripts.where((s) => s.estado == _filtroEstado).toList();
@@ -99,7 +118,10 @@ class _ScriptsScreenState extends State<ScriptsScreen> {
                 Expanded(
                   child: filtered.isEmpty
                       ? const EmptyView(message: 'No hay guiones con ese estado.', icon: Icons.filter_alt_off_outlined)
-                      : ListView.separated(
+                      : MobileRefresh(
+                          onRefresh: _onPullRefresh,
+                          child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
                           itemCount: filtered.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, i) {
@@ -129,6 +151,7 @@ class _ScriptsScreenState extends State<ScriptsScreen> {
                               ],
                             );
                           },
+                        ),
                         ),
                 ),
               ],
@@ -188,17 +211,15 @@ Color colorForEstadoGuion(String estado) {
 }
 
 /// Abre el selector de archivos limitado a PDF. Devuelve null si la
-/// persona cancela. `withData: true` es necesario para que los bytes
-/// vengan listos en `PlatformFile.bytes` — imprescindible en Flutter
-/// Web, donde no hay una ruta de archivo real que se pueda leer luego.
+/// persona cancela. file_picker 13.x: pickFile() (singular) devuelve
+/// el PlatformFile directo, sin wrapper. Los bytes se leen aparte con
+/// PlatformFile.readAsBytes() (async, funciona igual en Web que en
+/// nativo) — ver los 2 lugares donde se usa este resultado más abajo.
 Future<PlatformFile?> pickPdfFile() async {
-  final result = await FilePicker.platform.pickFiles(
+  return FilePicker.pickFile(
     type: FileType.custom,
     allowedExtensions: ['pdf'],
-    withData: true,
   );
-  if (result == null || result.files.isEmpty) return null;
-  return result.files.single;
 }
 
 String formatBytes(int? bytes) {
@@ -412,8 +433,8 @@ class _ScriptEditCardState extends State<_ScriptEditCard> {
       });
 
       final pdf = _nuevoPdf;
-      if (pdf != null && pdf.bytes != null) {
-        await service.uploadArchivo(idGuion, bytes: pdf.bytes!, filename: pdf.name);
+      if (pdf != null) {
+        await service.uploadArchivo(idGuion, bytes: await pdf.readAsBytes(), filename: pdf.name);
       }
 
       widget.onSaved();
@@ -492,15 +513,22 @@ class _ScriptDetailScreenState extends State<ScriptDetailScreen> {
         nombre = nombre.substring(0, nombre.length - 4);
       }
 
-      await FileSaver.instance.saveFile(
+      // saveAs() (no saveFile()) para que en Android se abra el selector
+      // nativo y la persona elija dónde guardar (típicamente Descargas)
+      // — saveFile() guardaba en una carpeta privada de la app, invisible
+      // sin explorador de archivos avanzado, sin notificación ni forma
+      // fácil de encontrarlo después.
+      final savedPath = await FileSaver.instance.saveAs(
         name: nombre,
         bytes: Uint8List.fromList(bytes),
         fileExtension: 'pdf',
         mimeType: MimeType.pdf,
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Descarga iniciada')));
+      // savedPath == null: la persona cerró el selector sin elegir
+      // carpeta — no es un error, no hace falta avisar nada.
+      if (mounted && savedPath != null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PDF guardado correctamente')));
       }
     } catch (_) {
       if (mounted) {
@@ -916,8 +944,8 @@ class _ScriptFormSheetState extends State<_ScriptFormSheet> {
       ));
 
       final pdf = _pdf;
-      if (pdf != null && pdf.bytes != null && created.idGuion != null) {
-        await service.uploadArchivo(created.idGuion!, bytes: pdf.bytes!, filename: pdf.name);
+      if (pdf != null && created.idGuion != null) {
+        await service.uploadArchivo(created.idGuion!, bytes: await pdf.readAsBytes(), filename: pdf.name);
       }
 
       if (!mounted) return;

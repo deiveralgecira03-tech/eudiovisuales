@@ -1,10 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/responsive.dart';
 import '../core/session.dart';
 import '../core/theme_controller.dart';
 import '../theme/app_theme.dart';
 import 'app_logo.dart';
+
+/// Botón de acción con ícono + texto para el AppBar (ej. "Agregar
+/// Persona", "Invitar persona") que se colapsa a solo el ícono (con
+/// tooltip) en pantallas angostas — mismo criterio que
+/// [BulkUploadButton]. Antes estos botones con label fijo, sumados a los
+/// demás íconos del AppBar, eran los que desbordaban la barra en móvil y
+/// tapaban el logo con el aviso de overflow de Flutter.
+class AppBarActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final Color? backgroundColor;
+
+  const AppBarActionButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isMobileScreen(context)) {
+      return IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        tooltip: label,
+        style: IconButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: backgroundColor != null ? Colors.white : null,
+        ),
+      );
+    }
+
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: backgroundColor != null ? ElevatedButton.styleFrom(backgroundColor: backgroundColor) : null,
+    );
+  }
+}
 
 /// Los 8 módulos del proyecto (mockups 7, 7.1). Se usan tanto en las
 /// tarjetas del dashboard como en el menú lateral de todas las pantallas
@@ -136,6 +180,17 @@ String _titleWithProject(AuthSession session, String title) {
   return '$nombre - $title';
 }
 
+// El logo/wordmark y el título del AppBar deben verse SIEMPRE del mismo
+// tamaño en cualquier pantalla — pedido explícito del usuario
+// (2026-09-20): antes variaban según el ancho de pantalla (más chicos en
+// móvil) y además un `FittedBox` los reescalaba según cuánto espacio
+// sobrara en cada pantalla puntual, dando tamaños inconsistentes de una
+// pantalla a otra. Si el espacio no alcanza, lo que cede es el TEXTO del
+// título (se trunca con "...") o se recortan/ocultan otros íconos de la
+// barra — nunca el logo.
+const kAppWordmarkFontSize = 18.0;
+const kAppBarTitleFontSize = 15.0;
+
 /// Scaffold estándar de las pantallas "dentro" de un proyecto: barra
 /// superior con wordmark + botón volver opcional + menú de usuario
 /// (Perfil / Salir) + menú lateral de módulos, como en los mockups 7,
@@ -161,6 +216,12 @@ class AppScaffold extends StatelessWidget {
   // en todas las pantallas menos el Dashboard mismo (ahí no tiene
   // sentido, ya está en el dashboard).
   final bool showHome;
+  // El ícono de notificaciones antes aparecía en TODAS las pantallas —
+  // pedido explícito del usuario: dejarlo solo en el Dashboard (que es
+  // quien lo activa con showNotifications: true) y liberar ese espacio
+  // en el resto, tanto porque no hay nada nuevo que notificar ahí como
+  // para darle más aire al logo/título en pantallas angostas.
+  final bool showNotifications;
 
   const AppScaffold({
     super.key,
@@ -173,6 +234,7 @@ class AppScaffold extends StatelessWidget {
     this.endDrawer,
     this.showModuleMenu = true,
     this.showHome = true,
+    this.showNotifications = false,
   });
 
   @override
@@ -198,19 +260,17 @@ class AppScaffold extends StatelessWidget {
     final themeMode = context.watch<ThemeController>().mode;
     final themeKey = ValueKey(themeMode);
 
-    // En móvil/tablet vertical, el wordmark ("Raccord") no se encoge por
-    // sí solo (es una imagen de ancho fijo, no un texto) y el bloque de
-    // `actions` con scroll horizontal reportaba su ancho de CONTENIDO
-    // completo (no el disponible) al AppBar, lo que hacía que el
-    // NavigationToolbar le diera todo ese espacio y el wordmark quedara
-    // tapado/solapado por los íconos. La solución: 1) achicar el
-    // wordmark en pantallas angostas, y 2) acotar explícitamente el
-    // ancho máximo del bloque de acciones con un `ConstrainedBox`, para
-    // que reporte ESE ancho (y no el de todo su contenido) y realmente
-    // recorte/scrollee en vez de solaparse con el título.
+    // El bloque de `actions` con scroll horizontal reportaba su ancho de
+    // CONTENIDO completo (no el disponible) al AppBar, lo que hacía que
+    // el NavigationToolbar le diera todo ese espacio y el título quedara
+    // tapado/solapado por los íconos. Se acota explícitamente el ancho
+    // máximo del bloque de acciones con un `ConstrainedBox`, para que
+    // reporte ESE ancho (y no el de todo su contenido) y realmente
+    // recorte/scrollee en vez de solaparse con el logo/título — el logo
+    // y el título en sí mantienen SIEMPRE el mismo tamaño (ver
+    // kAppWordmarkFontSize/kAppBarTitleFontSize arriba).
     final screenWidth = MediaQuery.of(context).size.width;
     final isNarrow = screenWidth < 600;
-    final wordmarkFontSize = isNarrow ? 14.0 : 20.0;
 
     final effectiveEndDrawer = endDrawer ??
         (showModuleMenu
@@ -234,16 +294,23 @@ class AppScaffold extends StatelessWidget {
               )
             : null,
         automaticallyImplyLeading: showBack,
+        // El logo NUNCA se achica (tamaño fijo, kAppWordmarkFontSize) — lo
+        // único que cede espacio si la pantalla es angosta es el título
+        // (Flexible + ellipsis: se trunca con "..." en vez de desbordar).
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppWordmark(fontSize: wordmarkFontSize),
+            const AppWordmark(fontSize: kAppWordmarkFontSize),
             if (title.isNotEmpty) ...[
               const SizedBox(width: 12),
               Container(width: 1, height: 18, color: AppColors.border),
               const SizedBox(width: 12),
               Flexible(
-                child: Text(_titleWithProject(session, title), style: TextStyle(fontSize: isNarrow ? 14 : 16, overflow: TextOverflow.ellipsis)),
+                child: Text(
+                  _titleWithProject(session, title),
+                  style: const TextStyle(fontSize: kAppBarTitleFontSize),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ],
@@ -276,12 +343,11 @@ class AppScaffold extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (r) => false),
                     ),
                 if (actions != null) KeyedSubtree(key: themeKey, child: Row(mainAxisSize: MainAxisSize.min, children: actions!)),
-                // Solo el ícono por ahora (decisión explícita del usuario):
-                // todavía no hay sistema de notificaciones real (ni tabla en
-                // BD, ni eventos que las disparen) — eso queda como una
-                // siguiente fase, a definir qué eventos notificar. Por ahora
-                // solo reserva el espacio visual, como en la referencia de
-                // FilmScript, y avisa que la función viene después.
+                // Solo en el Dashboard (showNotifications: true) — pedido
+                // explícito del usuario: en el resto de pantallas no
+                // aporta nada (todavía no hay notificaciones reales que
+                // mostrar) y solo le quita espacio al logo/título.
+                if (showNotifications)
                 Builder(
                   builder: (context) => IconButton(
                     icon: const Icon(Icons.notifications_outlined),
@@ -366,15 +432,20 @@ class ModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        // El ícono se calcula proporcional al ancho real de la tarjeta
-        // (en vez de un radio fijo de 26), así se ve grande de verdad en
-        // pantallas anchas y no queda diminuto dentro de la tarjeta.
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final radius = (constraints.maxWidth * 0.22).clamp(28.0, 46.0);
-            return Column(
+      child: LayoutBuilder(
+        // El ícono, el padding y el texto se calculan proporcionales al
+        // ancho real de la tarjeta (no de la pantalla completa) — así en
+        // PC se ven grandes de verdad, y en la grilla 2x2 de móvil (donde
+        // cada tarjeta es más angosta) todo se achica en conjunto en vez
+        // de quedar un ícono chico con un padding/botón de tamaño fijo
+        // "sobrando" espacio, que era lo que las hacía verse infladas.
+        builder: (context, constraints) {
+          final w = constraints.maxWidth;
+          final radius = (w * 0.22).clamp(22.0, 46.0);
+          final padding = (w * 0.12).clamp(10.0, 20.0);
+          return Padding(
+            padding: EdgeInsets.all(padding),
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircleAvatar(
@@ -382,21 +453,25 @@ class ModuleCard extends StatelessWidget {
                   backgroundColor: color,
                   child: Icon(icon, color: Colors.white, size: radius * 0.9),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: padding * 0.7),
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: w < 160 ? 13 : 14),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: padding * 0.6),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(onPressed: onTap, child: const Text('Ver más')),
+                  child: ElevatedButton(
+                    onPressed: onTap,
+                    style: w < 160 ? ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 8), textStyle: const TextStyle(fontSize: 12)) : null,
+                    child: const Text('Ver más'),
+                  ),
                 ),
               ],
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }

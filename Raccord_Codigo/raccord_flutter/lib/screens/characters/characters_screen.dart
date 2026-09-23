@@ -12,6 +12,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/bulk_upload_button.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/state_views.dart';
 import 'actor_form_screen.dart';
@@ -66,7 +67,19 @@ class _CharactersScreenState extends State<CharactersScreen> {
     return _CharactersData(personajes, porPersonaje);
   }
 
-  void _reload() => setState(() => _future = _load());
+  // Con llaves para que el callback de setState devuelva void y no el
+  // Future de _load() (ver crew_list_screen.dart para el detalle del bug).
+  void _reload() => setState(() {
+        _future = _load();
+      });
+
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh).
+  Future<void> _onPullRefresh() async {
+    _reload();
+    try {
+      await _future;
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +111,16 @@ class _CharactersScreenState extends State<CharactersScreen> {
           final all = snap.data?.personajes ?? [];
           final actoresPorPersonaje = snap.data?.actoresPorPersonaje ?? const {};
           if (all.isEmpty) {
-            return const EmptyView(message: 'Todavía no hay personajes creados.', icon: Icons.theater_comedy_outlined);
+            // Envuelto en un ListView (con AlwaysScrollableScrollPhysics)
+            // solo para que el gesto de "deslizar para recargar" funcione
+            // incluso cuando todavía no hay ningún personaje creado.
+            return MobileRefresh(
+              onRefresh: _onPullRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [EmptyView(message: 'Todavía no hay personajes creados.', icon: Icons.theater_comedy_outlined)],
+              ),
+            );
           }
 
           final filtered = _query.isEmpty
@@ -131,7 +153,10 @@ class _CharactersScreenState extends State<CharactersScreen> {
                           message: all.isEmpty ? 'Todavía no hay personajes creados.' : 'Sin resultados.',
                           icon: all.isEmpty ? Icons.theater_comedy_outlined : Icons.search_off,
                         )
-                      : ListView.separated(
+                      : MobileRefresh(
+                          onRefresh: _onPullRefresh,
+                          child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
                           itemCount: pageItems.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, i) {
@@ -193,6 +218,7 @@ class _CharactersScreenState extends State<CharactersScreen> {
               );
             },
           ),
+                        ),
                 ),
                 if (filtered.isNotEmpty) ...[
                   const SizedBox(height: 12),

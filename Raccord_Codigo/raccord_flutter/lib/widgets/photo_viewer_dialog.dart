@@ -1,10 +1,15 @@
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
+import 'package:file_saver/file_saver.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api_exception.dart';
 import '../core/session.dart';
+import '../core/watermark.dart';
 import '../models/character.dart';
 import '../models/gallery_photo.dart';
 import '../services/character_service.dart';
@@ -90,6 +95,7 @@ class _PhotoViewerDialogState extends State<_PhotoViewerDialog> {
   late int _index;
   bool _editing = false;
   bool _saving = false;
+  bool _downloading = false;
 
   late String _tipoFoto;
   late final TextEditingController _personaje;
@@ -187,6 +193,88 @@ class _PhotoViewerDialogState extends State<_PhotoViewerDialog> {
       widget.onDeleted?.call();
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  // true en Android/iOS (nunca en Web/Windows, donde no existe una
+  // "Galería del sistema" a la que guardar) — mismo criterio que la
+  // descarga masiva de gallery_screen.dart.
+  bool get _guardarEnGaleriaNativa => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
+  (String, String) _splitNombreArchivo(String archivoNombre) {
+    final idx = archivoNombre.lastIndexOf('.');
+    if (idx <= 0 || idx == archivoNombre.length - 1) return (archivoNombre, 'jpg');
+    return (archivoNombre.substring(0, idx), archivoNombre.substring(idx + 1));
+  }
+
+  MimeType _mimeFor(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return MimeType.jpeg;
+      case 'png':
+        return MimeType.png;
+      default:
+        return MimeType.other;
+    }
+  }
+
+  /// Descarga la foto que se está viendo ahora mismo — automático, sin
+  /// pasos extra: en Android/iOS se guarda directo en la Galería del
+  /// sistema (álbum "Raccord", igual que la descarga masiva); en
+  /// Web/Windows abre el selector "Guardar como". Lleva la misma marca
+  /// de agua que el resto de descargas de la app (guion, PDFs, fotos).
+  Future<void> _download() async {
+    setState(() => _downloading = true);
+    final session = context.read<AuthSession>();
+    try {
+      final bytesOriginales = await GalleryService(session.api).archivoBytes(_photo.idFoto);
+      final (nombreBase, extensionOriginal) = _splitNombreArchivo(_photo.archivoNombre);
+      final marcaAguaTexto = watermarkTextFor(session);
+
+      // Si la marca de agua falla (ej. archivo que no es una imagen
+      // válida), se descarga igual la foto original sin marca, en vez
+      // de bloquear la descarga completa (mismo criterio que en
+      // gallery_screen.dart).
+      Uint8List bytesFinal;
+      String extension;
+      try {
+        bytesFinal = await watermarkImageBytes(Uint8List.fromList(bytesOriginales), marcaAguaTexto);
+        extension = 'png'; // watermarkImageBytes siempre devuelve PNG
+      } catch (_) {
+        bytesFinal = Uint8List.fromList(bytesOriginales);
+        extension = extensionOriginal;
+      }
+
+      if (_guardarEnGaleriaNativa) {
+        try {
+          await Gal.putImageBytes(bytesFinal, name: nombreBase, album: 'Raccord');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Foto guardada correctamente')));
+          }
+        } on GalException catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.type.message)));
+        }
+      } else {
+        final savedPath = await FileSaver.instance.saveAs(
+          name: nombreBase,
+          bytes: bytesFinal,
+          fileExtension: extension,
+          mimeType: _mimeFor(extension),
+        );
+        // savedPath == null: la persona cerró el selector "Guardar
+        // como" sin elegir carpeta — no es un error, no hace falta
+        // avisar nada.
+        if (mounted && savedPath != null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Foto guardada correctamente')));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo descargar la foto.')));
+      }
+    } finally {
+      if (mounted) setState(() => _downloading = false);
     }
   }
 
@@ -345,6 +433,17 @@ class _PhotoViewerDialogState extends State<_PhotoViewerDialog> {
                     ),
                 ],
               ),
+            ),
+            IconButton(
+              icon: _downloading
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.grisOscuro),
+                    )
+                  : const Icon(Icons.download_outlined, color: AppColors.grisOscuro, size: 20),
+              tooltip: 'Descargar foto',
+              onPressed: _downloading ? null : _download,
             ),
             if (widget.canEdit)
               IconButton(

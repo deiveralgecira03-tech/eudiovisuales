@@ -16,6 +16,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/bulk_upload_button.dart';
+import '../../widgets/mobile_refresh.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/state_views.dart';
 import 'scene_edit_screen.dart';
@@ -76,13 +77,21 @@ class _ScenesScreenState extends State<ScenesScreen> {
         _page = 0;
       });
 
+  // Para "deslizar hacia abajo para recargar" (ver MobileRefresh).
+  Future<void> _onPullRefresh() async {
+    _reload();
+    try {
+      await _future;
+    } catch (_) {}
+  }
+
   void _selectScene(Scene scene) {
     setState(() {
       _selectedScene = scene;
-      // En móvil la vista dividida no está disponible (ver build()), así
-      // que no tiene sentido descargar el PDF del guion completo solo
-      // para nunca mostrarlo.
-      _pdfBytes = (scene.idGuion != null && !isMobileScreen(context))
+      // En móvil/tablet (app nativa) la vista dividida no está disponible
+      // (ver build()) — solo en PC/Web —, así que no tiene sentido
+      // descargar el PDF del guion completo solo para nunca mostrarlo.
+      _pdfBytes = (scene.idGuion != null && canUseSplitView(context))
           ? ScriptService(context.read<AuthSession>().api).archivoBytes(scene.idGuion!)
           : null;
     });
@@ -139,17 +148,17 @@ class _ScenesScreenState extends State<ScenesScreen> {
   Widget build(BuildContext context) {
     final session = context.watch<AuthSession>();
     final canEdit = session.can('create_scenes');
-    // La vista dividida (guion en PDF al lado de la lista) no se ofrece
-    // en móvil: además de quedar inutilizable en una pantalla angosta,
-    // carga el visor de PDF (pdfrx/PDFium) sin necesidad.
-    final mobile = isMobileScreen(context);
-    final mostrarVistaDividida = _vistaDividida && !mobile;
+    // La vista dividida (guion en PDF al lado de la lista) solo se ofrece
+    // en PC/Web — pedido explícito del usuario: en móvil/tablet (app
+    // nativa) nunca debe aparecer, sin importar el ancho de pantalla.
+    final splitViewAllowed = canUseSplitView(context);
+    final mostrarVistaDividida = _vistaDividida && splitViewAllowed;
 
     return AppScaffold(
       title: 'Escenas',
       showBack: true,
       actions: [
-        if (_selectedScene != null && !mobile)
+        if (_selectedScene != null && splitViewAllowed)
           IconButton(
             icon: Icon(_vistaDividida ? Icons.vertical_split : Icons.vertical_split_outlined),
             tooltip: _vistaDividida ? 'Cerrar vista dividida' : 'Vista dividida con el guion',
@@ -176,7 +185,13 @@ class _ScenesScreenState extends State<ScenesScreen> {
           if (snap.hasError) return ErrorView(message: 'No se pudieron cargar las escenas.', onRetry: _reload);
           final all = snap.data ?? [];
           if (all.isEmpty) {
-            return const EmptyView(message: 'Todavía no hay escenas registradas.', icon: Icons.movie_filter_outlined);
+            return MobileRefresh(
+              onRefresh: _onPullRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [EmptyView(message: 'Todavía no hay escenas registradas.', icon: Icons.movie_filter_outlined)],
+              ),
+            );
           }
 
           final filtered = _filterSort(all);
@@ -361,7 +376,10 @@ class _ScenesScreenState extends State<ScenesScreen> {
                 Expanded(
                   child: pageItems.isEmpty
                       ? const EmptyView(message: 'No hay escenas con ese estado.', icon: Icons.filter_alt_off_outlined)
-                      : ListView.separated(
+                      : MobileRefresh(
+                          onRefresh: _onPullRefresh,
+                          child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
                           itemCount: pageItems.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, i) => _SceneRow(
@@ -380,6 +398,7 @@ class _ScenesScreenState extends State<ScenesScreen> {
                             },
                             onDelete: () => _delete(pageItems[i]),
                           ),
+                        ),
                         ),
                 ),
                 if (filtered.isNotEmpty) ...[

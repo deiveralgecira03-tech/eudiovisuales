@@ -559,14 +559,20 @@ class _ActorFormScreenState extends State<ActorFormScreen> {
     final idActor = _idActor;
     if (idActor == null) return;
     final session = context.read<AuthSession>();
-    setState(() => _fotoPersonaje = ActorService(session.api).fotoPersonajeBytes(idActor));
+    // Con llaves — evita 'setState() callback argument returned a
+    // Future' (ver detalle en crew_list_screen.dart).
+    setState(() {
+      _fotoPersonaje = ActorService(session.api).fotoPersonajeBytes(idActor);
+    });
   }
 
   void _reloadFotoNormal() {
     final idActor = _idActor;
     if (idActor == null) return;
     final session = context.read<AuthSession>();
-    setState(() => _fotoNormal = ActorService(session.api).fotoNormalBytes(idActor));
+    setState(() {
+      _fotoNormal = ActorService(session.api).fotoNormalBytes(idActor);
+    });
   }
 
   Future<void> _pickAndUploadFotoPersonaje() => _pickAndUploadFoto(
@@ -598,7 +604,16 @@ class _ActorFormScreenState extends State<ActorFormScreen> {
     if (source == _PhotoSource.camera) {
       XFile? foto;
       try {
-        foto = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 90);
+        // maxWidth/maxHeight: limita la resolución de la foto tomada
+        // (una cámara moderna saca varios MB sin esto) para que la
+        // subida no tarde de más en red real — mismo criterio que en
+        // Continuidad Visual (scene_edit_screen.dart).
+        foto = await ImagePicker().pickImage(
+          source: ImageSource.camera,
+          imageQuality: 90,
+          maxWidth: 1920,
+          maxHeight: 1920,
+        );
       } catch (e) {
         // P.ej. el navegador/SO negó el permiso de cámara, o el
         // dispositivo no tiene una cámara soportada.
@@ -613,12 +628,13 @@ class _ActorFormScreenState extends State<ActorFormScreen> {
       bytes = await foto.readAsBytes();
       filename = foto.name;
     } else {
-      final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
-      if (result == null || result.files.isEmpty) return;
-      final file = result.files.single;
-      if (file.bytes == null) return;
-      bytes = file.bytes;
-      filename = file.name;
+      // file_picker 13.x: pickFile() (singular) devuelve el
+      // PlatformFile directo; los bytes se leen aparte, async, con
+      // readAsBytes().
+      final picked = await FilePicker.pickFile(type: FileType.image);
+      if (picked == null) return;
+      bytes = await picked.readAsBytes();
+      filename = picked.name;
     }
     if (bytes == null || filename == null) return;
 
