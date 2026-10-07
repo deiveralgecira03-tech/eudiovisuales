@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, func
 from sqlalchemy.dialects.postgresql import UUID
 from app.config.database import Base
 
@@ -71,4 +71,21 @@ class GalleryPhoto(Base):
         DateTime,
         nullable=False,
         server_default=func.now()
+    )
+
+    # Papelera de reciclaje: Onset/Jefe de Departamento/Director pueden
+    # mover una foto acá (soft-delete, ver "delete_photos" en
+    # permissions.py); solo Jefe de Departamento y Director pueden
+    # restaurarla o eliminarla DEFINITIVAMENTE (ver "manage_recycle_bin").
+    # El Administrador puede ver la papelera pero no actuar sobre ella.
+    # Mientras eliminada=True, la foto se oculta de los listados
+    # normales (ver get_photos_by_scene/get_all_photos).
+    eliminada = Column(Boolean, nullable=False, server_default="false")
+
+    fecha_eliminacion = Column(DateTime, nullable=True)
+
+    eliminada_por = Column(  # llave foránea -> users.id_user (informativo, quién la borró)
+        UUID(as_uuid=True),
+        ForeignKey("users.id_user", ondelete="SET NULL"),
+        nullable=True
     )

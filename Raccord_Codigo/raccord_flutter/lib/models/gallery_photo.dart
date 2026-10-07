@@ -44,6 +44,12 @@ class GalleryPhoto {
   // ahí por día dramático (panel lateral estilo Google Photos, ver
   // gallery_screen.dart). null = escena sin día dramático asignado.
   final int? diaDramaticoOrigen;
+  // Papelera de reciclaje (ver crew_list... no, ver
+  // recycle_bin_screen.dart): true mientras la foto está en la
+  // papelera (soft-delete). fechaEliminacion solo viene cuando
+  // eliminada es true.
+  final bool eliminada;
+  final DateTime? fechaEliminacion;
 
   GalleryPhoto({
     required this.idFoto,
@@ -58,10 +64,13 @@ class GalleryPhoto {
     this.numeroDeEscenaOrigen,
     this.encabezadoEscenaOrigen,
     this.diaDramaticoOrigen,
+    this.eliminada = false,
+    this.fechaEliminacion,
   });
 
   factory GalleryPhoto.fromJson(Map<String, dynamic> json) {
     final fecha = asString(pick(json, ['fecha_subida']));
+    final fechaElim = asString(pick(json, ['fecha_eliminacion']));
     return GalleryPhoto(
       idFoto: asString(pick(json, ['id_foto'])) ?? '',
       idEscena: asString(pick(json, ['id_escena'])) ?? '',
@@ -75,6 +84,8 @@ class GalleryPhoto {
       numeroDeEscenaOrigen: asString(pick(json, ['numero_de_escena'])),
       encabezadoEscenaOrigen: asString(pick(json, ['encabezado'])),
       diaDramaticoOrigen: asInt(pick(json, ['dia_dramatico'])),
+      eliminada: pick(json, ['eliminada']) == true,
+      fechaEliminacion: fechaElim != null ? DateTime.tryParse(fechaElim) : null,
     );
   }
 }

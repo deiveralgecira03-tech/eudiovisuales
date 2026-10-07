@@ -104,11 +104,17 @@ class ApiClient {
   /// campo bajo el nombre `fieldName` (FastAPI: `file: UploadFile`).
   /// `fields` son campos de texto adicionales del mismo formulario
   /// (FastAPI: `Form(...)`) — ej. tipo_foto, descripcion.
+  ///
+  /// `bytes`/`filename` son opcionales (a diferencia de antes, que los
+  /// exigía siempre): las Notificaciones (ver notification_service.dart)
+  /// reusan este mismo método para un formulario multipart cuya foto es
+  /// opcional — sin bytes, se manda el formulario sin archivo adjunto
+  /// (el backend ya trata `file: UploadFile | None = File(None)`).
   Future<dynamic> postFile(
     String path, {
     required String fieldName,
-    required List<int> bytes,
-    required String filename,
+    List<int>? bytes,
+    String? filename,
     String? contentType,
     Map<String, String>? fields,
     bool auth = true,
@@ -117,12 +123,14 @@ class ApiClient {
     final headers = _headers(auth: auth)..remove('Content-Type'); // multipart arma su propio boundary
     request.headers.addAll(headers);
     if (fields != null) request.fields.addAll(fields);
-    request.files.add(http.MultipartFile.fromBytes(
-      fieldName,
-      bytes,
-      filename: filename,
-      contentType: contentType != null ? MediaType.parse(contentType) : null,
-    ));
+    if (bytes != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        fieldName,
+        bytes,
+        filename: filename ?? 'archivo',
+        contentType: contentType != null ? MediaType.parse(contentType) : null,
+      ));
+    }
     // Antes SOLO el envío tenía timeout — la lectura del cuerpo de la
     // respuesta (fromStream) podía quedarse esperando para siempre sin
     // avisar nada si el backend tardaba en terminar de procesar/guardar

@@ -4,10 +4,13 @@ from app.config.database import get_db
 from app.controllers.gallery_photo_controller import (
     get_photos_by_scene,
     get_all_photos,
+    get_papelera,
     upload_photo,
     get_photo_archivo,
     update_photo,
     delete_photo,
+    restore_photo,
+    delete_photo_permanent,
 )
 from app.models.scene_model import Scene
 from app.models.gallery_photo_model import GalleryPhoto
@@ -19,6 +22,7 @@ from app.schemas.gallery_photo_schema import GalleryPhotoUpdateSchema
 # guiones.id_project.
 from app.utils.project_scope import (
     require_project_member,
+    require_project_permission,
     require_record_project_permission,
     resolve_project_of_scene,
     resolve_project_via_scene_fk,
@@ -105,9 +109,11 @@ def edit_photo(
 
 
 # Eliminar foto: permiso propio "delete_photos" (separado de
-# "upload_photos" a pedido explícito: Onset puede subir fotos de
-# continuidad pero no eliminarlas), resuelto contra el proyecto de la
-# escena dueña de la foto.
+# "upload_photos" a pedido explícito). Desde 2026-09-23 esto es un
+# soft-delete: manda la foto a la Papelera de Reciclaje en vez de
+# borrarla para siempre — Onset, Jefe de Departamento y Director
+# pueden hacerlo; el Administrador YA NO (puede ver fotos, pero no
+# eliminarlas — ver app/utils/permissions.py).
 @router.delete("/fotos/{id_foto}")
 def destroy_photo(
     id_foto: str,
@@ -117,4 +123,47 @@ def destroy_photo(
         resolve_project=resolve_project_via_scene_fk("id_escena"), not_found_message="Foto no encontrada",
     )),
 ):
-    return delete_photo(id_foto, db)
+    return delete_photo(id_foto, db, current_user)
+
+
+# Ver la Papelera de Reciclaje de un proyecto: permiso "view_recycle_bin"
+# (Jefe de Departamento, Director y Administrador de solo lectura — el
+# frontend oculta los botones de restaurar/eliminar definitivo para
+# Administrador, ver "manage_recycle_bin").
+@router.get("/fotos/papelera/{id_project}")
+def papelera(
+    id_project: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_project_permission("view_recycle_bin")),
+):
+    check_module_view_access(db, current_user, id_project, "galeria", current_user.get("id_rol"))
+    return get_papelera(id_project, db)
+
+
+# Restaurar una foto desde la Papelera: permiso "manage_recycle_bin"
+# (SOLO Jefe de Departamento y Director).
+@router.post("/fotos/{id_foto}/restaurar")
+def restaurar_foto(
+    id_foto: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_record_project_permission(
+        "manage_recycle_bin", model=GalleryPhoto, pk_column="id_foto", pk_path_param="id_foto",
+        resolve_project=resolve_project_via_scene_fk("id_escena"), not_found_message="Foto no encontrada",
+    )),
+):
+    return restore_photo(id_foto, db)
+
+
+# Eliminar DEFINITIVAMENTE una foto desde la Papelera: permiso
+# "manage_recycle_bin" (SOLO Jefe de Departamento y Director) — este
+# sí borra el binario en MinIO y la fila, sin vuelta atrás.
+@router.delete("/fotos/{id_foto}/definitivo")
+def eliminar_foto_definitivo(
+    id_foto: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_record_project_permission(
+        "manage_recycle_bin", model=GalleryPhoto, pk_column="id_foto", pk_path_param="id_foto",
+        resolve_project=resolve_project_via_scene_fk("id_escena"), not_found_message="Foto no encontrada",
+    )),
+):
+    return delete_photo_permanent(id_foto, db)

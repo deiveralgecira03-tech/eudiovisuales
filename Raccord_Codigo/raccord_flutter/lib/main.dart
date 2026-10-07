@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 // import 'package:screen_protector/screen_protector.dart'; // ver nota 2026-09-20 más abajo
 
 import 'core/navigation_keys.dart';
+import 'core/plan_change_tracker.dart';
 import 'core/session.dart';
 import 'core/theme_controller.dart';
 import 'screens/auth/forgot_password_screen.dart';
@@ -17,6 +18,8 @@ import 'screens/characters/characters_screen.dart';
 import 'screens/characters/crew_list_screen.dart';
 import 'screens/dashboard/project_dashboard_screen.dart';
 import 'screens/gallery/gallery_screen.dart';
+import 'screens/gallery/recycle_bin_screen.dart';
+import 'screens/notifications/notifications_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/projects/project_form_screen.dart';
 import 'screens/projects/project_selection_screen.dart';
@@ -112,6 +115,9 @@ void main() {
         // en memoria a propósito: cada vez que se abre la app arranca en
         // oscuro, sin importar lo que se haya elegido en la sesión anterior.
         ChangeNotifierProvider(create: (_) => ThemeController()),
+        // Cambios acumulados del Plan de Rodaje pendientes de notificar al
+        // equipo (ver core/plan_change_tracker.dart).
+        ChangeNotifierProvider(create: (_) => PlanChangeTracker()),
       ],
       child: const RaccordApp(),
     ),
@@ -205,6 +211,12 @@ Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
       break;
     case '/galeria':
       page = const GalleryScreen();
+      break;
+    case '/papelera':
+      page = const RecycleBinScreen();
+      break;
+    case '/notificaciones':
+      page = const NotificationsScreen();
       break;
     case '/perfil':
       page = const ProfileScreen();

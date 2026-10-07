@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/pdf_export.dart';
+import '../../core/plan_change_tracker.dart';
 import '../../core/session.dart';
 import '../../core/watermark.dart';
 import '../../models/scene.dart';
@@ -324,6 +325,7 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
     return AppScaffold(
       title: 'Plan de Rodaje',
       showBack: true,
+      guardPlanChanges: true,
       actions: [
         if (canDownload)
           IconButton(
@@ -635,8 +637,15 @@ class _ShootingDaysScreenState extends State<ShootingDaysScreen> {
     if (!ok || !mounted) return;
 
     final session = context.read<AuthSession>();
+    final tracker = context.read<PlanChangeTracker>();
     try {
       await ShootingDayService(session.api).delete(day.idRodaje!);
+      tracker.record(
+        session,
+        key: 'dia|${day.idRodaje}',
+        descripcion: 'Se eliminó el día de rodaje ${day.diaRodaje != null ? 'Día ${day.diaRodaje}' : 'Versión ${day.version}'}',
+        conValores: false,
+      );
       _reload();
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -837,12 +846,24 @@ class _DayCardState extends State<_DayCard> {
   Future<void> _persistReorder(BuildContext context, List<Scene> newOrder) async {
     final session = context.read<AuthSession>();
     final service = SceneService(session.api);
+    final tracker = context.read<PlanChangeTracker>();
     try {
+      var huboCambios = false;
       for (var i = 0; i < newOrder.length; i++) {
         final s = newOrder[i];
         if (s.idEscena != null && s.ordenRodaje != i) {
           await service.updatePartial(s.idEscena!, {'orden_rodaje': i});
+          huboCambios = true;
         }
+      }
+      if (huboCambios) {
+        tracker.record(
+          session,
+          key: 'orden|${widget.day.idRodaje}',
+          descripcion:
+              'Se cambió el orden de las escenas del ${widget.day.diaRodaje != null ? 'Día ${widget.day.diaRodaje}' : 'Versión ${widget.day.version}'}',
+          conValores: false,
+        );
       }
       widget.onScenesChanged();
     } on ApiException catch (e) {
@@ -1178,13 +1199,67 @@ class _StripboardRow extends StatelessWidget {
     final changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => SceneEditScreen(scene: scene)),
     );
-    if (changed == true) onSceneChanged?.call(scene);
+    if (changed == true) {
+      if (context.mounted) {
+        context.read<PlanChangeTracker>().record(
+              context.read<AuthSession>(),
+              key: 'edicion|${scene.idEscena}',
+              descripcion: 'ESC ${scene.numeroDeEscena}: se modificó la información de la escena',
+              conValores: false,
+            );
+      }
+      onSceneChanged?.call(scene);
+    }
+  }
+
+  static const _kEtiquetaCampo = {
+    'locacion_rodaje': 'Locación de rodaje',
+    'tiempo_estimado': 'Tiempo estimado',
+    'bloque_grabacion': 'Bloque de grabación',
+    'notas_rodaje': 'Notas de rodaje',
+    'hora_inicio_rodaje': 'Hora de inicio',
+  };
+
+  String? _valorActual(String campo) {
+    switch (campo) {
+      case 'locacion_rodaje':
+        return scene.locacionRodaje;
+      case 'tiempo_estimado':
+        return scene.tiempoEstimado;
+      case 'bloque_grabacion':
+        return scene.bloqueGrabacion?.toString();
+      case 'notas_rodaje':
+        return scene.notasRodaje;
+      case 'hora_inicio_rodaje':
+        return _soloHM(scene.horaInicioRodaje);
+    }
+    return null;
+  }
+
+  static String? _soloHM(String? v) {
+    if (v == null || v.isEmpty) return null;
+    return v.length >= 5 ? v.substring(0, 5) : v;
   }
 
   Future<void> _updateField(BuildContext context, Map<String, dynamic> changes) async {
     final session = context.read<AuthSession>();
+    final tracker = context.read<PlanChangeTracker>();
     try {
       await SceneService(session.api).updatePartial(scene.idEscena!, changes);
+      changes.forEach((campo, nuevo) {
+        final etiqueta = _kEtiquetaCampo[campo];
+        if (etiqueta == null) return;
+        var despues = nuevo?.toString();
+        if (campo == 'hora_inicio_rodaje') despues = _soloHM(despues);
+        if (despues != null && despues.trim().isEmpty) despues = null;
+        tracker.record(
+          session,
+          key: '${scene.idEscena}|$campo',
+          descripcion: 'ESC ${scene.numeroDeEscena} · $etiqueta',
+          antes: _valorActual(campo),
+          despues: despues,
+        );
+      });
       onSceneChanged?.call(scene);
     } on ApiException catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -1647,13 +1722,33 @@ class _AssignScenesDialogState extends State<_AssignScenesDialog> {
 
     final agregadas = _seleccionadas.difference(_originales);
     final quitadas = _originales.difference(_seleccionadas);
+    final tracker = context.read<PlanChangeTracker>();
+
+    String numero(String id) {
+      for (final s in widget.allScenes) {
+        if (s.idEscena == id) return s.numeroDeEscena;
+      }
+      return '?';
+    }
 
     try {
       for (final id in agregadas) {
         await service.updatePartial(id, {'id_rodaje': widget.dayId});
+        tracker.record(
+          session,
+          key: 'asignacion|$id',
+          descripcion: 'ESC ${numero(id)} se asignó a ${widget.dayLabel}',
+          conValores: false,
+        );
       }
       for (final id in quitadas) {
         await service.updatePartial(id, {'id_rodaje': null});
+        tracker.record(
+          session,
+          key: 'asignacion|$id',
+          descripcion: 'ESC ${numero(id)} se quitó de ${widget.dayLabel}',
+          conValores: false,
+        );
       }
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -1753,6 +1848,9 @@ class _ShootingDayFormSheetState extends State<_ShootingDayFormSheet> {
     final horaInicio = _horaInicio.text.trim().isEmpty ? null : '${_horaInicio.text.trim()}:00';
     final horaFin = _horaFin.text.trim().isEmpty ? null : '${_horaFin.text.trim()}:00';
 
+    final tracker = context.read<PlanChangeTracker>();
+    final etiquetaDia = _diaRodaje.text.trim().isNotEmpty ? 'Día ${_diaRodaje.text.trim()}' : 'Versión ${_version.text.trim()}';
+
     try {
       if (_isEdit) {
         await ShootingDayService(session.api).update(widget.existing!.idRodaje!, {
@@ -1778,6 +1876,12 @@ class _ShootingDayFormSheetState extends State<_ShootingDayFormSheet> {
           idProject: session.projectId,
         ));
       }
+      tracker.record(
+        session,
+        key: 'dia|${widget.existing?.idRodaje ?? 'nuevo|${_version.text.trim()}|${_diaRodaje.text.trim()}'}',
+        descripcion: _isEdit ? 'Se modificó el $etiquetaDia de rodaje' : 'Se creó el $etiquetaDia de rodaje',
+        conValores: false,
+      );
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {

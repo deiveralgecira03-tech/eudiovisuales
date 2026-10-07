@@ -53,6 +53,24 @@ USUARIO = 1005
 # "edit_department_breakdown" -> crear/editar/eliminar esa
 # segmentación específica. Solo el Jefe de Departamento (1003); Onset
 # y Usuario del mismo departamento pueden verla pero no modificarla.
+#
+# Papelera de reciclaje de fotos (2026-09-23, a pedido explícito):
+# "delete_photos" ahora es un soft-delete (mueve la foto a la
+# papelera, ver fotos_continuidad.eliminada), no un borrado real.
+#
+# "view_recycle_bin" -> ver la pantalla de Papelera de Reciclaje.
+# Jefe de Departamento, Director y Administrador (este último de
+# SOLO LECTURA: ve la papelera pero no tiene botones de acción, ver
+# "manage_recycle_bin").
+#
+# "manage_recycle_bin" -> restaurar una foto o eliminarla
+# DEFINITIVAMENTE desde la papelera. Exclusivo de Jefe de
+# Departamento y Director — ni Onset ni Administrador pueden.
+#
+# Notificaciones (2026-09-27, a pedido explícito):
+# "publish_notifications" -> publicar una notificación al equipo
+# (general o específica de uno o más departamentos). Exclusivo de
+# Jefe de Departamento y Director; el Administrador NO publica.
 ROLE_PERMISSIONS = {
     ADMINISTRADOR: {
         "full_management": True,     # CRUD total de usuarios, clientes y roles
@@ -66,12 +84,15 @@ ROLE_PERMISSIONS = {
         "create_scenes": True,
         "create_characters": True,
         "upload_photos": True,
-        "delete_photos": True,
+        "delete_photos": False,      # el Admin puede VER fotos pero no eliminarlas
         "comment_scenes": True,
         "read_only": False,
         "manage_general_breakdown": True,
         "view_department_breakdown": False,
         "edit_department_breakdown": False,
+        "view_recycle_bin": True,    # solo lectura, ver "manage_recycle_bin"
+        "manage_recycle_bin": False,
+        "publish_notifications": False,
     },
     DIRECTOR: {
         "full_management": True,
@@ -91,6 +112,9 @@ ROLE_PERMISSIONS = {
         "manage_general_breakdown": True,
         "view_department_breakdown": False,
         "edit_department_breakdown": False,
+        "view_recycle_bin": True,
+        "manage_recycle_bin": True,
+        "publish_notifications": True,
     },
     JEFE_DEPARTAMENTO: {
         "full_management": False,
@@ -110,6 +134,9 @@ ROLE_PERMISSIONS = {
         "manage_general_breakdown": False,
         "view_department_breakdown": True,
         "edit_department_breakdown": True,
+        "view_recycle_bin": True,
+        "manage_recycle_bin": True,
+        "publish_notifications": True,
     },
     ONSET: {
         "full_management": False,
@@ -123,12 +150,15 @@ ROLE_PERMISSIONS = {
         "create_scenes": False,
         "create_characters": False,
         "upload_photos": True,
-        "delete_photos": False,  # Onset puede subir fotos de continuidad, pero no eliminarlas
+        "delete_photos": True,   # Onset puede mover fotos a la papelera (antes no podía eliminar)
         "comment_scenes": True,
         "read_only": False,
         "manage_general_breakdown": False,
         "view_department_breakdown": True,
         "edit_department_breakdown": False,
+        "view_recycle_bin": False,   # no ve la pantalla de Papelera
+        "manage_recycle_bin": False,
+        "publish_notifications": False,
     },
     USUARIO: {
         "full_management": False,
@@ -148,6 +178,9 @@ ROLE_PERMISSIONS = {
         "manage_general_breakdown": False,
         "view_department_breakdown": True,
         "edit_department_breakdown": False,
+        "view_recycle_bin": False,
+        "manage_recycle_bin": False,
+        "publish_notifications": False,
     },
 }
 

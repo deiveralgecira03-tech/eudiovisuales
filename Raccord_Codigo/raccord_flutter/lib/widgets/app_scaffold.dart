@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/plan_change_tracker.dart';
 import '../core/responsive.dart';
 import '../core/session.dart';
 import '../core/theme_controller.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'app_logo.dart';
 
@@ -64,6 +66,10 @@ const appSideMenuItems = [
   ('Personajes', Icons.people_outline, '/personajes'),
   ('Cast List', Icons.theater_comedy_outlined, '/actores'),
   ('Galería', Icons.photo_library_outlined, '/galeria'),
+  // Papelera de Reciclaje de fotos (2026-09-23): solo Jefe de
+  // Departamento, Director y Administrador (este de solo lectura) la
+  // ven — Onset y Usuario ni siquiera saben que existe.
+  ('Papelera de Reciclaje', Icons.delete_outline, '/papelera'),
   // Crew List va casi al final del menú porque es el listado de TODAS
   // las personas del proyecto (no solo elenco) — pedido explícito del
   // usuario para no confundirlo con "Cast List".
@@ -78,6 +84,11 @@ const appSideMenuItems = [
 // el backend ya la rechazaba con 403 para estos dos).
 const _kRestrictedMenuRoute = '/roles';
 
+// Papelera de Reciclaje: solo para quienes tienen "view_recycle_bin"
+// (Jefe de Departamento, Director y Administrador — Onset y Usuario no
+// la ven en absoluto, ver app/utils/permissions.py).
+const _kRecycleBinMenuRoute = '/papelera';
+
 // Ruta -> clave de módulo (ver app/utils/module_access.py / ModuloAccesos
 // en models/module_access.dart) — para que el menú también respete una
 // excepción puntual de "Personalizar accesos" (nivel "sin_acceso"),
@@ -90,6 +101,7 @@ const Map<String, String> _kMenuRouteModulo = {
   '/personajes': 'personajes',
   '/actores': 'cast',
   '/galeria': 'galeria',
+  '/papelera': 'galeria', // la Papelera comparte el módulo "galeria" (ver override "Personalizar accesos")
   '/crew-list': 'crew_list',
   '/roles': 'roles',
 };
@@ -135,6 +147,7 @@ class AppSideMenu extends StatelessWidget {
     // rol EFECTIVO en el proyecto activo (session.can), no el rol global.
     final visibleItems = appSideMenuItems.where((item) {
       if (item.$3 == _kRestrictedMenuRoute && !session.can('invite_users')) return false;
+      if (item.$3 == _kRecycleBinMenuRoute && !session.can('view_recycle_bin')) return false;
       final modulo = _kMenuRouteModulo[item.$3];
       if (modulo != null && !session.canSeeModule(modulo)) return false;
       return true;
@@ -222,6 +235,11 @@ class AppScaffold extends StatelessWidget {
   // en el resto, tanto porque no hay nada nuevo que notificar ahí como
   // para darle más aire al logo/título en pantallas angostas.
   final bool showNotifications;
+  // Solo el Plan de Rodaje lo activa: al salir (volver, menú, casa, perfil,
+  // cambiar proyecto, salir) y haber cambios pendientes, muestra el
+  // diálogo "Notificar estos cambios al equipo" — ver
+  // core/plan_change_tracker.dart.
+  final bool guardPlanChanges;
 
   const AppScaffold({
     super.key,
@@ -235,6 +253,7 @@ class AppScaffold extends StatelessWidget {
     this.showModuleMenu = true,
     this.showHome = true,
     this.showNotifications = false,
+    this.guardPlanChanges = false,
   });
 
   @override
@@ -272,25 +291,42 @@ class AppScaffold extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final isNarrow = screenWidth < 600;
 
+    // Con guardPlanChanges, antes de abandonar la pantalla se ofrece
+    // notificar los cambios acumulados; false = quedarse en la pantalla.
+    Future<bool> canLeave() async {
+      if (!guardPlanChanges) return true;
+      return PlanChangeTracker.confirmLeave(context);
+    }
+
     final effectiveEndDrawer = endDrawer ??
         (showModuleMenu
             ? Drawer(
                 child: SafeArea(
-                  child: AppSideMenu(onSelect: (route) {
+                  child: AppSideMenu(onSelect: (route) async {
                     Navigator.of(context).pop(); // cierra el drawer
+                    if (!await canLeave()) return;
+                    if (!context.mounted) return;
                     Navigator.of(context).pushNamed(route);
                   }),
                 ),
               )
             : null);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       endDrawer: effectiveEndDrawer == null ? null : KeyedSubtree(key: themeKey, child: effectiveEndDrawer),
       appBar: AppBar(
         leading: showBack
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: onBack ?? () => Navigator.of(context).pop(),
+                onPressed: () async {
+                  if (!await canLeave()) return;
+                  if (!context.mounted) return;
+                  if (onBack != null) {
+                    onBack!();
+                  } else {
+                    Navigator.of(context).pop();
+                  }
+                },
               )
             : null,
         automaticallyImplyLeading: showBack,
@@ -340,25 +376,20 @@ class AppScaffold extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.home_outlined),
                       tooltip: 'Ir al Dashboard',
-                      onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (r) => false),
+                      onPressed: () async {
+                        if (!await canLeave()) return;
+                        if (!context.mounted) return;
+                        Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (r) => false);
+                      },
                     ),
                 if (actions != null) KeyedSubtree(key: themeKey, child: Row(mainAxisSize: MainAxisSize.min, children: actions!)),
                 // Solo en el Dashboard (showNotifications: true) — pedido
                 // explícito del usuario: en el resto de pantallas no
-                // aporta nada (todavía no hay notificaciones reales que
-                // mostrar) y solo le quita espacio al logo/título.
-                if (showNotifications)
-                Builder(
-                  builder: (context) => IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
-                    tooltip: 'Notificaciones (próximamente)',
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Notificaciones: disponible próximamente')),
-                      );
-                    },
-                  ),
-                ),
+                // aporta nada y solo le quita espacio al logo/título.
+                // Desde 2026-09-27 ya es el módulo real de Notificaciones
+                // (antes solo mostraba "próximamente"), con badge de no
+                // leídas — ver _NotificationsBellButton más abajo.
+                if (showNotifications) const _NotificationsBellButton(),
                 if (effectiveEndDrawer != null)
                   Builder(
                     builder: (context) => IconButton(
@@ -377,6 +408,8 @@ class AppScaffold extends StatelessWidget {
                     ),
                   ),
                   onSelected: (value) async {
+                    if (!await canLeave()) return;
+                    if (!context.mounted) return;
                     if (value == 'perfil') {
                       Navigator.of(context).pushNamed('/perfil');
                     } else if (value == 'proyectos') {
@@ -410,6 +443,90 @@ class AppScaffold extends StatelessWidget {
       ),
       body: SafeArea(child: KeyedSubtree(key: themeKey, child: body)),
       floatingActionButton: floatingActionButton == null ? null : KeyedSubtree(key: themeKey, child: floatingActionButton!),
+    );
+
+    if (!guardPlanChanges) return scaffold;
+
+    // Botón/gesto "atrás" del sistema (Android, navegador): si hay cambios
+    // pendientes se intercepta y se ofrece notificarlos antes de salir.
+    final hasPending = context.watch<PlanChangeTracker>().hasPending;
+    return PopScope(
+      canPop: !hasPending,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await PlanChangeTracker.confirmLeave(context) && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: scaffold,
+    );
+  }
+}
+
+/// Campana de Notificaciones (2026-09-27): pide el contador de no
+/// leídas una vez al construirse y muestra un badge si hay alguna. Al
+/// tocarla, navega a /notificaciones — desde ahí, al volver, la
+/// próxima vez que este botón se reconstruya (ej. al reabrir el
+/// Dashboard) el contador se vuelve a pedir solo.
+class _NotificationsBellButton extends StatefulWidget {
+  const _NotificationsBellButton();
+
+  @override
+  State<_NotificationsBellButton> createState() => _NotificationsBellButtonState();
+}
+
+class _NotificationsBellButtonState extends State<_NotificationsBellButton> {
+  late Future<int> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<int> _load() {
+    final session = context.read<AuthSession>();
+    if (!session.hasProject) return Future.value(0);
+    return NotificationService(session.api).unreadCount(session.projectId!);
+  }
+
+  Future<void> _abrir() async {
+    await Navigator.of(context).pushNamed('/notificaciones');
+    if (mounted) setState(() => _future = _load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<int>(
+      future: _future,
+      builder: (context, snap) {
+        final noLeidas = snap.data ?? 0;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined),
+              tooltip: 'Notificaciones',
+              onPressed: _abrir,
+            ),
+            if (noLeidas > 0)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  constraints: const BoxConstraints(minWidth: 16),
+                  decoration: const BoxDecoration(color: AppColors.error, shape: BoxShape.circle),
+                  child: Text(
+                    noLeidas > 9 ? '9+' : '$noLeidas',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

@@ -180,9 +180,11 @@ class _PhotoViewerDialogState extends State<_PhotoViewerDialog> {
   }
 
   Future<void> _delete() async {
+    // Soft-delete: se mueve a la Papelera de Reciclaje, no se borra
+    // para siempre (ver recycle_bin_screen.dart).
     final confirmed = await confirmDelete(
       context,
-      message: '¿Eliminar esta foto de continuidad? Esta acción no se puede deshacer.',
+      message: '¿Mover esta foto a la papelera de reciclaje?',
     );
     if (!confirmed) return;
 

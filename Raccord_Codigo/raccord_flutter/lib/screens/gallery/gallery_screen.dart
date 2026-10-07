@@ -710,9 +710,13 @@ class _GalleryPhotoThumb extends StatelessWidget {
   }
 
   Future<void> _delete(BuildContext context) async {
+    // Desde 2026-09-23 esto es un soft-delete: la foto se mueve a la
+    // Papelera de Reciclaje (recycle_bin_screen.dart), no se borra para
+    // siempre — solo Jefe de Departamento o Director pueden restaurarla
+    // o eliminarla definitivamente ahí.
     final confirmed = await confirmDelete(
       context,
-      message: '¿Eliminar esta foto de continuidad? Esta acción no se puede deshacer.',
+      message: '¿Mover esta foto a la papelera de reciclaje?',
     );
     if (!confirmed) return;
 

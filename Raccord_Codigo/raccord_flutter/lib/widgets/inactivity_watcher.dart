@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/navigation_keys.dart';
+import '../core/plan_change_tracker.dart';
 import '../core/session.dart';
 import '../core/theme_controller.dart';
 
@@ -124,6 +125,12 @@ class _InactivityWatcherState extends State<InactivityWatcher> {
 
     final context = rootNavigatorKey.currentContext;
     if (context != null) {
+      // Cambios pendientes del Plan de Rodaje: se notifican solos ANTES de
+      // cerrar la sesión (el token aún debe ser válido).
+      try {
+        await context.read<PlanChangeTracker>().flush(context.read<AuthSession>());
+      } catch (_) {}
+      if (!context.mounted) return;
       await context.read<AuthSession>().logout();
       // Mismo criterio que el "Salir" manual del menú (ver
       // widgets/app_scaffold.dart): el login siempre debe quedar en

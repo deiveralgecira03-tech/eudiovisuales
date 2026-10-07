@@ -72,7 +72,30 @@ class GalleryService {
     return GalleryPhoto.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
+  /// Mueve la foto a la Papelera de Reciclaje (soft-delete: Onset,
+  /// Jefe de Departamento y Director pueden hacerlo — el Administrador
+  /// ya no, ver app/utils/permissions.py del backend).
   Future<void> delete(String idFoto) async {
     await api.delete('/fotos/$idFoto');
+  }
+
+  /// Papelera de reciclaje del proyecto — visible para Jefe de
+  /// Departamento, Director y Administrador (este último de solo
+  /// lectura, ver recycle_bin_screen.dart).
+  Future<List<GalleryPhoto>> papelera(String idProject) async {
+    final data = await api.get('/fotos/papelera/$idProject');
+    return asListOfMap(data).map(GalleryPhoto.fromJson).toList();
+  }
+
+  /// Restaura una foto desde la Papelera (solo Jefe de Departamento y
+  /// Director).
+  Future<void> restaurar(String idFoto) async {
+    await api.post('/fotos/$idFoto/restaurar', body: const {});
+  }
+
+  /// Elimina la foto DEFINITIVAMENTE desde la Papelera (solo Jefe de
+  /// Departamento y Director) — sin vuelta atrás.
+  Future<void> eliminarDefinitivo(String idFoto) async {
+    await api.delete('/fotos/$idFoto/definitivo');
   }
 }

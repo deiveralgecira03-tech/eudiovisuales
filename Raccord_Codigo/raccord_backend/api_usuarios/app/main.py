@@ -27,6 +27,7 @@ from app.routes.gallery_photo_routes import router as gallery_photo_router
 from app.routes.crew_member_routes import router as crew_member_router
 from app.routes.module_access_routes import router as module_access_router
 from app.routes.contact_routes import router as contact_router
+from app.routes.notification_routes import router as notification_router
 
 from app.config.database import Base, engine
 from app.utils.minio_client import ensure_buckets
@@ -44,6 +45,7 @@ from app.models.gallery_photo_model import GalleryPhoto
 from app.models.crew_member_model import CrewMember
 from app.models.module_access_model import UserProjectModuleAccess
 from app.models.revoked_token_model import RevokedToken
+from app.models.notification_model import Notification, NotificationDepartamento, NotificationRead
 from app.utils.response import api_response
 
 load_dotenv()
@@ -123,6 +125,7 @@ app.include_router(scene_character_router)
 app.include_router(gallery_photo_router)
 app.include_router(crew_member_router)
 app.include_router(module_access_router)
+app.include_router(notification_router)
 
 # Landing / contacto - público
 app.include_router(contact_router)

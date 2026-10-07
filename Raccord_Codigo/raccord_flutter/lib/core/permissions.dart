@@ -43,11 +43,14 @@ const Map<int, Map<String, bool>> _rolePermissions = {
     'create_scenes': true,
     'create_characters': true,
     'upload_photos': true,
-    'delete_photos': true,
+    'delete_photos': false, // el Admin puede VER fotos pero no eliminarlas (2026-09-23)
     'comment_scenes': true,
     'manage_general_breakdown': true,
     'view_department_breakdown': false,
     'edit_department_breakdown': false,
+    'view_recycle_bin': true, // ve la Papelera, pero de solo lectura (ver manage_recycle_bin)
+    'manage_recycle_bin': false,
+    'publish_notifications': false,
   },
   Roles.director: {
     'full_management': true,
@@ -66,6 +69,9 @@ const Map<int, Map<String, bool>> _rolePermissions = {
     'manage_general_breakdown': true,
     'view_department_breakdown': false,
     'edit_department_breakdown': false,
+    'view_recycle_bin': true,
+    'manage_recycle_bin': true,
+    'publish_notifications': true,
   },
   Roles.jefeDepartamento: {
     'full_management': false,
@@ -84,6 +90,9 @@ const Map<int, Map<String, bool>> _rolePermissions = {
     'manage_general_breakdown': false,
     'view_department_breakdown': true,
     'edit_department_breakdown': true,
+    'view_recycle_bin': true,
+    'manage_recycle_bin': true,
+    'publish_notifications': true,
   },
   Roles.onset: {
     'full_management': false,
@@ -97,11 +106,14 @@ const Map<int, Map<String, bool>> _rolePermissions = {
     'create_scenes': false,
     'create_characters': false,
     'upload_photos': true,
-    'delete_photos': false, // Onset sube fotos de continuidad, pero no puede eliminarlas
+    'delete_photos': true, // Onset puede mover fotos a la papelera (2026-09-23, antes no podía eliminar)
     'comment_scenes': true,
     'manage_general_breakdown': false,
     'view_department_breakdown': true,
     'edit_department_breakdown': false,
+    'view_recycle_bin': false,
+    'manage_recycle_bin': false,
+    'publish_notifications': false,
   },
   Roles.usuario: {
     'full_management': false,
@@ -120,6 +132,9 @@ const Map<int, Map<String, bool>> _rolePermissions = {
     'manage_general_breakdown': false,
     'view_department_breakdown': true,
     'edit_department_breakdown': false,
+    'view_recycle_bin': false,
+    'manage_recycle_bin': false,
+    'publish_notifications': false,
   },
 };
 
