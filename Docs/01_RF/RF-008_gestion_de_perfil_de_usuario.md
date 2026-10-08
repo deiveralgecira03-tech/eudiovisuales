@@ -9,7 +9,7 @@
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Media |
 | Estado | Pendiente |
-| RNF asociados | RNF-033 |
+| RNF asociados | — |
 
 ---
 
@@ -20,7 +20,7 @@
 
 - Teléfono (opcional, formato internacional)
 - Foto de perfil (imagen JPG/PNG, máx 2 MB)
-- Preferencias de notificación: Email (sí/no), Push (sí/no)
+- Preferencias de notificación por correo (sí/no)
 - Configuración de interfaz: Modo oscuro (sí/no)
 
 **Proceso**:

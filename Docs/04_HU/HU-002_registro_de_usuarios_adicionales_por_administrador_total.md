@@ -7,7 +7,7 @@
 | ID | HU-002 |
 | Título | Registro de Usuarios Adicionales por Administrador Total |
 | Prioridad | Crítica |
-| Estado | Completada |
+| Estado | Completado |
 | RF asociado | RF-002 |
 
 ---

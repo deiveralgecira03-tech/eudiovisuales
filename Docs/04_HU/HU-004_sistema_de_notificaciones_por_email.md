@@ -7,7 +7,7 @@
 | ID | HU-004 |
 | Título | Sistema de Notificaciones por Email |
 | Prioridad | Crítica |
-| Estado | Completada |
+| Estado | Completado |
 | RF asociado | RF-004 |
 
 ---
@@ -15,7 +15,7 @@
 ## Historia
 
 *Como* usuario del sistema,
-*quiero* recibir por correo las notificaciones de eventos críticos (activación de cuenta, código 2FA, recuperación de contraseña, cambios de calendario, comunicados),
+*quiero* recibir por correo las notificaciones de eventos críticos (activación de cuenta, código 2FA, recuperación de contraseña),
 *para* enterarme a tiempo sin tener que revisar la plataforma constantemente.
 
 ## Criterios de Aceptación

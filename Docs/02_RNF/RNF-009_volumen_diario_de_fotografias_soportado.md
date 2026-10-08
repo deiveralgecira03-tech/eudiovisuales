@@ -9,7 +9,7 @@
 | Categoría | Rendimiento / Escalabilidad |
 | Prioridad | Alta |
 | Estado | Pendiente |
-| RF asociados | RF-010 |
+| RF asociados | RF-011 |
 
 ---
 
@@ -23,7 +23,7 @@
 
 
 **Aplica a**:
-- RF-010 (Carga de fotografías)
+- RF-011 (Carga de fotografías)
 - Sistema de almacenamiento (S3 o equivalente)
 
 **Estándar/Norma**: ISO/IEC 25010 - Capacidad

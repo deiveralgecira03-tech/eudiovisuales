@@ -13,40 +13,44 @@
 
 ---
 
-**Descripción**: El sistema debe implementar control de acceso basado en roles (RBAC) con 4 roles predefinidos, cada uno con permisos granulares específicos sobre los 3 módulos principales (Continuidad Visual, Comunicación, Guiones).
-
+**Descripción**: El sistema debe controlar qué puede hacer cada persona dentro de un proyecto mediante cinco roles fijos (Administrador, Director, Jefe de Departamento, Onset y Usuario). Cada rol define una matriz de permisos aplicada en el servidor en cada endpoint; la interfaz oculta las acciones que el rol no puede ejecutar.
 
 **Entradas**:
-- Rol asignado al usuario (definido en RF-005, RF-005)
-- Acción solicitada por usuario (ej: subir fotografía, editar plan de rodaje, ver guion)
-- Módulo al que intenta acceder (Continuidad Visual/plan de rodaje/Comunicación/Guiones)
+
+- Rol asignado a la persona en el proyecto (Administrador, Director, Jefe de Departamento, Onset, Usuario)
+- Permiso requerido por la acción (por ejemplo: subir guiones, crear escenas, subir fotos, descargar archivos, comentar escenas, gestionar la papelera, publicar notificaciones)
 
 **Proceso**:
 
-- Usuario solicita ejecutar acción en el sistema
-- Sistema consulta rol del usuario desde base de datos
-- Sistema verifica en matriz de permisos si ese rol tiene permiso para esa acción en ese módulo
-- Si permiso existe: permitir acción y ejecutar
-- Si permiso NO existe: denegar acción y mostrar mensaje "No tiene permisos para realizar esta acción"
-- Registrar intento de acceso (permitido o denegado) en log de auditoría
-  
+- El rol se asigna al invitar a la persona al proyecto (RF-002) y solo lo cambian Administrador y Director.
+- Cada petición al servidor valida el token y comprueba el permiso del rol antes de ejecutar la acción.
+- Reglas principales:
+
+        Administrador: control total; es el único que crea proyectos y elimina usuarios Administrador
+        Director: mismo nivel que el Administrador, salvo crear proyectos y eliminar Administradores; además gestiona la papelera y publica notificaciones
+        Jefe de Departamento: invita personal, sube y elimina fotos, descarga archivos, edita el desglose de su departamento, gestiona la papelera y publica notificaciones; no sube guiones ni crea escenas ni personajes
+        Onset: ve el proyecto, sube fotos, las envía a la papelera y comenta escenas; no administra
+        Usuario: solo lectura
+
+- Si una persona intenta una acción sin permiso, el sistema responde con error de acceso denegado.
+- El nivel de acceso por módulo de cada persona puede restringirse adicionalmente (RF-010).
+
 **Salidas**:
 
-- Acción permitida o denegada
-- Mensaje de error si acción denegada
-- Registro en log de auditoría
+- Acciones permitidas o rechazadas según el rol
+- Interfaz adaptada al rol de la persona
 
 **Precondiciones**:
 
-- Usuario debe estar autenticado (RF-003)
-- Usuario debe tener rol asignado
+- Usuario autenticado y asociado al proyecto con un rol
 
-**Postcondiciones** : Acción ejecutada si el permiso existe y registro de intento (exitoso o fallido) en log de auditoría
+**Postcondiciones**:
 
-**Actores**: Todos los usuarios del sistema
+- Ninguna acción se ejecuta sin el permiso correspondiente
+
+**Actores**: Administrador, Director, Jefe de Departamento, Onset, Usuario
 
 **Dependencias**:
 
-RF-003 (Usuario autenticado)
-
-Nota Crítica: El sistema debe validar que siempre exista al menos 1 usuario con rol "Administrador Total" activo. No se puede eliminar o cambiar rol del último Administrador Total.
+- RF-002 (Registro de usuarios adicionales)
+- RF-003 (Inicio de sesión)

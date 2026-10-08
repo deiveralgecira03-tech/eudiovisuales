@@ -22,7 +22,7 @@
 
         Validación de credenciales: < 2 segundo
         Generación de código 2FA: < 5 segundos
-        Envío de código (email/SMS): < 60 segundos (ver RNF-003)
+        Envío de código por correo: < 60 segundos (ver RNF-003)
 
 
 - Validación de código 2FA: < 2 segundos

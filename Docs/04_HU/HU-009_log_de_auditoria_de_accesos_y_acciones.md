@@ -14,12 +14,13 @@
 
 ## Historia
 
-*Como* Administrador Total,
-*quiero* que el sistema registre automáticamente cada acceso y acción crítica de los usuarios,
-*para* poder auditar la actividad del sistema y detectar posibles filtraciones.
+*Como* Administrador,
+*quiero* que el sistema registre las acciones sensibles de autenticación, usuarios y roles, guiones y fotografías,
+*para* poder investigar accesos sospechosos o una posible filtración de material confidencial.
 
 ## Criterios de Aceptación
 
-- Cada acción crítica (login, visualización de fotos/guiones, cambios de calendario, exportaciones, cambios de permisos) genera un registro con usuario, timestamp, IP, dispositivo y resultado.
-- Los registros del log no se pueden editar ni eliminar, solo insertar.
-- Los registros se conservan 90 días activos, se archivan automáticamente después y se purgan a los 15 meses.
+- Se registran inicios de sesión (exitosos y fallidos), cambios de rol y acceso, subida, visualización y descarga de guiones, y subida, descarga y eliminación de fotografías.
+- Cada registro incluye fecha y hora, usuario, acción, elemento, IP, dispositivo y resultado.
+- Los registros no se pueden editar ni eliminar desde la aplicación.
+- Los demás módulos (escenas, desglose, plan de rodaje, crew list) no se auditan.

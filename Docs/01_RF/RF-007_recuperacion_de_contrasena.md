@@ -9,7 +9,7 @@
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Alta |
 | Estado | Pendiente |
-| RNF asociados | RNF-003, RNF-005, RNF-017 |
+| RNF asociados | RNF-003, RNF-005, RNF-016 |
 
 ---
 

@@ -7,7 +7,7 @@
 | ID | HU-012 |
 | Título | Búsqueda Avanzada por Filtros |
 | Prioridad | Crítica |
-| Estado | Completada |
+| Estado | Completado |
 | RF asociado | RF-012 |
 
 ---

@@ -9,16 +9,16 @@
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Crítica |
 | Estado | Pendiente |
-| RNF asociados | RNF-003 |
+| RNF asociados | RNF-003, RNF-018 |
 
 ---
 
-**Descripción**: El sistema debe proveer servicio de envío de notificaciones a usuarios mediante email para eventos críticos (activación de cuenta, código 2FA, recuperación de contraseña, cambios de calendario, comunicados oficiales).
+**Descripción**: El sistema debe proveer servicio de envío de notificaciones a usuarios mediante email para eventos críticos (activación de cuenta, código 2FA, recuperación de contraseña, invitación al proyecto y mensajes del formulario de contacto).
 
 
 **Entradas**:
-- Destinatario (email o teléfono del usuario)
-- Tipo de notificación (Activación/2FA/Recuperación/Cambio Calendario/Comunicado)
+- Destinatario (correo electrónico)
+- Tipo de notificación (Activación/2FA/Recuperación/Invitación)
 - Contenido del mensaje (texto dinámico según tipo)
 - Prioridad (Normal/Urgente/Crítica)
 
@@ -40,7 +40,7 @@
 - Confirmación de entrega (cuando servicio lo provea)
 - Registro en log de notificaciones
 
-**Precondiciones**: Usuario destinatario debe tener email o teléfono válido registrado y servicio de terceros, debe estar configurado y con créditos
+**Precondiciones**: Usuario destinatario debe tener un email válido registrado y el servicio de correo (SMTP) debe estar configurado
 
 **Postcondiciones**:
 

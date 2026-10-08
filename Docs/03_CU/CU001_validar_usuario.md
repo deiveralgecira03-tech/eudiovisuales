@@ -16,7 +16,7 @@
 #### Actores
 
 - **Primario:** Cualquier usuario registrado
-- **Secundario:** Sistema de autenticación, Servicio de email/SMS, Sistema de LOG
+- **Secundario:** Sistema de autenticación, Servicio de correo, Sistema de LOG
 
 #### Descripción
 
@@ -48,7 +48,7 @@ Verifica el acceso al sistema mediante correo electrónico, contraseña y códig
 1. Usuario ingresa email y contraseña
 2. Sistema valida credenciales en BD
 3. Sistema genera código 2FA de 6 dígitos
-4. Sistema envía código al canal elegido (email/SMS)
+4. Sistema envía código al correo del usuario
 5. Usuario ingresa código 2FA
 6. Sistema valida código (válido 2 minutos)
 7. Sistema genera token JWT (30 Min) y refresh token (7 días)
@@ -60,7 +60,7 @@ Verifica el acceso al sistema mediante correo electrónico, contraseña y códig
 
 **FA-001: Recuperación de Contraseña**: Usuario selecciona "¿Olvidaste tu contraseña?" → Sistema envía email con enlace temporal (1 hora) → Usuario crea nueva contraseña → Sistema actualiza y registra LOG
 
-**FA-002: Reenvío Código 2FA** : Usuario no recibe código → Selecciona "Reenviar" → Sistema invalida anterior y envía nuevo por canal alternativo
+**FA-002: Reenvío Código 2FA** : Usuario no recibe código → Selecciona "Reenviar" → Sistema invalida anterior y envía nuevo por correo
 
 **FA-003: Activación de Cuenta Pendiente** : Usuario con cuenta "Inactiva" intenta login → Sistema muestra mensaje → Opción "Reenviar email activación" → Usuario activa cuenta mediante enlace → Redirigido a login
 

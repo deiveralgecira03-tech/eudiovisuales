@@ -9,26 +9,23 @@
 | Categoría | Funcionalidad |
 | Prioridad | Media |
 | Estado | Pendiente |
-| RF asociados | RF-022, RF-024 |
+| RF asociados | RF-020 |
 
 ---
 
-**Descripción**: El sistema debe registrar timestamp de lectura de notificaciones cuando usuario abre la notificación o marca como leída, permitiendo a emisores ver quién leyó y quién no.
+**Descripción**: El sistema debe registrar, por usuario, la fecha y hora en que abrió cada notificación, para calcular el contador de no leídas y saber qué leyó cada persona.
 
 **Métrica**:
-- 100% de notificaciones con tracking de lectura
-- Timestamp registrado con precisión de segundos
-- Visible para emisor en menos de 2 segundos tras actualización
-
+- 100% de notificaciones con registro de lectura por usuario
+- Fecha y hora de lectura con precisión de segundos
+- El contador de no leídas se actualiza al abrir la notificación
 
 **Aplica a**:
-- RF-022 (Notificaciones push)
-- RF-024 (Comunicados oficiales con confirmación obligatoria)
+- RF-020 (Notificaciones del proyecto)
 
 **Estándar/Norma**: Funcionalidad estándar de sistemas de mensajería
 
 **Método de Verificación**:
-- Enviar 50 notificaciones a 10 usuarios
-- Usuarios abren notificaciones en momentos diferentes
-- Verificar que timestamp se registra correctamente
-- Verificar que emisor ve actualización en <2 segundos
+- Publicar 10 notificaciones a un equipo de 5 usuarios
+- Abrir algunas con cada usuario
+- Verificar que el registro de lectura y el contador reflejan exactamente lo abierto

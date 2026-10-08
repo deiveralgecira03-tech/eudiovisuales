@@ -47,13 +47,12 @@ Permite al Productor de Línea o Jefe de Producción realizar el registro, consu
 - Estado "Revocado"
 - Sesiones cerradas (<60s)
 - Tokens invalidados
-- Eliminado de canales
 - Registro en LOG
 
 **Actualización perfil:**
 - Campos editables actualizados
 - Foto comprimida (500x500px)
-- Sincronizado en todos dispositivos
+- Datos del perfil guardados
 
 #### Flujo Principal (Registro)
 

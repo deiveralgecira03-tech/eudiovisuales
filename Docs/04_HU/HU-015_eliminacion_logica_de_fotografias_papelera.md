@@ -4,11 +4,11 @@
 
 | Campo | Valor |
 |---|---|
-| ID | HU-016 |
+| ID | HU-015 |
 | Título | Eliminación Lógica de Fotografías (Papelera) |
 | Prioridad | Media |
-| Estado | Pendiente |
-| RF asociado | RF-016 |
+| Estado | Completado |
+| RF asociado | RF-015 |
 
 ---
 

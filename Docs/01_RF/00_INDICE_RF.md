@@ -9,32 +9,27 @@
 - [RF-007: Recuperación de Contraseña](RF-007_recuperacion_de_contrasena.md) — Alta — Módulo: Autenticación y Gestión de Usuarios
 - [RF-008: Gestión de Perfil de Usuario](RF-008_gestion_de_perfil_de_usuario.md) — Media — Módulo: Autenticación y Gestión de Usuarios
 - [RF-009: Log de Auditoría de Accesos y Acciones](RF-009_log_de_auditoria_de_accesos_y_acciones.md) — Alta — Módulo: Autenticación y Gestión de Usuarios
-- [RF-010: Carga de Fotografías](RF-010_carga_de_fotografias.md) — Crítica — Módulo: Gestión de Fotografías de Continuidad
-- [RF-011: Gestión de Nomenclatura y Versionado de Fotografías](RF-011_gestion_de_nomenclatura_y_versionado_de_fotografias.md) — Alta — Módulo: Gestión de Fotografías de Continuidad
-- [RF-012: Búsqueda Avanzada por Filtros](RF-012_busqueda_avanzada_por_filtros.md) — Crítica — Módulo: Gestión de Fotografías de Continuidad
-- [RF-013: Comparación Visual Lado a Lado](RF-013_comparacion_visual_lado_a_lado.md) — Alta — Módulo: Gestión de Fotografías de Continuidad
-- [RF-014: Gestión de Estados de Continuidad](RF-014_gestion_de_estados_de_continuidad.md) — Alta — Módulo: Gestión de Fotografías de Continuidad
-- [RF-015: Marca de Agua Dinámica No Removible](RF-015_marca_de_agua_dinamica_no_removible.md) — Crítica — Módulo: Gestión de Fotografías de Continuidad
-- [RF-016: Eliminación Lógica de Fotografías (Papelera)](RF-016_eliminacion_logica_de_fotografias_papelera.md) — Media — Módulo: Gestión de Fotografías de Continuidad
-- [RF-017: Creación de Proyectos](RF-017_creacion_de_proyectos.md) — Crítica — Módulo: Gestión de Calendario y Planeación
-- [RF-018: Creación de Eventos en Calendario de Rodaje](RF-018_creacion_de_eventos_en_calendario_de_rodaje.md) — Crítica — Módulo: Gestión de Calendario y Planeación
-- [RF-019: Modificación de Eventos de Calendario](RF-019_modificacion_de_eventos_de_calendario.md) — Crítica — Módulo: Gestión de Calendario y Planeación
-- [RF-020: Gestión de Desgloses de Escenas](RF-020_gestion_de_desgloses_de_escenas.md) — Alta — Módulo: Gestión de Calendario y Planeación
-- [RF-021: Notas Personales Privadas en Calendario](RF-021_notas_personales_privadas_en_calendario.md) — Baja — Módulo: Gestión de Calendario y Planeación
-- [RF-022: Notificaciones Push Instantáneas de Cambios de Calendario](RF-022_notificaciones_push_instantaneas_de_cambios_de_calendario.md) — Crítica — Módulo: Gestión de Calendario y Planeación
-- [RF-023: Comunicación Interna por Canales Segmentados](RF-023_comunicacion_interna_por_canales_segmentados.md) — Media — Módulo: Gestión de Calendario y Planeación
-- [RF-024: Comunicados Oficiales con Confirmación de Lectura Obligatoria](RF-024_comunicados_oficiales_con_confirmacion_de_lectura_obligatori.md) — Media — Módulo: Gestión de Calendario y Planeación
-- [RF-025: Directorio de Equipo (Crew List)](RF-025_directorio_de_equipo_crew_list.md) — Baja — Módulo: Gestión de Calendario y Planeación
-- [RF-026: Subida y Control de Versiones de Guion](RF-026_subida_y_control_de_versiones_de_guion.md) — Alta — Módulo: Gestión de Guiones
-- [RF-027: Visualización de Guion con Marca de Agua y Protección Avanzada](RF-027_visualizacion_de_guion_con_marca_de_agua_y_proteccion_avanza.md) — Crítica — Módulo: Gestión de Guiones
-- [RF-028: Anotaciones Colaborativas en Guion](RF-028_anotaciones_colaborativas_en_guion.md) — Alta — Módulo: Gestión de Guiones
-- [RF-029: Comparación de Versiones de Guion (Diff)](RF-029_comparacion_de_versiones_de_guion_diff.md) — Media — Módulo: Gestión de Guiones
-- [RF-030: Vinculación Automática Guion-Continuidad](RF-030_vinculacion_automatica_guion_continuidad.md) — Media — Módulo: Gestión de Guiones
-- [RF-031: Desglose Editable de Guion](RF-031_desglose_editable_de_guion.md) — Media — Módulo: Gestión de Guiones
-- [RF-032: Reporte de Preparación para Rodaje](RF-032_reporte_de_preparacion_para_rodaje.md) — Alta — Módulo: Reportes y Analítica
-- [RF-033: Informe de Continuidad por Escena](RF-033_informe_de_continuidad_por_escena.md) — Media — Módulo: Reportes y Analítica
-- [RF-034: Parte de Rodaje Diario Semi-Automático](RF-034_parte_de_rodaje_diario_semi_automatico.md) — Media — Módulo: Reportes y Analítica
-- [RF-035: Listado de Vestuario por Personaje](RF-035_listado_de_vestuario_por_personaje.md) — Media — Módulo: Reportes y Analítica
-- [RF-036: Checklist de Escenas Grabadas vs Pendientes](RF-036_checklist_de_escenas_grabadas_vs_pendientes.md) — Media — Módulo: Reportes y Analítica
-- [RF-037: Reporte de Auditoría de Accesos](RF-037_reporte_de_auditoria_de_accesos.md) — Alta — Módulo: Reportes y Analítica
-- [RF-038: Inventario de Recursos/Materiales](RF-038_inventario_de_recursos_materiales.md) — Baja — Módulo: Funcionalidades Adicionales
+- [RF-010: Accesos Personalizados por Módulo](RF-010_accesos_personalizados_por_modulo.md) — Media — Módulo: Autenticación y Gestión de Usuarios
+- [RF-011: Carga de Fotografías](RF-011_carga_de_fotografias.md) — Crítica — Módulo: Gestión de Fotografías de Continuidad
+- [RF-012: Búsqueda y Filtrado de Fotografías](RF-012_busqueda_y_filtrado_de_fotografias.md) — Crítica — Módulo: Gestión de Fotografías de Continuidad
+- [RF-013: Estados de Continuidad de la Escena](RF-013_estados_de_continuidad_de_la_escena.md) — Alta — Módulo: Gestión de Fotografías de Continuidad
+- [RF-014: Marca de Agua en Descargas](RF-014_marca_de_agua_en_descargas.md) — Crítica — Módulo: Gestión de Fotografías de Continuidad
+- [RF-015: Eliminación Lógica de Fotografías (Papelera)](RF-015_eliminacion_logica_de_fotografias_papelera.md) — Media — Módulo: Gestión de Fotografías de Continuidad
+- [RF-016: Creación de Proyectos](RF-016_creacion_de_proyectos.md) — Crítica — Módulo: Gestión de Calendario y Planeación
+- [RF-017: Creación de Días de Rodaje en el Plan de Rodaje](RF-017_creacion_de_dias_de_rodaje_en_el_plan_de_rodaje.md) — Crítica — Módulo: Gestión de Calendario y Planeación
+- [RF-018: Modificación del Plan de Rodaje](RF-018_modificacion_del_plan_de_rodaje.md) — Crítica — Módulo: Gestión de Calendario y Planeación
+- [RF-019: Gestión de Desgloses de Escenas](RF-019_gestion_de_desgloses_de_escenas.md) — Alta — Módulo: Gestión de Calendario y Planeación
+- [RF-020: Notificaciones del Proyecto](RF-020_notificaciones_del_proyecto.md) — Alta — Módulo: Gestión de Calendario y Planeación
+- [RF-021: Directorio de Equipo (Crew List)](RF-021_directorio_de_equipo_crew_list.md) — Baja — Módulo: Gestión de Calendario y Planeación
+- [RF-022: Gestión de Actores y Personajes](RF-022_gestion_de_actores_y_personajes.md) — Alta — Módulo: Gestión de Calendario y Planeación
+- [RF-023: Subida y Control de Versiones de Guion](RF-023_subida_y_control_de_versiones_de_guion.md) — Alta — Módulo: Gestión de Guiones
+- [RF-024: Visualización de Guion y Descarga Protegida](RF-024_visualizacion_de_guion_y_descarga_protegida.md) — Crítica — Módulo: Gestión de Guiones
+- [RF-025: Comentarios por Escena](RF-025_comentarios_por_escena.md) — Alta — Módulo: Gestión de Guiones
+- [RF-026: Segmentación del Guion en Escenas](RF-026_segmentacion_del_guion_en_escenas.md) — Media — Módulo: Gestión de Guiones
+- [RF-027: Desglose Editable de Guion](RF-027_desglose_editable_de_guion.md) — Media — Módulo: Gestión de Guiones
+- [RF-028: Reportes en PDF de Desglose y Plan de Rodaje](RF-028_reportes_en_pdf_de_desglose_y_plan_de_rodaje.md) — Media — Módulo: Reportes y Analítica
+- [RF-029: Checklist de Escenas Grabadas vs Pendientes](RF-029_checklist_de_escenas_grabadas_vs_pendientes.md) — Media — Módulo: Reportes y Analítica
+- [RF-030: Reporte de Auditoría de Accesos](RF-030_reporte_de_auditoria_de_accesos.md) — Alta — Módulo: Reportes y Analítica
+- [RF-031: Carga Masiva de Datos (CSV/JSON)](RF-031_carga_masiva_de_datos_csv_json.md) — Baja — Módulo: Funcionalidades Adicionales
+- [RF-032: Página de Presentación y Formulario de Contacto](RF-032_pagina_de_presentacion_y_formulario_de_contacto.md) — Baja — Módulo: Funcionalidades Adicionales
+- [RF-033: Inventario de Recursos/Materiales](RF-033_inventario_de_recursos_materiales.md) — Baja — Módulo: Funcionalidades Adicionales

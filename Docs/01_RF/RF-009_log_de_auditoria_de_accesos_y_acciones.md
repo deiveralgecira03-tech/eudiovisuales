@@ -9,57 +9,51 @@
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Alta |
 | Estado | Pendiente |
-| RNF asociados | RNF-016 |
+| RNF asociados | RNF-015 |
 
 ---
 
-**Descripción**: El sistema debe registrar automáticamente en una tabla LOG todos los eventos de seguridad y acciones críticas realizadas por usuarios para garantizar trazabilidad completa.
+**Descripción**: El sistema debe registrar en un log de auditoría las acciones sensibles realizadas en un conjunto acotado de módulos (no en toda la aplicación), de modo que el Administrador y el Director puedan investigar accesos sospechosos o una posible filtración de material confidencial.
 
+**Módulos y acciones auditadas**:
 
-**Entradas (capturadas automáticamente por el sistema)**:
+- Autenticación: inicios de sesión exitosos y fallidos, cierres de sesión, recuperación de contraseña
+- Usuarios y roles: invitación, cambio de rol, suspensión/reactivación, cambios de acceso por módulo
+- Guiones: subida de un guion, visualización y descarga del PDF
+- Fotografías: subida, descarga, envío a la papelera, restauración y eliminación definitiva
 
-- Usuario que ejecuta acción (ID y email)
-- Tipo de acción (Login exitoso/fallido, Visualización de fotografía, Visualización de guion, Modificación de calendario, Exportación de reporte, Cambio de permisos, Revocación de acceso)
-- Timestamp (fecha y hora exacta con zona horaria)
-- IP de origen
-- Dispositivo (tipo, modelo, sistema operativo, navegador)
-- Resultado (Éxito/Fallo)
-- Detalles adicionales (ej: qué fotografía visualizó, qué evento del calendario modificó)
+Fuera del alcance de la auditoría: escenas, desglose, plan de rodaje, personajes/actores, crew list y notificaciones.
+
+**Entradas** (capturadas automáticamente):
+
+- Fecha y hora de la acción
+- Usuario que la realiza
+- Acción y módulo
+- Elemento afectado (guion, foto, usuario)
+- Dirección IP y dispositivo
+- Resultado (exitoso / fallido)
 
 **Proceso**:
 
-- Cada acción crítica del sistema ejecuta trigger que registra evento en tabla LOG
-- Sistema captura automáticamente contexto de la acción (usuario, IP, dispositivo)
-- Registro se almacena en tabla LOG de base de datos
-- Sistema NO permite edición ni eliminación de registros de log (solo inserción)
-- Logs se retienen 90 días en sistema activo (acceso inmediato)
-- Logs mayores a 90 días se archivan automáticamente (acceso mediante solicitud)
-- Logs mayores a 15 meses se purgan automáticamente
+- Cada acción auditada genera un registro en el servidor, sin intervención del usuario.
+- Los registros no se pueden editar ni eliminar desde la aplicación.
+- La consulta del log queda limitada a Administrador y Director (ver RF-030).
 
 **Salidas**:
-- Registro insertado en tabla LOG con todos los campos
-- Registro inmutable (no puede editarse ni eliminarse)
 
-**Precondiciones**: Usuario debe ejecutar alguna acción en el sistema
+- Registros de auditoría consultables por proyecto
+
+**Precondiciones**:
+
+- Usuario autenticado (excepto en intentos fallidos de inicio de sesión)
 
 **Postcondiciones**:
 
-- Evento queda registrado permanentemente en log
+- Trazabilidad de quién accedió o descargó material sensible
 
-**Actores**:
+**Actores**: Sistema (registro automático), Administrador y Director (consulta)
 
-- Sistema (registro automático)
-- Todos los usuarios del sistema (generan eventos)
+**Dependencias**:
 
-**Dependencias**: Base de datos PostgreSQL con tabla LOG configurada
-
-Eventos Registrados:
-
-- Intentos de login (exitosos y fallidos)
-- Visualización de fotografías de continuidad
-- Visualización de guiones
-- Subida de fotografías
-- Exportación de reportes
-- Cambios de roles/permisos
-- Revocación de accesos
-- Cambios de contraseña
+- RF-003 (Inicio de sesión)
+- RF-005 (Roles y permisos)

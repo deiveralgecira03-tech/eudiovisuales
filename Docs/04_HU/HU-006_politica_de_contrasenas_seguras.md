@@ -7,7 +7,7 @@
 | ID | HU-006 |
 | Título | Política de Contraseñas Seguras |
 | Prioridad | Alta |
-| Estado | Completada |
+| Estado | Completado |
 | RF asociado | RF-006 |
 
 ---

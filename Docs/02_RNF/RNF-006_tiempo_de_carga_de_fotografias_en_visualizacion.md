@@ -9,7 +9,7 @@
 | Categoría | Rendimiento |
 | Prioridad | Crítica |
 | Estado | Pendiente |
-| RF asociados | RF-010, RF-013 |
+| RF asociados | RF-011 |
 
 ---
 
@@ -23,8 +23,7 @@
 
 
 **Aplica a**:
-- RF-010 (Visualización de fotografías)
-- RF-013 (Comparación lado a lado)
+- RF-011 (Visualización de fotografías)
 
 **Estándar/Norma**: ISO/IEC 25010 - Eficiencia de desempeño
 

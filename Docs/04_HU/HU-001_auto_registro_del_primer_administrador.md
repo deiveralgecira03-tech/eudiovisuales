@@ -7,7 +7,7 @@
 | ID | HU-001 |
 | Título | Auto-registro del primer administrador |
 | Prioridad | Crítica |
-| Estado | completado |
+| Estado | Completado |
 | RF asociado | RF-001 |
 
 ---

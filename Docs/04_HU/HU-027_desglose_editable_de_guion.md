@@ -4,11 +4,11 @@
 
 | Campo | Valor |
 |---|---|
-| ID | HU-031 |
+| ID | HU-027 |
 | Título | Desglose Editable de Guion |
 | Prioridad | Media |
 | Estado | Completado |
-| RF asociado | RF-031 |
+| RF asociado | RF-027 |
 
 ---
 
@@ -23,5 +23,5 @@
 - El sistema detecta y sugiere locaciones (encabezados "INT."/"EXT.") y menciones de vehículos o efectos especiales mediante palabras clave, sin usar inteligencia artificial.
 - Personajes, vestuario y utilería se capturan siempre de forma manual, ya que el texto libre del guion es demasiado ambiguo para sugerirlos de forma confiable con reglas simples.
 - El usuario puede confirmar, editar o descartar cualquier sugerencia, y añadir los elementos que falten manualmente.
-- El desglose confirmado se vincula automáticamente con la gestión de desgloses de escena (RF-020).
+- El desglose confirmado se vincula automáticamente con la gestión de desgloses de escena (RF-019).
 - El desglose se puede exportar en PDF o Excel.

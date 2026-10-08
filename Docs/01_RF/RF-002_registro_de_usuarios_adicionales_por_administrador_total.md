@@ -9,7 +9,7 @@
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Crítica |
 | Estado | Pendiente |
-| RNF asociados | — |
+| RNF asociados | RNF-005 |
 
 ---
 

@@ -7,7 +7,7 @@
 | ID | HU-003 |
 | Título | Inicio de Sesión con Autenticación de Dos Factores |
 | Prioridad | Crítica |
-| Estado | Completada |
+| Estado | Completado |
 | RF asociado | RF-003 |
 
 ---

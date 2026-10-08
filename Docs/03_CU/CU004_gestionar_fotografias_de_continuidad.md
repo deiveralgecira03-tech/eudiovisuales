@@ -7,7 +7,7 @@
 | ID | CU004 |
 | Título | Gestionar Fotografías de Continuidad |
 | Módulo | Módulo 2: Continuidad Visual |
-| Actor primario | onset y usuario |
+| Actor primario | Administrador, Director, Jefe de Departamento, Onset |
 | Frecuencia | Alta |
 | Estado | Pendiente |
 
@@ -15,86 +15,44 @@
 
 #### Actores
 
-- **Primario:** onset y usuario
-- **Secundario:** Sistema de storage, Sistema de marca de agua, Sistema de notificaciones, Sistema de LOG
+- **Primario:** Administrador, Director, Jefe de Departamento, Onset
+- **Secundario:** Sistema de almacenamiento de imágenes
 
 #### Descripción
 
-Permite al Script, Jefes de Departamento y Asistentes Onset subir fotografías de continuidad desde dispositivos móviles o tablets. Al subir, el sistema solicita completar campos obligatorios: Proyecto, Episodio, Escena, Toma, Personaje(s), Detalle (vestuario/maquillaje/utilería/set), Estado de Continuidad (OK/Pendiente/Error), y Comentarios adicionales. El sistema genera automáticamente la nomenclatura estandarizada: `PROYECTO_EPISODIO_ESCENA_TOMA_PERSONAJE_DETALLE_VERSION` y aplica marca de agua no removible con usuario y timestamp. Las fotografías se pueden modificar (actualizar metadatos, añadir comentarios) o marcar como "Versión anterior" cuando se sube una nueva versión del mismo detalle. Solo el Script puede eliminar fotografías (quedan en papelera por 30 días).
+Permite subir fotografías de continuidad a una escena (con la cámara o desde archivos), editar sus datos, enviarlas a la papelera y, a quienes tienen permiso, restaurarlas o eliminarlas definitivamente.
 
 #### Precondiciones
 
-- Usuario autenticado con rol autorizado (Script/Jefe Depto/Asistente Onset)
-- Proyecto activo seleccionado
-- Personajes registrados en tabla PERSONAJES
-- Espacio storage ≥50 MB, almacenamiento local ≥100 MB (offline)
-- No excedió límite 100 fotos/día
+- Usuario autenticado con permiso de subir fotografías
+- La escena existe
 
 #### Postcondiciones
 
-**Subida online:**
-- Foto en storage con nomenclatura
-- Versión auto-incrementada (V1→V2)
-- Metadatos en BD
-- Marca de agua aplicada
-- Archivo original cifrado (AES-256)
-- Hash SHA-256 calculado
-- Visible en búsquedas
-- Registro en LOG
-- Si Estado="Error": Notificación urgente a Jefe Depto según tipo detalle, marcada "Bloqueante" en reportes
-
-**Subida offline:**
-- Foto en almacenamiento local (SQLite)
-- Marcada "Pendiente sincronización"
-- Sincroniza automáticamente al reconectar
-
-**Modificación:**
-- Campos actualizados
-- Timestamp modificado
-- Registro en LOG
-
-**Eliminación:**
-- Estado "Eliminada"
-- Movida a papelera (30 días)
-- Excluida de búsquedas
-- Registro en LOG
+- Foto almacenada con sus datos y visible en la galería
+- Fotos eliminadas quedan en la papelera hasta su restauración o eliminación definitiva
 
 #### Flujo Principal (Subir)
 
-1. Usuario abre módulo "Continuidad Visual"
-2. Usuario hace clic "Subir Fotografía"
-3. Sistema muestra opciones: "Tomar Foto" o "Seleccionar de Galería"
-4. Usuario selecciona opción y captura/selecciona foto
-5. Sistema muestra preview y formulario de metadatos
-6. Usuario completa campos obligatorios: Proyecto, Episodio, Escena, Toma, Personaje(s), Tipo Detalle, Estado, Comentarios
-7. Usuario hace clic "Guardar"
-8. Sistema valida campos completos y formato/tamaño archivo
-9. Sistema genera nomenclatura: `PROYECTO_EPISODIO_ESCENA_TOMA_PERSONAJE_DETALLE_VERSION`
-10. Sistema verifica duplicados y asigna/incrementa versión (V1, V2...)
-11. Sistema aplica marca de agua (usuario + timestamp + proyecto)
-12. Sistema sube foto a storage cifrado
-13. Sistema guarda metadatos en BD
-14. Sistema registra acción en LOG
-15. Si Estado="Error": sistema notifica a Jefe de Departamento
-16. Sistema muestra mensaje "Fotografía subida exitosamente"
+1. Usuario abre la escena o la Galería
+2. Usuario toma una foto o selecciona un archivo
+3. Usuario indica tipo de foto (Locación, Propuesta, Prueba, En Rodaje), personaje, descripción y notas
+4. Sistema valida el archivo y lo guarda en el almacenamiento
+5. Sistema muestra la foto en la galería
 
 #### Flujos Alternativos
 
-**FA-001: Subida Masiva de Fotografías** : Usuario selecciona múltiples fotos (hasta 50) → Sistema procesa en lote → Aplica nomenclatura secuencial → Muestra progreso → Notifica completado
+**FA-001: Enviar a la papelera** : Usuario con permiso (Director, Jefe de Departamento y Onset; el Administrador no) elimina la foto → Sistema la mueve a la papelera
 
-**FA-002: Modo Offline - Sincronización Posterior** : Usuario sin conexión → Fotos almacenadas SQLite local → Al reconectar, sistema detecta pendientes → Sincroniza automáticamente → Notifica éxito/errores
+**FA-002: Restaurar o eliminar definitivamente** : Director o Jefe de Departamento abren la Papelera → Restauran la foto o la eliminan para siempre (el Administrador solo puede verla)
 
-**FA-003: Actualizar Metadatos sin Subir Nueva Versión** : Usuario selecciona foto → "Editar Metadatos" → Modifica campos → Sistema actualiza BD sin crear nueva versión → Registra LOG
+**FA-003: Editar datos** : Usuario con permiso modifica descripción, notas, personaje o tipo
 
 #### Flujos Excepcionales
 
-**FE-001: Fotografía Marcada "Bloqueante"** : Jefe Depto marca estado "Error" → Sistema genera notificación urgente a Script y AD → Foto destacada en rojo en galería → Requiere resolución antes de continuar escena
+**FE-001: Archivo no válido o demasiado grande** : Sistema rechaza el archivo
 
-**FE-002: Límite 100 Fotos/Día Excedido** : Sistema detecta límite → Bloquea subida → Muestra "Límite diario alcanzado. Contacta Admin para ampliar cuota"
-
-**FE-003: Storage Sin Espacio** : Sistema detecta storage <50MB → Bloquea subida → Alerta Admins → Muestra "Espacio insuficiente, contacta soporte técnico"
-
-**FE-004: Fallo Aplicación Marca de Agua** : Sistema no puede aplicar marca → Rechaza subida → Registra error crítico → Alerta técnicos → No guarda foto sin marca
+**FE-002: Sin permiso** : Sistema muestra acceso denegado
 
 #### Frecuencia
 

@@ -4,11 +4,11 @@
 
 | Campo | Valor |
 |---|---|
-| ID | HU-020 |
+| ID | HU-019 |
 | Título | Gestión de Desgloses de Escenas |
 | Prioridad | Alta |
 | Estado | Completado |
-| RF asociado | RF-020 |
+| RF asociado | RF-019 |
 
 ---
 
@@ -21,6 +21,6 @@
 ## Criterios de Aceptación
 
 - El sistema no permite números de escena duplicados dentro del mismo proyecto.
-- Si la escena ya tiene un evento de calendario asociado, el desglose se vincula automáticamente a ese evento.
+- Si la escena ya está asignada a un día del Plan de Rodaje, el desglose se muestra junto a ella en el plan.
 - El desglose se vincula automáticamente con las fotografías de continuidad de la misma escena.
 - Solo Primera AD y Script pueden editar el desglose después de creado.

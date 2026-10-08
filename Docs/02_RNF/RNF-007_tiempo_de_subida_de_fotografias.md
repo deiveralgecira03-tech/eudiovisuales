@@ -9,7 +9,7 @@
 | Categoría | Rendimiento |
 | Prioridad | Crítica |
 | Estado | Pendiente |
-| RF asociados | RF-010 |
+| RF asociados | RF-011 |
 
 ---
 
@@ -20,10 +20,10 @@
 - Tiempo de subida < 5 segundos por fotografía (percentil 95)
 - Con fotografías de hasta 10 MB
 - Con conexión upload de 5 Mbps
-- Incluye: subida + validación + generación nomenclatura + almacenamiento + confirmación
+- Incluye: subida + validación + almacenamiento + confirmación
 
 
-**Aplica a**: RF-010 (Carga de fotografías con metadatos)
+**Aplica a**: RF-011 (Carga de fotografías con metadatos)
 
 **Estándar/Norma**: ISO/IEC 25010 - Eficiencia de desempeño
 
