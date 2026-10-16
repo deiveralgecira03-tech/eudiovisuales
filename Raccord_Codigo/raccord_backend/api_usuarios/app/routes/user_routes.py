@@ -216,4 +216,4 @@ def patch_user_estado(
     current_user: dict = Depends(require_permission("manage_team_status")),
     _scope: dict = Depends(require_same_client_user()),
 ):
-    return set_user_estado(id, data.estado, current_user, db)
+    return set_user_estado(id, data.estado, current_user, db, data.id_project)
