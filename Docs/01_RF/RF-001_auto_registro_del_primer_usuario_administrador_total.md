@@ -8,7 +8,7 @@
 | Título | Auto-registro del Primer Usuario (Administrador Total) |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | RNF-001, RNF-005 |
 
 ---

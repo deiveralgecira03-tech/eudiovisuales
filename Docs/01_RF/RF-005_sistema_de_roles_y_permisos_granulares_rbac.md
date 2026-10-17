@@ -8,7 +8,7 @@
 | Título | Sistema de Roles y Permisos Granulares (RBAC) |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | RNF-001 |
 
 ---

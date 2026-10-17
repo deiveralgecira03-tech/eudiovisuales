@@ -8,7 +8,7 @@
 | Título | Creación de Proyectos |
 | Módulo | Gestión de Calendario y Planeación |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---
@@ -20,8 +20,6 @@
 
 - Nombre del proyecto (texto, máx 100 caracteres)
 - Tipo de producción (Película/Serie/Cortometraje/Comercial/Documental/Video Institucional)
-- Fecha de inicio estimada (fecha)
-- Fecha de finalización estimada (fecha)
 - Descripción breve (texto, máx 500 caracteres, opcional)
 
 **Proceso**:

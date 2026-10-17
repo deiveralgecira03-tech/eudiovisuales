@@ -33,3 +33,4 @@
 - [RF-031: Carga Masiva de Datos (CSV/JSON)](RF-031_carga_masiva_de_datos_csv_json.md) — Baja — Módulo: Funcionalidades Adicionales
 - [RF-032: Página de Presentación y Formulario de Contacto](RF-032_pagina_de_presentacion_y_formulario_de_contacto.md) — Baja — Módulo: Funcionalidades Adicionales
 - [RF-033: Inventario de Recursos/Materiales](RF-033_inventario_de_recursos_materiales.md) — Baja — Módulo: Funcionalidades Adicionales
+- [RF-034: Modo Sincrónico: Captura sin Conexión y Sincronización en Celular y Tablet](RF-034_modo_sincronico_captura_offline_en_movil_y_tablet.md) — Alta — Módulo: Gestión de Fotografías de Continuidad

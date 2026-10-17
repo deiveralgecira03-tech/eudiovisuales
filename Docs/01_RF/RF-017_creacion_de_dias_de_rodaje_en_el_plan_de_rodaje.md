@@ -8,7 +8,7 @@
 | Título | Creación de Días de Rodaje en el Plan de Rodaje |
 | Módulo | Gestión de Calendario y Planeación |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | RNF-010, RNF-019 |
 
 ---

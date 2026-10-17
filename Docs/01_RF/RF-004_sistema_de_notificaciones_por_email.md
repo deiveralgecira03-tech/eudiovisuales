@@ -8,7 +8,7 @@
 | Título | Sistema de Notificaciones por Email |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | RNF-003, RNF-018 |
 
 ---

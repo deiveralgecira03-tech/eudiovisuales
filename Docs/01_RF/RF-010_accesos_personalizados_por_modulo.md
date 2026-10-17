@@ -8,7 +8,7 @@
 | Título | Accesos Personalizados por Módulo |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---

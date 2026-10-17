@@ -8,7 +8,7 @@
 | Título | Directorio de Equipo (Crew List) |
 | Módulo | Gestión de Calendario y Planeación |
 | Prioridad | Baja |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---

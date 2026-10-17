@@ -8,7 +8,7 @@
 | Título | Desglose Editable de Guion |
 | Módulo | Gestión de Guiones |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---

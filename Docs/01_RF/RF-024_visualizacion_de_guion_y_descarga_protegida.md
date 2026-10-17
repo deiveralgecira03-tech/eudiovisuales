@@ -8,7 +8,7 @@
 | Título | Visualización de Guion y Descarga Protegida |
 | Módulo | Gestión de Guiones |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | RNF-017 |
 
 ---

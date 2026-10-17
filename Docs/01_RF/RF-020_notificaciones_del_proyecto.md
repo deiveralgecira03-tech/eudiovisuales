@@ -8,7 +8,7 @@
 | Título | Notificaciones del Proyecto |
 | Módulo | Gestión de Calendario y Planeación |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | RNF-011, RNF-012, RNF-019 |
 
 ---

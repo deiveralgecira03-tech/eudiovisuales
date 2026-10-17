@@ -8,7 +8,7 @@
 | Título | Comentarios por Escena |
 | Módulo | Gestión de Guiones |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---

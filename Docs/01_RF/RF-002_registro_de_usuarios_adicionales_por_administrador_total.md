@@ -8,7 +8,7 @@
 | Título | Registro de Usuarios Adicionales por Administrador Total |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | completado |
 | RNF asociados | RNF-005 |
 
 ---

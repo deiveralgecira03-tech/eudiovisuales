@@ -8,7 +8,7 @@
 | Título | Gestión de Desgloses de Escenas |
 | Módulo | Gestión de Calendario y Planeación |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---

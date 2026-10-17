@@ -8,7 +8,7 @@
 | Título | Log de Auditoría de Accesos y Acciones |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | En Proceso |
 | RNF asociados | RNF-015 |
 
 ---

@@ -8,7 +8,7 @@
 | Título | Estados de Continuidad de la Escena |
 | Módulo | Gestión de Fotografías de Continuidad |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---

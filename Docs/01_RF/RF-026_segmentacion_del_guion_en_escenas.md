@@ -8,7 +8,7 @@
 | Título | Segmentación del Guion en Escenas |
 | Módulo | Gestión de Guiones |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | completado |
 | RNF asociados | — |
 
 ---

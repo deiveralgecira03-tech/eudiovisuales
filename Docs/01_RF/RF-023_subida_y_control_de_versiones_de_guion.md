@@ -8,7 +8,7 @@
 | Título | Subida y Control de Versiones de Guion |
 | Módulo | Gestión de Guiones |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---

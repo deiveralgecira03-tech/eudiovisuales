@@ -8,7 +8,7 @@
 | Título | Eliminación Lógica de Fotografías (Papelera) |
 | Módulo | Gestión de Fotografías de Continuidad |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | En Proceso |
 | RNF asociados | — |
 
 ---

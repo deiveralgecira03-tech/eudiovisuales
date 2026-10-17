@@ -8,7 +8,7 @@
 | Título | Gestión de Perfil de Usuario |
 | Módulo | Autenticación y Gestión de Usuarios |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---

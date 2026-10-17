@@ -8,7 +8,7 @@
 | Título | Marca de Agua en Descargas |
 | Módulo | Gestión de Fotografías de Continuidad |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | RNF-017 |
 
 ---

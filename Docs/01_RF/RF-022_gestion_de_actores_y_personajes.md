@@ -8,7 +8,7 @@
 | Título | Gestión de Actores y Personajes |
 | Módulo | Gestión de Calendario y Planeación |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RNF asociados | — |
 
 ---
