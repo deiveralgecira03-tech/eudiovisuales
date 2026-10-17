@@ -8,7 +8,7 @@
 | Título | Tiempo de Subida de Fotografías |
 | Categoría | Rendimiento |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-011 |
 
 ---

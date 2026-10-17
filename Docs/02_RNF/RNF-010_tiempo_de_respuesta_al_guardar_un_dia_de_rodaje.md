@@ -8,7 +8,7 @@
 | Título | Tiempo de Respuesta al Guardar un Día de Rodaje |
 | Categoría | Rendimiento |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-017, RF-018 |
 
 ---

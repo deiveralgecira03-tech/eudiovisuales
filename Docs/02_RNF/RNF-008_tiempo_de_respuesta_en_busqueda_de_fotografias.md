@@ -8,7 +8,7 @@
 | Título | Tiempo de Respuesta en Búsqueda de Fotografías |
 | Categoría | Rendimiento |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | En proceso |
 | RF asociados | RF-012 |
 
 ---

@@ -8,7 +8,7 @@
 | Título | Tiempo de Respuesta del Login |
 | Categoría | Rendimiento |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-003 |
 
 ---

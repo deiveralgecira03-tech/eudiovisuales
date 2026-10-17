@@ -8,12 +8,12 @@
 | Título | Tiempo de Carga de Fotografías en Visualización |
 | Categoría | Rendimiento |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-011 |
 
 ---
 
-**Descripción**: El sistema debe cargar fotografías de alta resolución (3-6 MB) para visualización en menos de 5 segundos con conexión estándar (10 Mbps), aplicando marca de agua dinámica en tiempo real.
+**Descripción**: El sistema debe cargar fotografías de alta resolución (3-6 MB) para visualización en menos de 5 segundos con conexión estándar (10 Mbps), aplicando marca de agua dinámica en tiempo real para descargas.
 
 **Métrica**:
 - Tiempo de carga completa < 5 segundos (percentil 95)

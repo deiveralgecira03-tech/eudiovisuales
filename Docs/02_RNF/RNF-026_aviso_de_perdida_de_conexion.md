@@ -8,7 +8,7 @@
 | Título | Aviso de Pérdida de Conexión |
 | Categoría | Confiabilidad / Usabilidad |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-011 |
 
 ---

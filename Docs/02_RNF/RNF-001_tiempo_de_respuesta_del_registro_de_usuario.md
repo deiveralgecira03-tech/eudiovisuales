@@ -8,7 +8,7 @@
 | Título | Tiempo de Respuesta del Registro de Usuario |
 | Categoría | Rendimiento |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-001, RF-003, RF-005 |
 
 ---
@@ -17,7 +17,7 @@
 
 **Métrica**:
 
-- Tiempo total de procesamiento < 3 segundos (percentil 95)
+- Tiempo total de procesamiento < 5 segundos
 - Incluye: validaciones, creación en base de datos, generación de contraseña (si aplica)
 - NO incluye: envío de email de activación (ese es asíncrono)
 

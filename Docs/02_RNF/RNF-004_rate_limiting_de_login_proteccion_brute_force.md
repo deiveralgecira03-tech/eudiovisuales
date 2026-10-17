@@ -8,7 +8,7 @@
 | Título | Rate Limiting de Login (Protección Brute Force) |
 | Categoría | Seguridad |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | En Proceso |
 | RF asociados | RF-003 |
 
 ---

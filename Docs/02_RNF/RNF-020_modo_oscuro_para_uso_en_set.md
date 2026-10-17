@@ -8,7 +8,7 @@
 | Título | Modo Oscuro para Uso en Set |
 | Categoría | Usabilidad / Accesibilidad |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | General / Transversal |
 
 ---

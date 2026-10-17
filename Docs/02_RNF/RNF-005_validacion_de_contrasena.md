@@ -8,7 +8,7 @@
 | Título | Validación de Contraseña |
 | Categoría | Seguridad / Usabilidad |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-001, RF-002, RF-006, RF-007 |
 
 ---

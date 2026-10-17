@@ -8,7 +8,7 @@
 | Título | Autenticación de Dos Factores por Correo |
 | Categoría | Seguridad |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-003, RF-004 |
 
 ---

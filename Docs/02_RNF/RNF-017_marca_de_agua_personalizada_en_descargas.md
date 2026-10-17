@@ -8,7 +8,7 @@
 | Título | Marca de Agua Personalizada en Descargas |
 | Categoría | Seguridad / Funcionalidad |
 | Prioridad | Crítica |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-011, RF-014, RF-024 |
 
 ---

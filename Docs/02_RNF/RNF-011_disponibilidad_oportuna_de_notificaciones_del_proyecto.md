@@ -8,7 +8,7 @@
 | Título | Disponibilidad Oportuna de Notificaciones del Proyecto |
 | Categoría | Rendimiento / Funcionalidad |
 | Prioridad | Alta |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | RF-018, RF-020 |
 
 ---

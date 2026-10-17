@@ -8,7 +8,7 @@
 | Título | Idioma del Sistema |
 | Categoría | Usabilidad / Localización |
 | Prioridad | Media |
-| Estado | Pendiente |
+| Estado | Completado |
 | RF asociados | General / Transversal |
 
 ---
